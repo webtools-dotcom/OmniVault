@@ -1,5 +1,6 @@
 pub mod models;
 pub mod schema;
+pub mod storage;
 
 use rusqlite::{Connection, Result};
 use std::path::Path;

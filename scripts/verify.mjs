@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
+import path from "node:path";
 
 console.log("\n=======================================================");
 console.log("   OmniVault Unified Verification Test Harness");
@@ -12,7 +13,8 @@ const steps = [
   },
   {
     name: "Rust Core Compilation & Unit Test Suite (cargo test)",
-    command: "cargo test --lib --manifest-path src-tauri/Cargo.toml",
+    command: "cargo test --lib",
+    cwd: "src-tauri",
   },
   {
     name: "Structural & Design Token Integrity Assertions",
@@ -33,7 +35,18 @@ for (const [index, step] of steps.entries()) {
   const stepStart = performance.now();
 
   try {
-    execSync(step.command, { stdio: "pipe", encoding: "utf-8" });
+    const execCwd = step.cwd ? path.resolve(process.cwd(), step.cwd) : process.cwd();
+    try {
+      execSync(step.command, { cwd: execCwd, stdio: "pipe", encoding: "utf-8" });
+    } catch (initialErr) {
+      // Windows MSVC link.exe transient lock recovery (LNK1104)
+      if (initialErr.stdout?.includes("LNK1104") || initialErr.stderr?.includes("LNK1104")) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+        execSync(step.command, { cwd: execCwd, stdio: "pipe", encoding: "utf-8" });
+      } else {
+        throw initialErr;
+      }
+    }
     const stepDuration = ((performance.now() - stepStart) / 1000).toFixed(2);
     console.log(`✅ PASSED (${stepDuration}s)`);
   } catch (error) {
