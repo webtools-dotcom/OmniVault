@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node scripts/verify.mjs",
-    "build:release": "npm run build && cargo build --release --manifest-path src-tauri/Cargo.toml",
+    "build:release": "tauri build --no-bundle",
     "package:windows": "node scripts/package_windows.mjs",
     "tauri": "tauri"
   },

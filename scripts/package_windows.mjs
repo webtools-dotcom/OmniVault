@@ -38,6 +38,7 @@ console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ 
 // 3. Create release directory & copy standalone binary
 fs.mkdirSync(releaseDistDir, { recursive: true });
 fs.copyFileSync(releaseExePath, targetExePath);
+fs.copyFileSync(releaseExePath, path.resolve(rootDir, "release/omnivault.exe"));
 
 const readmeContent = `OmniVault v0.1.0 - Windows Release (x86_64)
 ==============================================

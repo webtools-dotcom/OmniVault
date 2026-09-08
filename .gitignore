@@ -10,6 +10,8 @@ release/
 # Local database & media (runtime files)
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 media_storage/
 
 # System & IDE files
