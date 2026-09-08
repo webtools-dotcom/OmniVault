@@ -439,6 +439,33 @@ pub fn list_items_by_folder(conn: &Connection, folder_id: &str) -> Result<Vec<Va
     Ok(items)
 }
 
+pub fn get_item_by_id(conn: &Connection, item_id: &str) -> Result<Option<VaultItem>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, folder_id, item_type, title, content, metadata, is_pinned, is_archived, is_deleted, created_at, updated_at
+         FROM vault_items WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query_map([item_id], |row| {
+        Ok(VaultItem {
+            id: row.get(0)?,
+            folder_id: row.get(1)?,
+            item_type: row.get(2)?,
+            title: row.get(3)?,
+            content: row.get(4)?,
+            metadata: row.get(5)?,
+            is_pinned: row.get::<_, i64>(6)? != 0,
+            is_archived: row.get::<_, i64>(7)? != 0,
+            is_deleted: row.get::<_, i64>(8)? != 0,
+            created_at: row.get(9)?,
+            updated_at: row.get(10)?,
+        })
+    })?;
+
+    match rows.next() {
+        Some(item) => Ok(Some(item?)),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

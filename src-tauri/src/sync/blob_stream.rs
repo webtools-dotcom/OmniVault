@@ -1,11 +1,9 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-use crate::db::media::compute_sha256;
 
 const CHUNK_SIZE: usize = 16 * 1024; // 16 KB streaming buffer
 
@@ -246,7 +244,9 @@ pub fn download_blob_over_tcp<P: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::TcpListener;
     use std::thread;
+    use crate::db::media::compute_sha256;
 
     fn setup_test_media_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("omnivault_blob_test_{}_{}", name, uuid::Uuid::new_v4()));
