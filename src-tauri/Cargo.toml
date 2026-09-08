@@ -1,0 +1,24 @@
+[package]
+name = "omnivault"
+version = "0.1.0"
+description = "Private, local-first cross-device sync workspace"
+authors = ["OmniVault Team"]
+edition = "2021"
+
+[lib]
+name = "omnivault_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1.43", features = ["full"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
