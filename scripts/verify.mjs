@@ -22,6 +22,10 @@ const steps = [
     name: "Structural & Design Token Integrity Assertions",
     command: "node test/baseline_test.mjs",
   },
+  {
+    name: "Frontend Production Bundle Smoke Test",
+    command: "node test/preview_check.mjs",
+  },
 ];
 
 let allPassed = true;
