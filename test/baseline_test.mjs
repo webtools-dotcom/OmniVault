@@ -53,7 +53,8 @@ const requiredFiles = [
   "src/utils/qrCode.ts",
   "src/components/pairing/QrConnectModal.tsx",
   "public/manifest.json",
-  "public/sw.js"
+  "public/sw.js",
+  "scripts/package_windows.mjs"
 ];
 
 for (const relPath of requiredFiles) {
@@ -129,7 +130,28 @@ assert.ok(appLayoutContent.includes("touchstart"), "AppLayout missing touch gest
 
 assert.ok(appContent.includes("sharedTitle") || appContent.includes("sharedUrl"), "App.tsx missing mobile share target ingestion handler");
 
-console.log("✅ All baseline structure, triage, HTTP server, QR modal, and PWA mobile assertions passed successfully!");
+// 8. Verify P6-T01 Windows Release Packaging
+const cargoTomlContent = fs.readFileSync(path.resolve(process.cwd(), "src-tauri/Cargo.toml"), "utf-8");
+assert.ok(cargoTomlContent.includes("[profile.release]"), "Cargo.toml missing [profile.release]");
+assert.ok(cargoTomlContent.includes("opt-level = 3"), "Cargo.toml missing opt-level = 3");
+assert.ok(cargoTomlContent.includes("lto = true"), "Cargo.toml missing lto = true");
+assert.ok(cargoTomlContent.includes("strip = true"), "Cargo.toml missing strip = true");
+
+const tauriConfContent = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf-8"));
+assert.ok(tauriConfContent.bundle.icon && tauriConfContent.bundle.icon.length > 0, "tauri.conf.json missing bundle.icon list");
+assert.strictEqual(tauriConfContent.productName, "OmniVault", "tauri.conf.json incorrect productName");
+
+const pkgContent = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf-8"));
+assert.ok(pkgContent.scripts["build:release"], "package.json missing build:release script");
+assert.ok(pkgContent.scripts["package:windows"], "package.json missing package:windows script");
+
+const releaseExe = path.resolve(process.cwd(), "src-tauri/target/release/omnivault.exe");
+if (fs.existsSync(releaseExe)) {
+  const stat = fs.statSync(releaseExe);
+  assert.ok(stat.size < 15 * 1024 * 1024, `Release binary must be < 15MB. Actual: ${(stat.size / (1024 * 1024)).toFixed(2)} MB`);
+}
+
+console.log("✅ All baseline structure, triage, HTTP server, QR modal, PWA, and release packaging assertions passed successfully!");
 
 
 

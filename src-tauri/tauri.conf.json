@@ -27,6 +27,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "copyright": "OmniVault Team",
+    "shortDescription": "Private, local-first cross-device sync workspace",
+    "longDescription": "Private, local-first cross-device personal workspace and knowledge vault with nested folders, instant capture, and asynchronous store-and-forward mesh synchronization over local Wi-Fi."
   }
 }
