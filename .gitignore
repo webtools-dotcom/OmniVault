@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+target/
+
+# Build outputs
+dist/
+build/
+
+# Local database & media (runtime files)
+*.db
+*.db-journal
+media_storage/
+
+# System files
+.DS_Store
+Thumbs.db
