@@ -146,6 +146,12 @@ fn move_item_cmd(
 }
 
 #[tauri::command]
+fn toggle_pin_item_cmd(state: State<AppState>, id: String) -> Result<VaultItem, String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::toggle_pin_item(&mut conn, &id, &state.device_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn delete_item_cmd(state: State<AppState>, id: String) -> Result<(), String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
     storage::delete_item(&mut conn, &id, &state.device_id).map_err(|e| e.to_string())
@@ -182,11 +188,12 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let conn = Connection::open("omnivault.db")
+    let mut conn = Connection::open("omnivault.db")
         .or_else(|_| Connection::open_in_memory())
         .expect("failed to open database");
     schema::initialize_schema(&conn).expect("failed to init schema");
     let device_id = storage::get_or_create_device_id(&conn).expect("failed to get device_id");
+    let _ = storage::seed_defaults_if_empty(&mut conn, &device_id);
 
     let db = Arc::new(Mutex::new(conn));
 
@@ -215,6 +222,7 @@ pub fn run() {
             create_item_cmd,
             update_item_cmd,
             move_item_cmd,
+            toggle_pin_item_cmd,
             delete_item_cmd,
             save_image_media_cmd,
             get_item_media_cmd,

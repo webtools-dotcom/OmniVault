@@ -186,25 +186,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Sync Status Footer */}
-      <div className="h-10 px-3 border-t border-white/[0.06] bg-[#131317] shrink-0 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className={cn(
-              "w-1.5 h-1.5 rounded-full shrink-0",
-              meshState.status === "standby" || meshState.status === "synced"
-                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"
-                : meshState.status === "error"
-                ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.7)]"
-                : "bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.7)]"
-            )}
-          />
-          <div className="truncate">
-            <span className="text-zinc-400 block truncate text-[10px] font-mono leading-tight">
-              {meshState.peerCount > 0
-                ? `${meshState.peerCount} peer${meshState.peerCount > 1 ? "s" : ""} active`
-                : "Mesh: Standby (42420)"}
+      {/* User / Node Profile & Mesh Status (BridgeMind bottom profile dock) */}
+      <div className="h-12 px-3 border-t border-white/[0.06] bg-[#121215] shrink-0 flex items-center justify-between text-xs select-none">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 border border-white/10 flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs">
+            O
+          </div>
+          <div className="truncate min-w-0">
+            <span className="text-zinc-200 text-xs font-semibold block truncate leading-tight">
+              Local Vault
             </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full shrink-0",
+                  meshState.status === "standby" || meshState.status === "synced"
+                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"
+                    : meshState.status === "error"
+                    ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.7)]"
+                    : "bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.7)]"
+                )}
+              />
+              <span className="text-[10px] font-mono text-zinc-500 truncate">
+                {meshState.peerCount > 0 ? `${meshState.peerCount} peers` : "port: 42420"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -212,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onOpenPairing}
-            title="Connect Mobile / QR Pairing"
+            title="Connect Mobile (QR Code)"
             className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <QrCode className="w-3.5 h-3.5" />

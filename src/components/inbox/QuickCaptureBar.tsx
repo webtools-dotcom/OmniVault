@@ -76,7 +76,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-[#141418] border border-white/[0.08] hover:border-white/[0.16] rounded-xl p-2 sm:p-2.5 transition-all shadow-xs mb-4">
+    <div className="bg-[#141419] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 transition-all shadow-xs mb-3">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -86,8 +86,8 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         className="hidden"
       />
 
-      <form onSubmit={handleCapture} className="flex items-center gap-2">
-        <span className="text-blue-400 font-mono text-xs pl-1 shrink-0 font-bold select-none">❯</span>
+      <form onSubmit={handleCapture} className="flex items-center gap-2.5">
+        <span className="text-emerald-400 font-mono text-sm font-bold select-none shrink-0">❯</span>
 
         {/* Format selector pill */}
         <select
@@ -99,7 +99,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               fileInputRef.current?.click();
             }
           }}
-          className="bg-[#1C1C22] text-zinc-300 text-xs font-mono px-2 py-1 rounded-md border border-white/[0.08] focus:outline-none cursor-pointer shrink-0"
+          className="bg-[#1C1C23] text-zinc-300 text-xs font-mono px-2 py-1 rounded-md border border-white/[0.08] focus:outline-none cursor-pointer shrink-0"
         >
           <option value="note">Note</option>
           <option value="ticker">$ Ticker</option>
@@ -150,7 +150,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="px-2.5 py-1 bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-30 text-white rounded-lg text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+          className="h-7 px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
         >
           <span>Capture</span>
           <kbd className="font-mono text-[10px] text-zinc-400">↵</kbd>

@@ -68,18 +68,30 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             </p>
             {!searchQuery && (
               <div className="pt-2 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <span className="text-blue-400 block font-semibold mb-1 font-mono">↵ Quick Capture</span>
-                  <span className="text-zinc-500 font-sans">Type in the prompt above and press Enter to save fleeting notes and tasks.</span>
-                </div>
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <span className="text-emerald-400 block font-semibold mb-1 font-mono">$ Financial Assets</span>
-                  <span className="text-zinc-500 font-sans">Type $NVDA or $BTC for 1-click interactive TradingView chart launchers.</span>
-                </div>
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <span className="text-purple-400 block font-semibold mb-1 font-mono">Ctrl+V Paste Image</span>
-                  <span className="text-zinc-500 font-sans">Paste charts or screenshots anywhere to save as compressed WebP files.</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onCapture("note", "Quick Capture Guide", "- Type in the top prompt to save notes\n- Ctrl+V to paste screenshots\n- Pin cards to keep them at top")}
+                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
+                >
+                  <span className="text-blue-400 group-hover:text-blue-300 block font-semibold mb-1 font-mono">↵ + Starter Note</span>
+                  <span className="text-zinc-500 font-sans">Click to create a quick reference note in your stream.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCapture("ticker", "$NVDA", "NVIDIA Corporation - Breakout watch above 135.")}
+                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
+                >
+                  <span className="text-emerald-400 group-hover:text-emerald-300 block font-semibold mb-1 font-mono">$ + Watch $NVDA</span>
+                  <span className="text-zinc-500 font-sans">Click to create an interactive TradingView chart card.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCapture("link", "TradingView Charts", "https://www.tradingview.com")}
+                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
+                >
+                  <span className="text-purple-400 group-hover:text-purple-300 block font-semibold mb-1 font-mono">🌐 + Web Link</span>
+                  <span className="text-zinc-500 font-sans">Click to create a web link card with 1-click launcher.</span>
+                </button>
               </div>
             )}
           </div>

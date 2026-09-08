@@ -35,6 +35,19 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
   onStreamFilterChange,
   children,
 }) => {
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#0E0E11] overflow-hidden">
       {/* Top Header / Navigation Bar (BridgeMind 44px unified shell) */}
@@ -103,16 +116,17 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
         {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative hidden sm:block w-40 lg:w-56">
+          <div className="relative hidden sm:block w-36 md:w-48 lg:w-56">
             <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search captures..."
-              className="w-full h-7 pl-7.5 pr-6 bg-[#18181D] border border-white/[0.08] rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
+              placeholder="Search..."
+              className="w-full h-7 pl-7.5 pr-8 bg-[#18181D] border border-white/[0.08] rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 onClick={() => onSearchChange("")}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer"
@@ -120,6 +134,10 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               >
                 <X className="w-3 h-3" />
               </button>
+            ) : (
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-600 bg-white/[0.03] px-1 py-0.2 rounded border border-white/[0.05] pointer-events-none">
+                ⌘K
+              </kbd>
             )}
           </div>
 

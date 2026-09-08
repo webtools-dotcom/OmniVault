@@ -418,6 +418,15 @@ export const StorageService = {
   },
 
   async togglePinItem(itemId: string): Promise<VaultItem> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem>("toggle_pin_item_cmd", { id: itemId });
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+
     const items = getLocalItems();
     const item = items.find((i) => i.id === itemId);
     if (!item) throw new Error("Item not found");
