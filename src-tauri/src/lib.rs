@@ -1,3 +1,5 @@
+pub mod db;
+
 #[tauri::command]
 fn get_system_status() -> String {
     "OmniVault Core Ready".into()

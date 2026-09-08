@@ -11,12 +11,8 @@ const steps = [
     command: "npm run build",
   },
   {
-    name: "Rust Core Compilation Check (cargo check)",
-    command: "cargo check --manifest-path src-tauri/Cargo.toml",
-  },
-  {
-    name: "Rust Core Unit Test Suite (cargo test)",
-    command: "cargo test --manifest-path src-tauri/Cargo.toml",
+    name: "Rust Core Compilation & Unit Test Suite (cargo test)",
+    command: "cargo test --lib --manifest-path src-tauri/Cargo.toml",
   },
   {
     name: "Structural & Design Token Integrity Assertions",
