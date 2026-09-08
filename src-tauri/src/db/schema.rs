@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS device_meta (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
 );
+
+-- Paired Devices: Authorized mesh peer instances
+CREATE TABLE IF NOT EXISTS paired_devices (
+    device_id TEXT PRIMARY KEY NOT NULL,
+    device_name TEXT NOT NULL,
+    auth_token TEXT NOT NULL,
+    paired_at INTEGER NOT NULL,
+    last_sync_at INTEGER
+);
 "#;
 
 pub fn initialize_schema(conn: &Connection) -> Result<()> {
