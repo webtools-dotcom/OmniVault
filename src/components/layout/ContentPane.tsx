@@ -2,8 +2,7 @@ import React from "react";
 import { Menu, PanelLeft, Search, X } from "lucide-react";
 import { BreadcrumbItem } from "../../types";
 import { Breadcrumbs } from "./Breadcrumbs";
-import { Button } from "../common/Button";
-import { Badge } from "../common/Badge";
+import { cn } from "../../utils/cn";
 
 export interface ContentPaneProps {
   breadcrumbs: BreadcrumbItem[];
@@ -16,6 +15,8 @@ export interface ContentPaneProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   headerActions?: React.ReactNode;
+  streamFilter?: "stream" | "notes" | "markets";
+  onStreamFilterChange?: (filter: "stream" | "notes" | "markets") => void;
   children: React.ReactNode;
 }
 
@@ -25,99 +26,110 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
   isSidebarOpen,
   onToggleSidebar,
   isMobile,
-  title,
+  title: _title,
   itemCount,
   searchQuery,
   onSearchChange,
   headerActions,
+  streamFilter = "stream",
+  onStreamFilterChange,
   children,
 }) => {
   return (
-    <main className="flex-1 flex flex-col min-w-0 bg-vault-bg overflow-hidden">
-      {/* Top Header / Navigation Bar */}
-      <header className="h-14 px-4 sm:px-6 lg:px-8 border-b border-vault-border flex items-center justify-between gap-3 shrink-0 backdrop-blur-md bg-vault-bg/85 z-10">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Mobile/Tablet Menu or Desktop Restore Toggle */}
+    <main className="flex-1 flex flex-col min-w-0 bg-[#0E0E11] overflow-hidden">
+      {/* Top Header / Navigation Bar (BridgeMind 44px unified shell) */}
+      <header className="h-11 px-3 sm:px-4 border-b border-white/[0.07] flex items-center justify-between gap-3 shrink-0 bg-[#121216] z-10 select-none">
+        {/* Left: Sidebar Toggle & Location Breadcrumbs */}
+        <div className="flex items-center gap-2 min-w-0">
           {(!isSidebarOpen || isMobile) && (
-            <Button
-              variant="ghost"
-              size="icon"
+            <button
               onClick={onToggleSidebar}
               title="Open Sidebar (Ctrl+B)"
               aria-label="Open sidebar"
-              className="text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] shrink-0"
+              className="w-7 h-7 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
             >
-              {isMobile ? <Menu className="w-5 h-5" /> : <PanelLeft className="w-4 h-4" />}
-            </Button>
+              {isMobile ? <Menu className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+            </button>
           )}
 
           <Breadcrumbs items={breadcrumbs} onNavigateHome={onNavigateHome} />
+
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400 shrink-0 hidden md:inline-block">
+            {itemCount}
+          </span>
         </div>
 
-        {/* Quick Search & Actions */}
+        {/* Center: BridgeMind Segmented Switcher [ Stream | Notes | Markets ] */}
+        {onStreamFilterChange && (
+          <div className="hidden md:flex items-center bg-[#18181D] p-0.5 rounded-lg border border-white/[0.08] shadow-xs">
+            <button
+              type="button"
+              onClick={() => onStreamFilterChange("stream")}
+              className={cn(
+                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                streamFilter === "stream"
+                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              Stream
+            </button>
+            <button
+              type="button"
+              onClick={() => onStreamFilterChange("notes")}
+              className={cn(
+                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                streamFilter === "notes"
+                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              Notes
+            </button>
+            <button
+              type="button"
+              onClick={() => onStreamFilterChange("markets")}
+              className={cn(
+                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                streamFilter === "markets"
+                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              Markets
+            </button>
+          </div>
+        )}
+
+        {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative hidden sm:block w-48 lg:w-64">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-vault-muted pointer-events-none" />
+          <div className="relative hidden sm:block w-40 lg:w-56">
+            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Filter items..."
-              className="w-full h-8 pl-8 pr-7 bg-vault-card/80 border border-white/[0.08] rounded-lg text-xs text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-accent focus:ring-1 focus:ring-vault-accent/30 transition-all duration-150"
+              placeholder="Search captures..."
+              className="w-full h-7 pl-7.5 pr-6 bg-[#18181D] border border-white/[0.08] rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
             />
-            {searchQuery ? (
+            {searchQuery && (
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-vault-muted hover:text-vault-secondary p-0.5"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer"
                 aria-label="Clear filter"
               >
                 <X className="w-3 h-3" />
               </button>
-            ) : null}
+            )}
           </div>
 
           {headerActions}
         </div>
       </header>
 
-      {/* Sub-toolbar for Mobile Search (if screen is narrow) */}
-      <div className="sm:hidden px-4 py-2 border-b border-vault-border bg-vault-card/50">
-        <div className="relative w-full">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-vault-muted pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Filter items..."
-            className="w-full h-8 pl-8 pr-7 bg-vault-card/80 border border-white/[0.08] rounded-lg text-xs text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-accent focus:ring-1 focus:ring-vault-accent/30 transition-all duration-150"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-vault-muted hover:text-vault-secondary p-0.5"
-              aria-label="Clear filter"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* View Header Info */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3.5 border-b border-vault-border/50 bg-vault-bg/40 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-base sm:text-lg font-bold text-vault-primary tracking-tight">
-            {title}
-          </h1>
-          <Badge variant="default" size="sm">
-            {itemCount} {itemCount === 1 ? "item" : "items"}
-          </Badge>
-        </div>
-      </div>
-
       {/* Content Viewport */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+        <div className="w-full h-full">
           {children}
         </div>
       </div>

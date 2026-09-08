@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { FolderPlus, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Folder } from "../../types";
 import { buildFolderTree } from "../../utils/folderTree";
 import { FolderTreeItem } from "./FolderTreeItem";
@@ -7,7 +7,6 @@ import { CreateFolderModal } from "./CreateFolderModal";
 import { RenameFolderModal } from "./RenameFolderModal";
 import { MoveFolderModal } from "./MoveFolderModal";
 import { DeleteFolderModal } from "./DeleteFolderModal";
-import { Button } from "../common/Button";
 
 export interface FolderTreeProps {
   folders: Folder[];
@@ -95,27 +94,17 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   return (
     <div className="space-y-1">
       {activeFolders.length === 0 ? (
-        <div className="p-3 text-center rounded-lg border border-dashed border-vault-border bg-vault-bg/40">
-          <FolderPlus className="w-6 h-6 mx-auto mb-1.5 text-vault-muted/70" />
-          <p className="text-xs text-vault-secondary font-medium mb-1">
-            No folders yet
-          </p>
-          <p className="text-[11px] text-vault-muted mb-2.5">
-            Organize unfiled items into nested folders
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setCreateParentId(null);
-              setInternalCreateOpen(true);
-            }}
-            className="w-full text-xs"
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            New Folder
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCreateParentId(null);
+            setInternalCreateOpen(true);
+          }}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition-colors text-left cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5 text-zinc-500" />
+          <span>Add first folder</span>
+        </button>
       ) : (
         <div className="space-y-0.5">
           {treeNodes.map((node) => (

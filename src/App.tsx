@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FolderGit2, Plus, QrCode } from "lucide-react";
+import { Plus, QrCode } from "lucide-react";
 import { ActiveView, BreadcrumbItem, Folder, ItemType, MeshSyncState, VaultItem } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
-import { Button } from "./components/common/Button";
 import { getFolderPath } from "./utils/folderTree";
 import { StorageService } from "./services/storageService";
 import { QuickInboxView } from "./components/inbox/QuickInboxView";
@@ -33,6 +32,9 @@ export function App() {
 
   // QR Mobile Connect Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  // BridgeMind Stream Filter State (Stream | Notes | Markets)
+  const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
 
   const [meshState] = useState<MeshSyncState>({
     status: "standby",
@@ -278,8 +280,26 @@ export function App() {
     }
   };
 
+  const filteredInboxItems = useMemo(() => {
+    return inboxItems.filter((item) => {
+      if (streamFilter === "notes") return item.item_type === "note";
+      if (streamFilter === "markets") return item.item_type === "ticker" || item.item_type === "link";
+      return true;
+    });
+  }, [inboxItems, streamFilter]);
+
+  const displayedFolderItems = useMemo(() => {
+    return folderItems.filter((item) => {
+      if (streamFilter === "notes" && item.item_type !== "note") return false;
+      if (streamFilter === "markets" && item.item_type !== "ticker" && item.item_type !== "link") return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q);
+    });
+  }, [folderItems, streamFilter, searchQuery]);
+
   const currentItemCount =
-    activeView.type === "inbox" ? inboxItems.length : folderItems.length;
+    activeView.type === "inbox" ? filteredInboxItems.length : displayedFolderItems.length;
 
   return (
     <AppLayout
@@ -315,37 +335,37 @@ export function App() {
           itemCount={currentItemCount}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          streamFilter={streamFilter}
+          onStreamFilterChange={setStreamFilter}
           headerActions={
             <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => setIsQrModalOpen(true)}
                 title="Connect mobile / tablet via QR code"
-                className="font-semibold text-xs text-vault-primary hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl px-3 py-1.5 transition-all duration-150 shadow-xs"
+                className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#18181D] hover:bg-[#22222A] border border-white/[0.08] rounded-lg transition-colors cursor-pointer"
               >
-                <QrCode className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
-                <span className="hidden sm:inline">Connect Mobile</span>
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
+                <QrCode className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="hidden sm:inline">Connect</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setEditorItem(null);
                   setIsEditorOpen(true);
                 }}
-                className="font-semibold text-xs rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-150 active:scale-95 px-3.5 py-1.5"
+                className="h-7 px-2.5 flex items-center gap-1 text-xs font-medium text-white bg-[#272730] hover:bg-[#32323D] border border-white/[0.12] rounded-lg transition-colors cursor-pointer shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5 mr-1" />
+                <Plus className="w-3.5 h-3.5 text-zinc-300" />
                 <span>New Note</span>
-              </Button>
+              </button>
             </div>
           }
         >
           {/* Content Body */}
           {activeView.type === "inbox" ? (
             <QuickInboxView
-              items={inboxItems}
+              items={filteredInboxItems}
               folders={folders}
               onCapture={handleCaptureItem}
               onTogglePin={handleTogglePin}
@@ -365,7 +385,7 @@ export function App() {
               searchQuery={searchQuery}
             />
           ) : (
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="w-full space-y-3">
               {/* Direct Folder Capture Bar */}
               <QuickCaptureBar
                 onCapture={handleCaptureItem}
@@ -373,21 +393,33 @@ export function App() {
               />
 
               {/* Folder Items Grid */}
-              {folderItems.length === 0 ? (
-                <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-transparent p-6 sm:p-10 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4 text-blue-400 shadow-[0_0_24px_rgba(59,130,246,0.18)]">
-                    <FolderGit2 className="w-7 h-7" />
+              {displayedFolderItems.length === 0 ? (
+                <div className="border border-white/[0.08] rounded-xl bg-[#141418] overflow-hidden shadow-xs">
+                  <div className="h-8 px-3.5 border-b border-white/[0.06] bg-[#18181D] flex items-center justify-between text-xs select-none">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
+                      <span className="font-mono text-xs text-zinc-300">
+                        vault://folder/{activeFolder?.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed"}
+                      </span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">
+                        directory
+                      </span>
+                    </div>
+                    <span className="font-mono text-[10px] text-zinc-500">0 items</span>
                   </div>
-                  <h3 className="text-base font-bold text-vault-primary mb-1.5 tracking-tight">
-                    {activeFolder?.name || "Folder"} is Empty
-                  </h3>
-                  <p className="text-xs sm:text-sm text-vault-secondary max-w-md mb-4 leading-relaxed">
-                    Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
-                  </p>
+                  <div className="p-4 sm:p-5 font-mono text-xs space-y-2">
+                    <div className="text-zinc-300 font-semibold flex items-center gap-2">
+                      <span className="text-amber-400">❯</span>
+                      <span>directory empty</span>
+                    </div>
+                    <p className="text-zinc-500 text-[11px] leading-relaxed">
+                      Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {folderItems.map((item) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {displayedFolderItems.map((item) => (
                     <QuickInboxItemCard
                       key={item.id}
                       item={item}

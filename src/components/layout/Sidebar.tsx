@@ -8,8 +8,6 @@ import {
   X,
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
-import { Badge } from "../common/Badge";
-import { Button } from "../common/Button";
 import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
@@ -58,62 +56,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        "flex flex-col bg-vault-card border-r border-vault-border h-full transition-all duration-200 select-none",
+        "flex flex-col bg-[#111114] border-r border-white/[0.07] h-full transition-all duration-200 select-none",
         isMobile
           ? "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl"
-          : "w-64 shrink-0"
+          : "w-60 shrink-0"
       )}
     >
-      {/* Brand & App Header */}
-      <div className="h-14 px-4 border-b border-vault-border flex items-center justify-between shrink-0 bg-vault-card/60">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shadow-[0_0_12px_rgba(59,130,246,0.15)]">
-            <ShieldCheck className="w-4.5 h-4.5 text-vault-accent" />
+      {/* Brand & App Header (BridgeMind 44px style) */}
+      <div className="h-11 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#131317]">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+            <ShieldCheck className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-sm tracking-tight text-vault-primary">
-                OmniVault
-              </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-white/[0.04] text-vault-secondary border border-white/[0.08]">
-                v0.1.0
-              </span>
-            </div>
-            <div className="text-[11px] text-vault-muted leading-none mt-0.5 font-medium">
-              Private P2P Mesh
-            </div>
-          </div>
+          <span className="font-semibold text-xs tracking-tight text-zinc-200">
+            OmniVault
+          </span>
+          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-500 border border-white/[0.06]">
+            v0.1
+          </span>
         </div>
 
         {/* Desktop Collapse / Mobile Close */}
         {isMobile ? (
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={onClose}
             aria-label="Close sidebar"
-            className="text-vault-secondary hover:text-vault-primary"
+            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
-          </Button>
+            <X className="w-3.5 h-3.5" />
+          </button>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={onToggleCollapse}
             title="Collapse Sidebar (Ctrl+B)"
             aria-label="Collapse sidebar"
-            className="text-vault-secondary hover:text-vault-primary"
+            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
-            <PanelLeftClose className="w-4 h-4" />
-          </Button>
+            <PanelLeftClose className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
 
       {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-        {/* Quick Inbox */}
+      <div className="flex-1 overflow-y-auto px-2.5 py-2.5 space-y-3 scrollbar-none">
+        {/* Workspaces Header & Quick Inbox */}
         <div>
+          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            Workspaces
+          </div>
           <button
             onClick={onSelectInbox}
             onDragOver={(e) => {
@@ -142,47 +132,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
             }}
             className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 text-left cursor-pointer",
+              "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150 text-left cursor-pointer",
               isInboxDragOver
-                ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-[0_0_16px_rgba(59,130,246,0.25)] scale-[1.01]"
+                ? "bg-blue-500/20 text-white font-medium ring-1 ring-blue-500/50"
                 : isInboxActive
-                ? "bg-vault-accent-subtle text-vault-primary font-medium ring-1 ring-vault-accent/30 shadow-xs"
-                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
+                ? "bg-[#222227] text-white font-medium shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
             )}
           >
             <Inbox
               className={cn(
-                "w-4 h-4 shrink-0 transition-colors",
-                isInboxDragOver || isInboxActive ? "text-vault-accent" : "text-vault-secondary"
+                "w-3.5 h-3.5 shrink-0 transition-colors",
+                isInboxActive ? "text-blue-400" : "text-zinc-500"
               )}
             />
-            <span className="flex-1 font-medium">
+            <span className="flex-1 truncate">
               {isInboxDragOver ? "Drop to unfile" : "Quick Inbox"}
             </span>
-            <Badge
-              variant={inboxCount > 0 ? "accent" : "default"}
-              size="sm"
-            >
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] text-zinc-400">
               {inboxCount}
-            </Badge>
+            </span>
           </button>
         </div>
 
         {/* Folders Section with Hierarchical Tree */}
         <div>
-          <div className="flex items-center justify-between px-2 py-1 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-vault-muted">
+          <div className="flex items-center justify-between px-2 py-1 mb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
               Folders
             </span>
-            <Button
-              variant="ghost"
-              size="icon"
+            <button
+              type="button"
               onClick={() => setIsCreateOpen(true)}
               title="Create new folder"
-              className="h-6 w-6 text-vault-secondary hover:text-vault-primary"
+              className="w-5 h-5 flex items-center justify-center rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-            </Button>
+            </button>
           </div>
 
           <FolderTree
@@ -201,45 +187,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Sync Status Footer */}
-      <div className="p-3 border-t border-vault-border bg-vault-card/80 shrink-0 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative flex items-center justify-center shrink-0">
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full",
-                meshState.status === "standby" || meshState.status === "synced"
-                  ? "bg-vault-success shadow-[0_0_8px_rgba(16,185,129,0.7)]"
-                  : meshState.status === "error"
-                  ? "bg-vault-error shadow-[0_0_8px_rgba(239,68,68,0.7)]"
-                  : "bg-vault-accent shadow-[0_0_8px_rgba(59,130,246,0.7)]"
-              )}
-            />
-            {(meshState.status === "syncing" || meshState.status === "discovering") && (
-              <span className="absolute w-3.5 h-3.5 rounded-full bg-vault-accent/40 animate-ping" />
+      <div className="h-10 px-3 border-t border-white/[0.06] bg-[#131317] shrink-0 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              meshState.status === "standby" || meshState.status === "synced"
+                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"
+                : meshState.status === "error"
+                ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.7)]"
+                : "bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.7)]"
             )}
-          </div>
+          />
           <div className="truncate">
-            <span className="text-vault-primary font-medium block truncate text-[11px]">
+            <span className="text-zinc-400 block truncate text-[10px] font-mono leading-tight">
               {meshState.peerCount > 0
-                ? `${meshState.peerCount} peer${meshState.peerCount > 1 ? "s" : ""} connected`
-                : "Local Mesh Active"}
-            </span>
-            <span className="text-vault-muted block text-[10px]">
-              {meshState.peerCount > 0 ? "Real-time sync" : "Standby • Port 42420"}
+                ? `${meshState.peerCount} peer${meshState.peerCount > 1 ? "s" : ""} active`
+                : "Mesh: Standby (42420)"}
             </span>
           </div>
         </div>
 
         {onOpenPairing && (
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
+            type="button"
             onClick={onOpenPairing}
             title="Connect Mobile / QR Pairing"
-            className="h-7 w-7 text-vault-secondary hover:text-vault-primary hover:bg-white/[0.08] transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <QrCode className="w-3.5 h-3.5" />
-          </Button>
+          </button>
         )}
       </div>
     </aside>
