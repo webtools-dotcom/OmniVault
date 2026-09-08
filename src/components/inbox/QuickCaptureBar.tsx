@@ -95,7 +95,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-vault-card border border-vault-border rounded-xl p-3 shadow-md transition-all duration-150 mb-6">
+    <div className="bg-vault-card/90 border border-white/[0.08] rounded-2xl p-3.5 sm:p-4 shadow-[0_8px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.04] mb-6 backdrop-blur-md transition-all duration-200">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -106,7 +106,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       />
 
       {/* Type Selector Tabs */}
-      <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-vault-border/60">
+      <div className="flex items-center gap-1.5 mb-3 pb-2.5 border-b border-white/[0.06] overflow-x-auto scrollbar-none">
         <button
           type="button"
           onClick={() => {
@@ -114,13 +114,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             setImagePreview(null);
           }}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer min-h-[32px] shrink-0",
             itemType === "note"
-              ? "bg-vault-elevated text-vault-primary border border-vault-border"
-              : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+              ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.15] shadow-xs"
+              : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
           )}
         >
-          <FileText className="w-3.5 h-3.5 text-vault-accent" />
+          <FileText className="w-3.5 h-3.5 text-blue-400" />
           <span>Note</span>
         </button>
 
@@ -131,13 +131,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             setImagePreview(null);
           }}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer min-h-[32px] shrink-0",
             itemType === "ticker"
-              ? "bg-vault-elevated text-vault-primary border border-vault-border"
-              : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+              ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.15] shadow-xs"
+              : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
           )}
         >
-          <TrendingUp className="w-3.5 h-3.5 text-vault-success" />
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
           <span>Ticker ($)</span>
         </button>
 
@@ -148,13 +148,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             setImagePreview(null);
           }}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer min-h-[32px] shrink-0",
             itemType === "link"
-              ? "bg-vault-elevated text-vault-primary border border-vault-border"
-              : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+              ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.15] shadow-xs"
+              : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
           )}
         >
-          <Link2 className="w-3.5 h-3.5 text-vault-pending" />
+          <Link2 className="w-3.5 h-3.5 text-amber-400" />
           <span>Link</span>
         </button>
 
@@ -165,32 +165,32 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             fileInputRef.current?.click();
           }}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer min-h-[32px] shrink-0",
             itemType === "image"
-              ? "bg-vault-elevated text-vault-primary border border-vault-border"
-              : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+              ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.15] shadow-xs"
+              : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
           )}
         >
           <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
           <span>Screenshot</span>
         </button>
 
-        <div className="ml-auto flex items-center gap-1 text-[11px] text-vault-muted hidden sm:flex">
-          <Sparkles className="w-3 h-3 text-vault-accent" />
+        <div className="ml-auto flex items-center gap-1.5 text-[11px] text-vault-muted hidden sm:flex shrink-0">
+          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
           <span>{folderId ? "Direct Capture" : "Ctrl+V to Paste Screenshot"}</span>
         </div>
       </div>
 
       {/* Image Preview Thumbnail if selected */}
       {imagePreview && (
-        <div className="mb-2.5 p-2 rounded-lg bg-vault-bg border border-vault-border flex items-center gap-3">
+        <div className="mb-3 p-2.5 rounded-xl bg-vault-bg/90 border border-white/[0.08] flex items-center gap-3">
           <img
             src={imagePreview}
             alt="Upload Preview"
-            className="w-16 h-12 object-cover rounded border border-vault-border shrink-0"
+            className="w-16 h-12 object-cover rounded-lg border border-white/[0.1] shrink-0 shadow-xs"
           />
           <div className="min-w-0 flex-1 text-xs">
-            <span className="text-vault-primary font-medium block truncate">
+            <span className="text-vault-primary font-semibold block truncate">
               Image ready to capture
             </span>
             <span className="text-[11px] text-vault-muted">
@@ -200,7 +200,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           <button
             type="button"
             onClick={() => setImagePreview(null)}
-            className="text-vault-muted hover:text-vault-error text-xs px-2 py-1"
+            className="text-vault-muted hover:text-rose-400 text-xs px-2.5 py-1 rounded-md hover:bg-rose-500/10 transition-colors"
           >
             Remove
           </button>
@@ -208,7 +208,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       )}
 
       {/* Inputs */}
-      <form onSubmit={handleCapture} className="space-y-2">
+      <form onSubmit={handleCapture} className="space-y-2.5">
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -226,7 +226,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
                 ? "Image caption or title..."
                 : "Quick capture note title or thought..."
             }
-            className="flex-1 h-9 px-3 bg-vault-bg border border-vault-border rounded-md text-xs sm:text-sm text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-border-active transition-colors"
+            className="flex-1 h-10 px-3.5 bg-vault-bg/90 border border-white/[0.08] rounded-xl text-xs sm:text-sm text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-accent focus:ring-1 focus:ring-vault-accent/30 transition-all duration-150"
             disabled={isSubmitting}
           />
 
@@ -235,16 +235,16 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             variant="primary"
             size="sm"
             disabled={isSubmitting || (!title.trim() && !content.trim() && !imagePreview)}
-            className="h-9 px-4 font-medium shrink-0"
+            className="h-10 px-4.5 rounded-xl font-semibold shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-150 active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 mr-1" />
+            <Plus className="w-4 h-4 mr-1" />
             <span>Capture</span>
           </Button>
         </div>
 
         {/* Detailed Body Area (Expanded for notes / links) */}
         {(isExpanded || itemType === "link") && itemType !== "image" && (
-          <div className="space-y-2 animate-in fade-in duration-100">
+          <div className="space-y-2 animate-in fade-in duration-150">
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -257,16 +257,16 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
                   ? "Thesis, levels, or rationale..."
                   : "Write note content (Markdown supported)..."
               }
-              className="w-full p-2.5 bg-vault-bg border border-vault-border rounded-md text-xs text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-border-active transition-colors resize-none"
+              className="w-full p-3 bg-vault-bg/90 border border-white/[0.08] rounded-xl text-xs sm:text-sm text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-accent focus:ring-1 focus:ring-vault-accent/30 transition-all duration-150 resize-none font-sans"
               disabled={isSubmitting}
             />
 
-            <div className="flex items-center justify-between text-[11px] text-vault-muted pt-1">
-              <span>Press <kbd className="px-1 py-0.5 rounded bg-vault-elevated border border-vault-border text-[10px]">Ctrl+Enter</kbd> to save</span>
+            <div className="flex items-center justify-between text-[11px] text-vault-muted pt-0.5">
+              <span>Press <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08] text-[10px] font-mono">Ctrl+Enter</kbd> to save</span>
               <button
                 type="button"
                 onClick={() => setIsExpanded(false)}
-                className="text-vault-secondary hover:text-vault-primary"
+                className="text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
               >
                 Collapse
               </button>

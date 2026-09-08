@@ -71,19 +71,25 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({ onInsertSyntax
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1.5 bg-vault-bg border-b border-vault-border overflow-x-auto select-none">
-      {tools.map((tool) => {
+    <div className="flex items-center gap-1 px-3 py-1.5 bg-vault-bg border-b border-vault-border overflow-x-auto select-none scrollbar-none">
+      {tools.map((tool, idx) => {
         const Icon = tool.icon;
+        const showDivider = idx === 1 || idx === 3 || idx === 5 || idx === 7;
         return (
-          <button
-            key={tool.label}
-            type="button"
-            onClick={tool.action}
-            title={tool.label}
-            className="w-7 h-7 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary hover:bg-vault-card transition-colors shrink-0"
-          >
-            <Icon className="w-3.5 h-3.5" />
-          </button>
+          <React.Fragment key={tool.label}>
+            <button
+              type="button"
+              onClick={tool.action}
+              title={tool.label}
+              aria-label={tool.label}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated active:scale-90 transition-all shrink-0 cursor-pointer"
+            >
+              <Icon className="w-3.5 h-3.5" />
+            </button>
+            {showDivider && (
+              <div className="w-px h-3.5 bg-vault-border/60 mx-1 shrink-0" aria-hidden="true" />
+            )}
+          </React.Fragment>
         );
       })}
     </div>

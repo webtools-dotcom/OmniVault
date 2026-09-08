@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, Minus, Plus, RotateCcw, X } from "lucide-react";
-import { Button } from "../common/Button";
 
 export interface ImageLightboxProps {
   isOpen: boolean;
@@ -92,37 +91,37 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-vault-bg/95 backdrop-blur-md select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex flex-col bg-vault-bg/95 backdrop-blur-xl select-none animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
     >
       {/* Top Header Controls */}
-      <div className="h-14 px-4 sm:px-6 border-b border-vault-border flex items-center justify-between shrink-0 bg-vault-card/80">
+      <div className="h-14 px-4 sm:px-6 border-b border-vault-border flex items-center justify-between shrink-0 bg-vault-card/90">
         <div className="flex items-center gap-3 min-w-0">
           <h2 className="text-sm font-semibold text-vault-primary truncate max-w-[200px] sm:max-w-md">
             {title}
           </h2>
           {metadata?.byteSize && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block">
+            <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block font-mono">
               {formatSize(metadata.byteSize)} WebP
             </span>
           )}
         </div>
 
         {/* Zoom & Action Toolbar */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-vault-bg rounded-md border border-vault-border p-0.5">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-vault-bg rounded-xl border border-vault-border p-1 shadow-xs">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={zoom <= 0.5}
-              className="w-7 h-7 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary disabled:opacity-30 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-vault-secondary hover:text-vault-primary disabled:opacity-30 transition-all active:scale-90 cursor-pointer"
               title="Zoom Out (-)"
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-[11px] font-mono text-vault-primary px-2 min-w-10 text-center">
+            <span className="text-[11px] font-mono text-vault-primary px-2.5 min-w-11 text-center select-none">
               {Math.round(zoom * 100)}%
             </span>
 
@@ -130,7 +129,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               type="button"
               onClick={handleZoomIn}
               disabled={zoom >= 4}
-              className="w-7 h-7 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary disabled:opacity-30 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-vault-secondary hover:text-vault-primary disabled:opacity-30 transition-all active:scale-90 cursor-pointer"
               title="Zoom In (+)"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -139,7 +138,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             <button
               type="button"
               onClick={handleResetZoom}
-              className="w-7 h-7 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary transition-colors border-l border-vault-border/60 ml-0.5"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-vault-secondary hover:text-vault-primary transition-all border-l border-vault-border/60 ml-1 active:scale-90 cursor-pointer"
               title="Reset Zoom (0)"
             >
               <RotateCcw className="w-3 h-3" />
@@ -149,21 +148,19 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           <a
             href={imageUrl}
             download={title.endsWith(".webp") ? title : `${title}.webp`}
-            className="w-8 h-8 rounded-md bg-vault-elevated hover:bg-vault-card border border-vault-border flex items-center justify-center text-vault-secondary hover:text-vault-primary transition-colors ml-1"
+            className="w-8 h-8 rounded-xl bg-vault-elevated hover:bg-vault-card border border-vault-border flex items-center justify-center text-vault-secondary hover:text-vault-primary transition-all active:scale-90 cursor-pointer shadow-xs"
             title="Download Image"
           >
             <Download className="w-4 h-4" />
           </a>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={onClose}
-            className="text-vault-secondary hover:text-vault-primary ml-1"
+            className="w-8 h-8 rounded-xl hover:bg-vault-elevated flex items-center justify-center text-vault-secondary hover:text-vault-primary transition-all cursor-pointer"
             aria-label="Close lightbox"
           >
-            <X className="w-5 h-5" />
-          </Button>
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

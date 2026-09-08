@@ -322,9 +322,9 @@ export function App() {
                 size="sm"
                 onClick={() => setIsQrModalOpen(true)}
                 title="Connect mobile / tablet via QR code"
-                className="font-medium text-xs text-vault-secondary hover:text-vault-primary"
+                className="font-semibold text-xs text-vault-primary hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl px-3 py-1.5 transition-all duration-150 shadow-xs"
               >
-                <QrCode className="w-3.5 h-3.5 mr-1 text-vault-accent" />
+                <QrCode className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
                 <span className="hidden sm:inline">Connect Mobile</span>
               </Button>
               <Button
@@ -334,7 +334,7 @@ export function App() {
                   setEditorItem(null);
                   setIsEditorOpen(true);
                 }}
-                className="font-medium text-xs"
+                className="font-semibold text-xs rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-150 active:scale-95 px-3.5 py-1.5"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 <span>New Note</span>
@@ -374,15 +374,15 @@ export function App() {
 
               {/* Folder Items Grid */}
               {folderItems.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center rounded-2xl border border-dashed border-vault-border bg-vault-card/30 p-8">
-                  <div className="w-14 h-14 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-3 text-vault-accent shadow-xs">
+                <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-transparent p-6 sm:p-10 shadow-sm">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4 text-blue-400 shadow-[0_0_24px_rgba(59,130,246,0.18)]">
                     <FolderGit2 className="w-7 h-7" />
                   </div>
-                  <h3 className="text-sm font-semibold text-vault-primary mb-1">
+                  <h3 className="text-base font-bold text-vault-primary mb-1.5 tracking-tight">
                     {activeFolder?.name || "Folder"} is Empty
                   </h3>
-                  <p className="text-xs text-vault-secondary max-w-sm mb-4">
-                    Capture directly into this folder above, or file items here from your Quick Inbox.
+                  <p className="text-xs sm:text-sm text-vault-secondary max-w-md mb-4 leading-relaxed">
+                    Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
                   </p>
                 </div>
               ) : (

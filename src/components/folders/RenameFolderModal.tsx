@@ -61,21 +61,23 @@ export const RenameFolderModal: React.FC<RenameFolderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none">
       <div
-        className="w-full max-w-sm bg-vault-card border border-vault-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-sm bg-vault-card/95 border border-vault-border rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="rename-folder-title"
       >
-        <div className="px-5 py-4 border-b border-vault-border flex items-center justify-between">
-          <div className="flex items-center gap-2 text-vault-primary font-semibold text-sm">
-            <Edit2 className="w-4 h-4 text-vault-accent" />
+        <div className="px-5 py-4 border-b border-vault-border flex items-center justify-between bg-vault-card/90">
+          <div className="flex items-center gap-2.5 text-vault-primary font-semibold text-sm">
+            <div className="w-7 h-7 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0">
+              <Edit2 className="w-4 h-4 text-vault-accent" />
+            </div>
             <span id="rename-folder-title">Rename Folder</span>
           </div>
           <button
             onClick={onClose}
-            className="text-vault-muted hover:text-vault-secondary rounded p-1 transition-colors"
+            className="w-7 h-7 flex items-center justify-center text-vault-muted hover:text-vault-primary hover:bg-vault-elevated rounded-lg transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -95,13 +97,13 @@ export const RenameFolderModal: React.FC<RenameFolderModalProps> = ({
                 setName(e.target.value);
                 if (error) setError(null);
               }}
-              className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-md text-sm text-vault-primary focus:outline-none focus:border-vault-border-active transition-colors"
+              className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-xl text-xs sm:text-sm text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors"
               disabled={isSubmitting}
             />
-            {error && <p className="text-xs text-vault-error mt-1">{error}</p>}
+            {error && <p className="text-xs text-rose-400 mt-1.5">{error}</p>}
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-vault-border/60">
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-vault-border/60">
             <Button
               type="button"
               variant="ghost"

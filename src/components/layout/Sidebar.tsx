@@ -5,7 +5,6 @@ import {
   Plus,
   QrCode,
   ShieldCheck,
-  Wifi,
   X,
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
@@ -66,9 +65,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     >
       {/* Brand & App Header */}
-      <div className="h-14 px-4 border-b border-vault-border flex items-center justify-between shrink-0">
+      <div className="h-14 px-4 border-b border-vault-border flex items-center justify-between shrink-0 bg-vault-card/60">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent">
+          <div className="w-8 h-8 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shadow-[0_0_12px_rgba(59,130,246,0.15)]">
             <ShieldCheck className="w-4.5 h-4.5 text-vault-accent" />
           </div>
           <div>
@@ -76,12 +75,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-semibold text-sm tracking-tight text-vault-primary">
                 OmniVault
               </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-vault-elevated text-vault-secondary border border-vault-border">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-white/[0.04] text-vault-secondary border border-white/[0.08]">
                 v0.1.0
               </span>
             </div>
-            <div className="text-[11px] text-vault-muted leading-none mt-0.5">
-              Local-first Mesh
+            <div className="text-[11px] text-vault-muted leading-none mt-0.5 font-medium">
+              Private P2P Mesh
             </div>
           </div>
         </div>
@@ -143,21 +142,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
             }}
             className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-left",
+              "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 text-left cursor-pointer",
               isInboxDragOver
-                ? "bg-vault-accent/20 text-vault-primary font-medium border-2 border-vault-accent shadow-xs scale-[1.01]"
+                ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-[0_0_16px_rgba(59,130,246,0.25)] scale-[1.01]"
                 : isInboxActive
-                ? "bg-vault-elevated text-vault-primary font-medium border-l-2 border-vault-accent shadow-xs"
-                : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/60"
+                ? "bg-vault-accent-subtle text-vault-primary font-medium ring-1 ring-vault-accent/30 shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
             <Inbox
               className={cn(
-                "w-4 h-4 shrink-0",
+                "w-4 h-4 shrink-0 transition-colors",
                 isInboxDragOver || isInboxActive ? "text-vault-accent" : "text-vault-secondary"
               )}
             />
-            <span className="flex-1">
+            <span className="flex-1 font-medium">
               {isInboxDragOver ? "Drop to unfile" : "Quick Inbox"}
             </span>
             <Badge
@@ -202,28 +201,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Sync Status Footer */}
-      <div className="p-3 border-t border-vault-border bg-vault-card shrink-0 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="p-3 border-t border-vault-border bg-vault-card/80 shrink-0 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative flex items-center justify-center shrink-0">
-            <Wifi
+            <span
               className={cn(
-                "w-3.5 h-3.5",
-                meshState.status === "synced" && "text-vault-success",
-                meshState.status === "syncing" && "text-vault-pending animate-pulse",
-                meshState.status === "standby" && "text-vault-success",
-                meshState.status === "discovering" && "text-vault-accent animate-pulse",
-                meshState.status === "error" && "text-vault-error"
+                "w-2 h-2 rounded-full",
+                meshState.status === "standby" || meshState.status === "synced"
+                  ? "bg-vault-success shadow-[0_0_8px_rgba(16,185,129,0.7)]"
+                  : meshState.status === "error"
+                  ? "bg-vault-error shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+                  : "bg-vault-accent shadow-[0_0_8px_rgba(59,130,246,0.7)]"
               )}
             />
-            {meshState.status === "standby" && (
-              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-vault-success" />
+            {(meshState.status === "syncing" || meshState.status === "discovering") && (
+              <span className="absolute w-3.5 h-3.5 rounded-full bg-vault-accent/40 animate-ping" />
             )}
           </div>
           <div className="truncate">
-            <span className="text-vault-secondary block truncate text-[11px]">
+            <span className="text-vault-primary font-medium block truncate text-[11px]">
               {meshState.peerCount > 0
-                ? `${meshState.peerCount} peer${meshState.peerCount > 1 ? "s" : ""} online`
-                : "Local Mesh: Standby"}
+                ? `${meshState.peerCount} peer${meshState.peerCount > 1 ? "s" : ""} connected`
+                : "Local Mesh Active"}
+            </span>
+            <span className="text-vault-muted block text-[10px]">
+              {meshState.peerCount > 0 ? "Real-time sync" : "Standby • Port 42420"}
             </span>
           </div>
         </div>
@@ -233,8 +235,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onOpenPairing}
-            title="Pair device via PIN / QR code"
-            className="h-7 w-7 text-vault-secondary hover:text-vault-primary"
+            title="Connect Mobile / QR Pairing"
+            className="h-7 w-7 text-vault-secondary hover:text-vault-primary hover:bg-white/[0.08] transition-colors"
           >
             <QrCode className="w-3.5 h-3.5" />
           </Button>

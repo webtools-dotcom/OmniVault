@@ -71,24 +71,24 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({ isOpen, onClose 
   const viewBoxSize = size + 8;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none animate-in fade-in duration-150">
       <div
-        className="w-full max-w-md bg-vault-card border border-vault-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-md bg-vault-card/95 border border-white/[0.12] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl ring-1 ring-white/[0.05] overflow-hidden animate-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-modal-title"
       >
         {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-vault-border flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent">
+        <div className="px-6 py-4.5 border-b border-white/[0.08] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.18)]">
               <Smartphone className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 id="qr-modal-title" className="text-sm font-semibold text-vault-primary">
+              <h2 id="qr-modal-title" className="text-sm font-bold text-vault-primary tracking-tight">
                 Connect Mobile & Tablet
               </h2>
-              <p className="text-[11px] text-vault-muted">
+              <p className="text-[11px] text-vault-muted font-medium">
                 Zero-install local access over Wi-Fi
               </p>
             </div>
@@ -96,7 +96,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={onClose}
-            className="text-vault-muted hover:text-vault-secondary rounded-lg p-1 transition-colors"
+            className="text-vault-muted hover:text-vault-primary rounded-lg p-1.5 hover:bg-white/[0.06] transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -106,42 +106,42 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({ isOpen, onClose 
         {/* Modal Content */}
         <div className="p-6 flex flex-col items-center text-center space-y-5">
           {/* High-Contrast Crisp QR Code Card */}
-          <div className="p-3 bg-white rounded-2xl border border-vault-border shadow-md">
+          <div className="p-3.5 bg-white rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.06)] ring-4 ring-white/10">
             <svg
               viewBox={`-4 -4 ${viewBoxSize} ${viewBoxSize}`}
               className="w-44 h-44 shape-rendering-crispEdges block"
               aria-label={`QR code for ${lanInfo.url}`}
             >
               <rect x="-4" y="-4" width={viewBoxSize} height={viewBoxSize} fill="#FFFFFF" />
-              <path d={qrPath} fill="#0D1117" />
+              <path d={qrPath} fill="#080B0F" />
             </svg>
           </div>
 
           {/* Connection URL Pill with 1-Click Copy */}
-          <div className="w-full space-y-1.5">
-            <div className="text-[11px] font-medium text-vault-secondary flex items-center justify-center gap-1.5">
-              <Wifi className="w-3.5 h-3.5 text-vault-success" />
+          <div className="w-full space-y-2">
+            <div className="text-[11px] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider">
+              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
               <span>Local Network URL</span>
             </div>
-            <div className="flex items-center gap-1.5 p-1.5 pl-3 bg-vault-bg border border-vault-border rounded-xl">
-              <span className="text-xs font-mono text-vault-accent flex-1 truncate text-left select-all">
+            <div className="flex items-center gap-2 p-1.5 pl-3.5 bg-vault-bg/90 border border-white/[0.08] rounded-xl shadow-inner">
+              <span className="text-xs font-mono text-blue-400 flex-1 truncate text-left select-all font-medium">
                 {lanInfo.url}
               </span>
               <Button
                 variant={copied ? "secondary" : "ghost"}
                 size="sm"
                 onClick={handleCopyUrl}
-                className="h-7 px-2.5 text-xs shrink-0"
+                className="h-8 px-3 text-xs shrink-0 rounded-lg hover:bg-white/[0.08]"
               >
                 {copied ? (
                   <>
-                    <Check className="w-3.5 h-3.5 mr-1 text-vault-success" />
-                    <span className="text-vault-success font-medium">Copied</span>
+                    <Check className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Copied!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5 mr-1 text-vault-secondary" />
-                    <span>Copy</span>
+                    <span>Copy URL</span>
                   </>
                 )}
               </Button>
@@ -149,57 +149,57 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({ isOpen, onClose 
           </div>
 
           {/* 6-Digit Device Pairing PIN */}
-          <div className="w-full p-3 bg-vault-elevated/40 border border-vault-border rounded-xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-left">
-              <ShieldCheck className="w-4 h-4 text-vault-accent shrink-0" />
+          <div className="w-full p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5 text-left">
+              <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
               <div>
-                <span className="font-medium text-vault-primary block">
+                <span className="font-semibold text-vault-primary block text-xs">
                   Peer Authorization PIN
                 </span>
                 <span className="text-[10px] text-vault-muted">
-                  Required once for encrypted peer sync
+                  One-time authentication for peer sync
                 </span>
               </div>
             </div>
-            <div className="px-2.5 py-1 bg-vault-card border border-vault-border rounded-lg font-mono font-bold text-sm text-vault-primary tracking-widest">
+            <div className="px-3 py-1 bg-white/[0.06] border border-white/[0.1] rounded-xl font-mono font-bold text-sm text-vault-primary tracking-widest">
               {pairingPin}
             </div>
           </div>
 
           {/* Step-by-Step Instructions */}
-          <div className="w-full bg-vault-card/60 border border-vault-border/60 rounded-xl p-3.5 text-left space-y-2 text-xs">
-            <div className="flex items-start gap-2 text-vault-secondary">
-              <span className="w-4 h-4 rounded-full bg-vault-elevated text-vault-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-full bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 text-left space-y-2.5 text-xs">
+            <div className="flex items-start gap-2.5 text-vault-secondary">
+              <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                 1
               </span>
-              <span>Connect phone/tablet to the same Wi-Fi or mobile hotspot.</span>
+              <span className="leading-snug">Connect phone/tablet to the same Wi-Fi or mobile hotspot.</span>
             </div>
-            <div className="flex items-start gap-2 text-vault-secondary">
-              <span className="w-4 h-4 rounded-full bg-vault-elevated text-vault-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <div className="flex items-start gap-2.5 text-vault-secondary">
+              <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                 2
               </span>
-              <span>Open the Camera app and scan the QR code above.</span>
+              <span className="leading-snug">Open camera and scan the QR code above.</span>
             </div>
-            <div className="flex items-start gap-2 text-vault-secondary">
-              <span className="w-4 h-4 rounded-full bg-vault-elevated text-vault-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <div className="flex items-start gap-2.5 text-vault-secondary">
+              <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                 3
               </span>
-              <span>
-                Dump unfiled notes, tickers, and screenshots directly into your vault.
+              <span className="leading-snug">
+                Install as PWA or capture unfiled notes, charts, and links on the go.
               </span>
             </div>
           </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-vault-border bg-vault-bg/30 flex items-center justify-between text-xs">
+        <div className="px-6 py-4 border-t border-white/[0.08] bg-vault-bg/40 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-vault-success animate-pulse" />
-            <span className="text-[11px] text-vault-muted">
-              HTTP Server on Port {lanInfo.port}
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+            <span className="text-[11px] text-vault-muted font-medium">
+              LAN Server on Port {lanInfo.port}
             </span>
           </div>
-          <Button variant="primary" size="sm" onClick={onClose}>
+          <Button variant="primary" size="sm" onClick={onClose} className="rounded-xl px-4 py-1.5 font-semibold">
             Done
           </Button>
         </div>

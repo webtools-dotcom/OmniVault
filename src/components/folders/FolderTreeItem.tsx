@@ -120,12 +120,12 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          "group relative flex items-center h-8 pr-1.5 rounded-md text-xs transition-colors cursor-pointer",
+          "group relative flex items-center h-8 pr-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer",
           isDragOver
-            ? "bg-vault-accent/20 text-vault-primary font-medium border-2 border-vault-accent shadow-xs scale-[1.01]"
+            ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-[0_0_12px_rgba(59,130,246,0.3)] scale-[1.01]"
             : isActive
-            ? "bg-vault-elevated text-vault-primary font-medium border-l-2 border-vault-accent"
-            : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/50"
+            ? "bg-vault-accent-subtle text-vault-primary font-semibold ring-1 ring-vault-accent/30 shadow-xs"
+            : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
         )}
         style={{ paddingLeft: `${depth * 14 + 6}px` }}
         onClick={() => onSelectFolder(folder.id)}
@@ -207,7 +207,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
 
             {menuOpen && (
               <div
-                className="absolute right-0 top-full mt-1 w-36 bg-vault-card border border-vault-border rounded-lg shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 top-full mt-1.5 w-40 bg-vault-card/95 border border-white/[0.12] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] py-1.5 z-30 backdrop-blur-md ring-1 ring-white/[0.05] animate-in fade-in zoom-in-95 duration-100"
                 role="menu"
               >
                 <button
@@ -216,10 +216,10 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenCreateSubfolder(folder.id);
                   }}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated text-left transition-colors"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
-                  <FolderPlus className="w-3.5 h-3.5 text-vault-accent" />
+                  <FolderPlus className="w-3.5 h-3.5 text-blue-400" />
                   <span>New Subfolder</span>
                 </button>
 
@@ -229,7 +229,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenRename(folder);
                   }}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated text-left transition-colors"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-vault-muted" />
@@ -242,14 +242,14 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenMove(folder);
                   }}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated text-left transition-colors"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <FolderInput className="w-3.5 h-3.5 text-vault-muted" />
                   <span>Move</span>
                 </button>
 
-                <div className="my-1 border-t border-vault-border/60" />
+                <div className="my-1 border-t border-white/[0.06]" />
 
                 <button
                   type="button"
@@ -257,7 +257,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenDelete(folder);
                   }}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-xs text-vault-error hover:bg-vault-elevated text-left transition-colors"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-rose-400 hover:bg-rose-500/10 text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

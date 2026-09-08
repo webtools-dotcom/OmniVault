@@ -7,7 +7,6 @@ import { extractTickers } from "../../utils/tickerDetector";
 import { extractLinks } from "../../utils/linkDetector";
 import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
 import { Button } from "../common/Button";
-import { Badge } from "../common/Badge";
 import { cn } from "../../utils/cn";
 
 export interface NoteEditorModalProps {
@@ -144,16 +143,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const detectedLinks = useMemo(() => extractLinks(content), [content]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md select-none">
       <div
-        className="w-full max-w-4xl h-[90vh] max-h-[800px] bg-vault-card border border-vault-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-5xl h-[92vh] max-h-[860px] bg-vault-card/95 border border-vault-border rounded-2xl shadow-[0_32px_80px_rgba(0,0,0,0.75)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl"
         role="dialog"
         aria-modal="true"
       >
         {/* Editor Header */}
-        <div className="px-4 py-3 border-b border-vault-border flex items-center justify-between gap-3 shrink-0 bg-vault-card">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-7 h-7 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 border-b border-vault-border flex items-center justify-between gap-3 shrink-0 bg-vault-card/90">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0 shadow-[0_0_12px_rgba(59,130,246,0.2)]">
               <FileText className="w-4 h-4 text-vault-accent" />
             </div>
 
@@ -162,16 +161,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Note Title..."
-              className="w-full font-semibold text-sm sm:text-base text-vault-primary bg-transparent focus:outline-none placeholder-vault-muted"
+              className="w-full font-semibold text-sm sm:text-base text-vault-primary bg-transparent focus:outline-none placeholder-vault-muted transition-colors tracking-tight"
             />
           </div>
 
           {/* Destination Folder Selector */}
-          <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+          <div className="hidden md:flex items-center gap-1.5 shrink-0">
             <select
               value={folderId || ""}
               onChange={(e) => setFolderId(e.target.value ? e.target.value : null)}
-              className="h-7 px-2 bg-vault-bg border border-vault-border rounded text-xs text-vault-primary focus:outline-none focus:border-vault-border-active"
+              className="h-8 px-2.5 bg-vault-bg border border-vault-border rounded-lg text-xs text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors cursor-pointer"
             >
               <option value="">📥 Quick Inbox</option>
               {activeFolders.map((f) => (
@@ -183,14 +182,14 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-1 bg-vault-bg p-0.5 rounded border border-vault-border shrink-0">
+          <div className="flex items-center gap-1 bg-vault-bg p-1 rounded-xl border border-vault-border shrink-0">
             <button
               type="button"
               onClick={() => setViewMode("edit")}
               className={cn(
-                "px-2 py-1 rounded text-xs transition-colors",
+                "px-2.5 py-1 rounded-lg text-xs transition-all font-medium cursor-pointer",
                 viewMode === "edit"
-                  ? "bg-vault-card text-vault-primary font-medium"
+                  ? "bg-vault-card text-vault-primary shadow-xs"
                   : "text-vault-muted hover:text-vault-secondary"
               )}
               title="Edit only"
@@ -201,28 +200,28 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               type="button"
               onClick={() => setViewMode("split")}
               className={cn(
-                "px-2 py-1 rounded text-xs transition-colors hidden sm:flex items-center gap-1",
+                "px-2.5 py-1 rounded-lg text-xs transition-all font-medium hidden sm:flex items-center gap-1.5 cursor-pointer",
                 viewMode === "split"
-                  ? "bg-vault-card text-vault-primary font-medium"
+                  ? "bg-vault-card text-vault-primary shadow-xs"
                   : "text-vault-muted hover:text-vault-secondary"
               )}
               title="Split View"
             >
-              <Columns2 className="w-3 h-3" />
+              <Columns2 className="w-3.5 h-3.5" />
               <span>Split</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode("preview")}
               className={cn(
-                "px-2 py-1 rounded text-xs transition-colors flex items-center gap-1",
+                "px-2.5 py-1 rounded-lg text-xs transition-all font-medium flex items-center gap-1.5 cursor-pointer",
                 viewMode === "preview"
-                  ? "bg-vault-card text-vault-primary font-medium"
+                  ? "bg-vault-card text-vault-primary shadow-xs"
                   : "text-vault-muted hover:text-vault-secondary"
               )}
               title="Preview only"
             >
-              <Eye className="w-3 h-3" />
+              <Eye className="w-3.5 h-3.5" />
               <span>Preview</span>
             </button>
           </div>
@@ -230,22 +229,22 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Auto-save Status Badge */}
           <div className="shrink-0 flex items-center">
             {saveStatus === "saving" ? (
-              <Badge variant="pending" size="sm" className="gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-vault-pending animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span>Saving</span>
-              </Badge>
+              </span>
             ) : (
-              <Badge variant="success" size="sm" className="gap-1">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Check className="w-3 h-3" />
                 <span>Saved</span>
-              </Badge>
+              </span>
             )}
           </div>
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="text-vault-muted hover:text-vault-secondary rounded p-1 transition-colors shrink-0"
+            className="w-8 h-8 flex items-center justify-center text-vault-muted hover:text-vault-primary hover:bg-vault-elevated rounded-lg transition-colors shrink-0 cursor-pointer"
             aria-label="Close editor"
           >
             <X className="w-4 h-4" />
@@ -272,7 +271,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Write your note in Markdown... Press $ to detect stock tickers automatically."
-                className="w-full h-full p-4 bg-transparent text-vault-primary text-xs sm:text-sm font-sans placeholder-vault-muted resize-none focus:outline-none leading-relaxed"
+                className="w-full h-full p-4 sm:p-6 bg-transparent text-vault-primary text-xs sm:text-sm font-sans placeholder-vault-muted resize-none focus:outline-none leading-relaxed selection:bg-vault-accent/30 selection:text-white"
               />
             </div>
           )}
@@ -281,12 +280,12 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {viewMode !== "edit" && (
             <div
               className={cn(
-                "h-full p-4 overflow-y-auto bg-vault-card/40",
+                "h-full p-4 sm:p-6 overflow-y-auto bg-vault-card/40",
                 viewMode === "split" ? "w-1/2" : "w-full"
               )}
             >
               {content.trim() ? (
-                <div className="prose prose-invert max-w-none">
+                <div className="prose prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-100 prose-p:text-slate-300 prose-p:leading-relaxed prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-code:text-sky-300 prose-code:bg-vault-elevated prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l prose-blockquote:border-vault-accent/40 prose-blockquote:text-slate-400 prose-blockquote:bg-vault-elevated/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-xl">
                   {renderMarkdown(content)}
                 </div>
               ) : (
@@ -300,7 +299,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
         {/* Live Detected Market Symbols Bar */}
         {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
-          <div className="px-4 py-2 border-t border-vault-border/60 bg-vault-bg/40 flex items-center gap-2">
+          <div className="px-4 sm:px-6 py-2.5 border-t border-vault-border/60 bg-vault-bg/60 flex items-center gap-3">
             <span className="text-[11px] font-semibold text-vault-muted uppercase tracking-wider shrink-0">
               Detected Symbols:
             </span>
@@ -311,14 +310,14 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         )}
 
         {/* Editor Footer */}
-        <div className="px-4 py-2.5 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">
+        <div className="px-4 sm:px-6 py-3 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">
           <div className="flex items-center gap-3">
-            <span>{wordCount} words</span>
-            <span>•</span>
-            <span>{charCount} characters</span>
+            <span className="font-mono text-[11px]">{wordCount} words</span>
+            <span className="text-vault-muted">•</span>
+            <span className="font-mono text-[11px]">{charCount} characters</span>
             {item && onTogglePin && (
               <>
-                <span>•</span>
+                <span className="text-vault-muted">•</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -326,11 +325,13 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     onTogglePin(item.id);
                   }}
                   className={cn(
-                    "flex items-center gap-1 transition-colors",
-                    isPinned ? "text-vault-accent" : "hover:text-vault-primary"
+                    "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors cursor-pointer",
+                    isPinned
+                      ? "text-amber-400 bg-amber-400/10 font-medium"
+                      : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated"
                   )}
                 >
-                  <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
+                  <Pin className={cn("w-3.5 h-3.5", isPinned && "fill-current")} />
                   <span>{isPinned ? "Pinned" : "Pin"}</span>
                 </button>
               </>
@@ -348,9 +349,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     onClose();
                   }
                 }}
-                className="h-7 text-xs"
               >
-                <Trash2 className="w-3 h-3 mr-1" />
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
                 <span>Delete</span>
               </Button>
             )}
@@ -358,7 +358,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               variant="primary"
               size="sm"
               onClick={onClose}
-              className="h-7 text-xs font-medium"
+              className="font-medium"
             >
               Done
             </Button>

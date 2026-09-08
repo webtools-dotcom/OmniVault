@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Inbox, Sparkles, TrendingUp, Link2, FileText, Image as ImageIcon } from "lucide-react";
+import { Inbox, TrendingUp, Link2, FileText, Image as ImageIcon } from "lucide-react";
 import { Folder, ItemType, VaultItem } from "../../types";
 import { QuickCaptureBar } from "./QuickCaptureBar";
 import { QuickInboxItemCard } from "./QuickInboxItemCard";
@@ -56,16 +56,16 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
       <QuickCaptureBar onCapture={onCapture} />
 
       {/* Filter Chips Bar */}
-      <div className="flex items-center justify-between gap-2 pb-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+      <div className="flex items-center justify-between gap-2 pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
           <button
             type="button"
             onClick={() => setSelectedTypeFilter("all")}
             className={cn(
-              "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shrink-0",
               selectedTypeFilter === "all"
-                ? "bg-vault-elevated text-vault-primary border border-vault-border"
-                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+                ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.12] shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
             All Items ({items.length})
@@ -75,13 +75,13 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             type="button"
             onClick={() => setSelectedTypeFilter("note")}
             className={cn(
-              "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shrink-0",
               selectedTypeFilter === "note"
-                ? "bg-vault-elevated text-vault-primary border border-vault-border"
-                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+                ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.12] shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
-            <FileText className="w-3 h-3 text-vault-accent" />
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
             <span>Notes</span>
           </button>
 
@@ -89,13 +89,13 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             type="button"
             onClick={() => setSelectedTypeFilter("ticker")}
             className={cn(
-              "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shrink-0",
               selectedTypeFilter === "ticker"
-                ? "bg-vault-elevated text-vault-primary border border-vault-border"
-                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+                ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.12] shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
-            <TrendingUp className="w-3 h-3 text-vault-success" />
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             <span>Tickers</span>
           </button>
 
@@ -103,13 +103,13 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             type="button"
             onClick={() => setSelectedTypeFilter("link")}
             className={cn(
-              "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shrink-0",
               selectedTypeFilter === "link"
-                ? "bg-vault-elevated text-vault-primary border border-vault-border"
-                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+                ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.12] shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
-            <Link2 className="w-3 h-3 text-vault-pending" />
+            <Link2 className="w-3.5 h-3.5 text-amber-400" />
             <span>Links</span>
           </button>
 
@@ -117,13 +117,13 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             type="button"
             onClick={() => setSelectedTypeFilter("image")}
             className={cn(
-              "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shrink-0",
               selectedTypeFilter === "image"
-                ? "bg-vault-elevated text-vault-primary border border-vault-border"
-                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+                ? "bg-white/[0.08] text-vault-primary font-semibold ring-1 ring-white/[0.12] shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
             )}
           >
-            <ImageIcon className="w-3 h-3 text-purple-400" />
+            <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
             <span>Images</span>
           </button>
         </div>
@@ -131,27 +131,34 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
 
       {/* Inbox Items Grid / List */}
       {filteredItems.length === 0 ? (
-        <div className="py-12 flex flex-col items-center justify-center text-center rounded-2xl border border-dashed border-vault-border bg-vault-card/30 p-8">
-          <div className="w-14 h-14 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-3 text-vault-accent shadow-xs">
+        <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-transparent p-6 sm:p-10 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4 text-blue-400 shadow-[0_0_24px_rgba(59,130,246,0.18)]">
             <Inbox className="w-7 h-7" />
           </div>
-          <h3 className="text-sm font-semibold text-vault-primary mb-1">
-            {searchQuery ? "No matching items found" : "Inbox is completely empty"}
+          <h3 className="text-base font-bold text-vault-primary mb-1.5 tracking-tight">
+            {searchQuery ? "No matching captures found" : "Inbox Zero • All thoughts filed"}
           </h3>
-          <p className="text-xs text-vault-secondary max-w-sm mb-4">
+          <p className="text-xs sm:text-sm text-vault-secondary max-w-md mb-6 leading-relaxed">
             {searchQuery
-              ? `No captures matching "${searchQuery}". Try another keyword.`
-              : "Capture unfiled ideas, thoughts, tickers, links, or paste screenshots above."}
+              ? `No captures matching "${searchQuery}". Clear your search query or try different terms.`
+              : "Your staging ground is clear. Capture fleeting ideas above, paste screenshots from clipboard, or pair your phone over Wi-Fi."}
           </p>
           {!searchQuery && (
-            <div className="flex items-center gap-2 text-xs text-vault-muted">
-              <Sparkles className="w-3.5 h-3.5 text-vault-accent" />
-              <span>Press Ctrl+V anywhere to paste screenshot</span>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-vault-muted">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                <kbd className="font-mono text-blue-400 text-[11px]">Ctrl+V</kbd> Paste chart
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                <kbd className="font-mono text-emerald-400 text-[11px]">Ctrl+Enter</kbd> Save note
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                <kbd className="font-mono text-amber-400 text-[11px]">Ctrl+B</kbd> Toggle folders
+              </span>
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredItems.map((item) => (
             <QuickInboxItemCard
               key={item.id}
