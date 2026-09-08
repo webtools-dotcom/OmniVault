@@ -10,6 +10,12 @@ export interface Folder {
   is_deleted: boolean;
 }
 
+export interface FolderTreeNode {
+  folder: Folder;
+  children: FolderTreeNode[];
+  depth: number;
+}
+
 export type ItemType = 'note' | 'image' | 'link' | 'ticker';
 
 export interface VaultItem {

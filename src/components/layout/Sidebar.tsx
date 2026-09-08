@@ -1,7 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
 import {
-  Folder as FolderIcon,
-  FolderPlus,
   Inbox,
   PanelLeftClose,
   Plus,
@@ -13,6 +11,7 @@ import {
 import { ActiveView, Folder, MeshSyncState } from "../../types";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
 export interface SidebarProps {
@@ -23,7 +22,10 @@ export interface SidebarProps {
   activeView: ActiveView;
   onSelectInbox: () => void;
   onSelectFolder: (folderId: string) => void;
-  onCreateFolder?: () => void;
+  onCreateFolder: (name: string, parentId: string | null, color: string | null) => Promise<void> | void;
+  onRenameFolder: (folderId: string, newName: string) => Promise<void> | void;
+  onMoveFolder: (folderId: string, newParentId: string | null) => Promise<void> | void;
+  onDeleteFolder: (folderId: string) => Promise<void> | void;
   folders?: Folder[];
   inboxCount: number;
   meshState: MeshSyncState;
@@ -39,11 +41,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectInbox,
   onSelectFolder,
   onCreateFolder,
+  onRenameFolder,
+  onMoveFolder,
+  onDeleteFolder,
   folders = [],
   inboxCount,
   meshState,
   onOpenPairing,
 }) => {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const isInboxActive = activeView.type === "inbox";
   const activeFolderId = activeView.type === "folder" ? activeView.folderId : null;
 
@@ -131,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Folders Section */}
+        {/* Folders Section with Hierarchical Tree */}
         <div>
           <div className="flex items-center justify-between px-2 py-1 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-vault-muted">
@@ -140,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onCreateFolder}
+              onClick={() => setIsCreateOpen(true)}
               title="Create new folder"
               className="h-6 w-6 text-vault-secondary hover:text-vault-primary"
             >
@@ -148,55 +154,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Button>
           </div>
 
-          {folders.length === 0 ? (
-            <div className="p-3 text-center rounded-lg border border-dashed border-vault-border bg-vault-bg/40">
-              <FolderPlus className="w-6 h-6 mx-auto mb-1.5 text-vault-muted/70" />
-              <p className="text-xs text-vault-secondary font-medium mb-1">
-                No folders yet
-              </p>
-              <p className="text-[11px] text-vault-muted mb-2.5">
-                Organize unfiled items into hierarchical folders
-              </p>
-              {onCreateFolder && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onCreateFolder}
-                  className="w-full text-xs"
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  New Folder
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {folders.map((folder) => {
-                const isActive = activeFolderId === folder.id;
-                return (
-                  <button
-                    key={folder.id}
-                    onClick={() => onSelectFolder(folder.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors text-left group",
-                      isActive
-                        ? "bg-vault-elevated text-vault-primary font-medium border-l-2 border-vault-accent"
-                        : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/50"
-                    )}
-                  >
-                    <FolderIcon
-                      className={cn(
-                        "w-3.5 h-3.5 shrink-0",
-                        isActive ? "text-vault-accent" : "text-vault-muted group-hover:text-vault-secondary"
-                      )}
-                      style={folder.color ? { color: folder.color } : undefined}
-                    />
-                    <span className="truncate flex-1">{folder.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <FolderTree
+            folders={folders}
+            activeFolderId={activeFolderId}
+            onSelectFolder={onSelectFolder}
+            onCreateFolder={onCreateFolder}
+            onRenameFolder={onRenameFolder}
+            onMoveFolder={onMoveFolder}
+            onDeleteFolder={onDeleteFolder}
+            isCreateModalOpen={isCreateOpen}
+            onCloseCreateModal={() => setIsCreateOpen(false)}
+          />
         </div>
       </div>
 

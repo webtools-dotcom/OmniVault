@@ -1,45 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { FolderGit2, Inbox, Plus, Sparkles } from "lucide-react";
 import { ActiveView, BreadcrumbItem, Folder, MeshSyncState } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
 import { Button } from "./components/common/Button";
-
-// Initial folder hierarchy for scaffolding preview & navigation testing
-const INITIAL_FOLDERS: Folder[] = [
-  {
-    id: "fld-research",
-    parent_id: null,
-    name: "Research & Notes",
-    color: "#2F81F7",
-    created_at: Date.now() - 3600000,
-    updated_at: Date.now() - 3600000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-trading",
-    parent_id: null,
-    name: "Market Setups & Charts",
-    color: "#238636",
-    created_at: Date.now() - 7200000,
-    updated_at: Date.now() - 7200000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-ideas",
-    parent_id: null,
-    name: "Product Ideas",
-    color: "#D29922",
-    created_at: Date.now() - 10800000,
-    updated_at: Date.now() - 10800000,
-    is_deleted: false,
-  },
-];
+import { getFolderPath } from "./utils/folderTree";
+import { StorageService } from "./services/storageService";
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>({ type: "inbox" });
-  const [folders, setFolders] = useState<Folder[]>(INITIAL_FOLDERS);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [inboxCount] = useState(0);
   const [meshState] = useState<MeshSyncState>({
@@ -47,34 +18,49 @@ export function App() {
     peerCount: 0,
   });
 
+  // Load initial folders from storage service
+  const refreshFolders = useCallback(async () => {
+    try {
+      const data = await StorageService.getFolders();
+      setFolders(data);
+    } catch (err) {
+      console.error("Failed to load folders:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshFolders();
+  }, [refreshFolders]);
+
   // Find active folder details if folder view
   const activeFolder = useMemo(() => {
     if (activeView.type === "folder") {
-      return folders.find((f) => f.id === activeView.folderId) || null;
+      return folders.find((f) => f.id === activeView.folderId && !f.is_deleted) || null;
     }
     return null;
   }, [activeView, folders]);
 
-  // Compute breadcrumbs hierarchy based on active view
+  // Compute breadcrumbs hierarchy based on active view and folder ancestry
   const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
     if (activeView.type === "inbox") {
       return [{ id: "inbox", label: "Quick Inbox", active: true }];
     }
 
     if (activeView.type === "folder" && activeFolder) {
-      // If folder has parent, in future can traverse chain; currently single level
-      return [
-        {
-          id: "folders",
-          label: "Folders",
-          onClick: () => setActiveView({ type: "inbox" }),
-        },
-        { id: activeFolder.id, label: activeFolder.name, active: true },
-      ];
+      const path = getFolderPath(activeFolder.id, folders);
+      return path.map((folder, index) => ({
+        id: folder.id,
+        label: folder.name,
+        active: index === path.length - 1,
+        onClick:
+          index < path.length - 1
+            ? () => setActiveView({ type: "folder", folderId: folder.id })
+            : undefined,
+      }));
     }
 
     return [{ id: "root", label: "Workspace", active: true }];
-  }, [activeView, activeFolder]);
+  }, [activeView, activeFolder, folders]);
 
   // View title
   const viewTitle = useMemo(() => {
@@ -91,20 +77,35 @@ export function App() {
     setActiveView({ type: "folder", folderId });
   };
 
-  const handleCreateFolder = () => {
-    const name = window.prompt("Folder name:");
-    if (!name?.trim()) return;
-    const newFolder: Folder = {
-      id: `fld-${Date.now()}`,
-      parent_id: null,
-      name: name.trim(),
-      color: "#2F81F7",
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      is_deleted: false,
-    };
-    setFolders((prev) => [...prev, newFolder]);
-    setActiveView({ type: "folder", folderId: newFolder.id });
+  const handleCreateFolder = async (
+    name: string,
+    parentId: string | null,
+    color: string | null
+  ) => {
+    const created = await StorageService.createFolder(name, parentId, color);
+    await refreshFolders();
+    setActiveView({ type: "folder", folderId: created.id });
+  };
+
+  const handleRenameFolder = async (folderId: string, newName: string) => {
+    await StorageService.renameFolder(folderId, newName);
+    await refreshFolders();
+  };
+
+  const handleMoveFolder = async (
+    folderId: string,
+    newParentId: string | null
+  ) => {
+    await StorageService.moveFolder(folderId, newParentId);
+    await refreshFolders();
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    await StorageService.deleteFolder(folderId);
+    await refreshFolders();
+    if (activeView.type === "folder" && activeView.folderId === folderId) {
+      setActiveView({ type: "inbox" });
+    }
   };
 
   return (
@@ -119,6 +120,9 @@ export function App() {
           onSelectInbox={handleSelectInbox}
           onSelectFolder={handleSelectFolder}
           onCreateFolder={handleCreateFolder}
+          onRenameFolder={handleRenameFolder}
+          onMoveFolder={handleMoveFolder}
+          onDeleteFolder={handleDeleteFolder}
           folders={folders}
           inboxCount={inboxCount}
           meshState={meshState}

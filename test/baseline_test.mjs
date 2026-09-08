@@ -28,7 +28,15 @@ const requiredFiles = [
   "src/components/layout/Breadcrumbs.tsx",
   "src/components/layout/ContentPane.tsx",
   "src/components/common/Button.tsx",
-  "src/components/common/Badge.tsx"
+  "src/components/common/Badge.tsx",
+  "src/utils/folderTree.ts",
+  "src/services/storageService.ts",
+  "src/components/folders/FolderTree.tsx",
+  "src/components/folders/FolderTreeItem.tsx",
+  "src/components/folders/CreateFolderModal.tsx",
+  "src/components/folders/RenameFolderModal.tsx",
+  "src/components/folders/MoveFolderModal.tsx",
+  "src/components/folders/DeleteFolderModal.tsx"
 ];
 
 for (const relPath of requiredFiles) {
