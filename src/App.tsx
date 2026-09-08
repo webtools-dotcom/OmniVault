@@ -12,6 +12,8 @@ import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
 import { MoveItemModal } from "./components/inbox/MoveItemModal";
 import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
 import { NoteEditorModal } from "./components/editor/NoteEditorModal";
+import { ImageLightbox } from "./components/media/ImageLightbox";
+import { useClipboardPaste } from "./hooks/useClipboardPaste";
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>({ type: "inbox" });
@@ -24,6 +26,9 @@ export function App() {
   // Note Editor State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editorItem, setEditorItem] = useState<VaultItem | null>(null);
+
+  // Lightbox State
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   const [meshState] = useState<MeshSyncState>({
     status: "standby",
@@ -169,6 +174,26 @@ export function App() {
     }
   };
 
+  // Automatic Clipboard Paste Listener: capture pasted screenshot directly
+  useClipboardPaste({
+    enabled: !isEditorOpen && !lightboxImage,
+    onPasteImage: async (dataUrl, file) => {
+      const now = new Date();
+      const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const title = `Pasted Screenshot (${timeStr})`;
+      await handleCaptureItem(
+        "image",
+        title,
+        dataUrl,
+        JSON.stringify({
+          originalName: file.name,
+          byteSize: file.size,
+          mimeType: "image/webp",
+        })
+      );
+    },
+  });
+
   const handleTogglePin = async (itemId: string) => {
     await StorageService.togglePinItem(itemId);
     if (activeView.type === "folder") {
@@ -285,9 +310,16 @@ export function App() {
               onMoveItem={handleMoveItem}
               onDeleteItem={handleDeleteItem}
               onSelectItem={(item) => {
-                setEditorItem(item);
-                setIsEditorOpen(true);
+                if (item.item_type === "image") {
+                  setLightboxImage({ url: item.content, title: item.title });
+                } else {
+                  setEditorItem(item);
+                  setIsEditorOpen(true);
+                }
               }}
+              onViewImage={(url, title) =>
+                setLightboxImage({ url, title: title || "Image Preview" })
+              }
               searchQuery={searchQuery}
             />
           ) : (
@@ -321,9 +353,16 @@ export function App() {
                       onOpenMove={setTargetMoveFolderItem}
                       onDeleteItem={handleDeleteItem}
                       onSelectItem={(item) => {
-                        setEditorItem(item);
-                        setIsEditorOpen(true);
+                        if (item.item_type === "image") {
+                          setLightboxImage({ url: item.content, title: item.title });
+                        } else {
+                          setEditorItem(item);
+                          setIsEditorOpen(true);
+                        }
                       }}
+                      onViewImage={(url, title) =>
+                        setLightboxImage({ url, title: title || "Image Preview" })
+                      }
                     />
                   ))}
                 </div>
@@ -353,6 +392,14 @@ export function App() {
             onTogglePin={handleTogglePin}
             folders={folders}
             initialFolderId={activeView.type === "folder" ? activeView.folderId : null}
+          />
+
+          {/* High-Res Chart & Image Lightbox with Zoom */}
+          <ImageLightbox
+            isOpen={!!lightboxImage}
+            onClose={() => setLightboxImage(null)}
+            imageUrl={lightboxImage?.url || ""}
+            title={lightboxImage?.title}
           />
         </ContentPane>
       )}

@@ -3,7 +3,9 @@ import {
   ExternalLink,
   FileText,
   FolderInput,
+  Image as ImageIcon,
   Link2,
+  Maximize2,
   Pin,
   Trash2,
   TrendingUp,
@@ -19,6 +21,7 @@ export interface QuickInboxItemCardProps {
   onOpenMove: (item: VaultItem) => void;
   onDeleteItem: (itemId: string) => Promise<void> | void;
   onSelectItem?: (item: VaultItem) => void;
+  onViewImage?: (imageUrl: string, title?: string) => void;
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -38,9 +41,11 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   onOpenMove,
   onDeleteItem,
   onSelectItem,
+  onViewImage,
 }) => {
   const isTicker = item.item_type === "ticker";
   const isLink = item.item_type === "link";
+  const isImage = item.item_type === "image";
 
   // Parse ticker or link URL if present
   let tickerSymbol: string | null = null;
@@ -85,13 +90,16 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
               "w-6 h-6 rounded-md flex items-center justify-center shrink-0",
               isTicker && "bg-vault-success/15 text-vault-success",
               isLink && "bg-vault-pending/15 text-vault-pending",
-              !isTicker && !isLink && "bg-vault-accent/15 text-vault-accent"
+              isImage && "bg-purple-500/15 text-purple-400",
+              !isTicker && !isLink && !isImage && "bg-vault-accent/15 text-vault-accent"
             )}
           >
             {isTicker ? (
               <TrendingUp className="w-3.5 h-3.5" />
             ) : isLink ? (
               <Link2 className="w-3.5 h-3.5" />
+            ) : isImage ? (
+              <ImageIcon className="w-3.5 h-3.5" />
             ) : (
               <FileText className="w-3.5 h-3.5" />
             )}
@@ -130,8 +138,29 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         </div>
       </div>
 
-      {/* Card Body */}
-      {item.content && (
+      {/* Image Thumbnail Preview */}
+      {isImage && item.content && (
+        <div
+          className="relative mb-3 rounded-lg overflow-hidden border border-vault-border bg-vault-bg/60 group/img max-h-48 flex items-center justify-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewImage?.(item.content, item.title);
+          }}
+        >
+          <img
+            src={item.content}
+            alt={item.title}
+            className="w-full h-auto max-h-48 object-cover rounded"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-medium backdrop-blur-xs">
+            <Maximize2 className="w-4 h-4" />
+            <span>Click to Zoom</span>
+          </div>
+        </div>
+      )}
+
+      {/* Card Text Content (if not an image or if note) */}
+      {!isImage && item.content && (
         <p className="text-xs text-vault-secondary line-clamp-3 leading-relaxed mb-3 font-normal">
           {item.content}
         </p>

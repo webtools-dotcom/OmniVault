@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Inbox, Sparkles, TrendingUp, Link2, FileText } from "lucide-react";
+import { Inbox, Sparkles, TrendingUp, Link2, FileText, Image as ImageIcon } from "lucide-react";
 import { Folder, ItemType, VaultItem } from "../../types";
 import { QuickCaptureBar } from "./QuickCaptureBar";
 import { QuickInboxItemCard } from "./QuickInboxItemCard";
@@ -14,6 +14,7 @@ export interface QuickInboxViewProps {
   onMoveItem: (itemId: string, folderId: string | null) => Promise<void> | void;
   onDeleteItem: (itemId: string) => Promise<void> | void;
   onSelectItem?: (item: VaultItem) => void;
+  onViewImage?: (imageUrl: string, title?: string) => void;
   searchQuery?: string;
 }
 
@@ -25,6 +26,7 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
   onMoveItem,
   onDeleteItem,
   onSelectItem,
+  onViewImage,
   searchQuery = "",
 }) => {
   const [targetMoveItem, setTargetMoveItem] = useState<VaultItem | null>(null);
@@ -110,6 +112,20 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             <Link2 className="w-3 h-3 text-vault-pending" />
             <span>Links</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTypeFilter("image")}
+            className={cn(
+              "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              selectedTypeFilter === "image"
+                ? "bg-vault-elevated text-vault-primary border border-vault-border"
+                : "text-vault-muted hover:text-vault-secondary hover:bg-vault-elevated/40"
+            )}
+          >
+            <ImageIcon className="w-3 h-3 text-purple-400" />
+            <span>Images</span>
+          </button>
         </div>
       </div>
 
@@ -125,12 +141,12 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
           <p className="text-xs text-vault-secondary max-w-sm mb-4">
             {searchQuery
               ? `No captures matching "${searchQuery}". Try another keyword.`
-              : "Capture unfiled ideas, thoughts, tickers, or links above. Triage them into folders when ready."}
+              : "Capture unfiled ideas, thoughts, tickers, links, or paste screenshots above."}
           </p>
           {!searchQuery && (
             <div className="flex items-center gap-2 text-xs text-vault-muted">
               <Sparkles className="w-3.5 h-3.5 text-vault-accent" />
-              <span>Items save locally in sub-millisecond time</span>
+              <span>Press Ctrl+V anywhere to paste screenshot</span>
             </div>
           )}
         </div>
@@ -144,6 +160,7 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
               onOpenMove={setTargetMoveItem}
               onDeleteItem={onDeleteItem}
               onSelectItem={onSelectItem}
+              onViewImage={onViewImage}
             />
           ))}
         </div>

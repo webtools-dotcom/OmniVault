@@ -5,7 +5,8 @@ use tauri::State;
 pub mod db;
 pub mod sync;
 
-use crate::db::models::{Folder, VaultItem};
+use crate::db::media;
+use crate::db::models::{Folder, MediaFile, VaultItem};
 use crate::db::schema;
 use crate::db::storage;
 
@@ -147,6 +148,30 @@ fn delete_item_cmd(state: State<AppState>, id: String) -> Result<(), String> {
     storage::delete_item(&mut conn, &id, &state.device_id).map_err(|e| e.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Media Commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn save_image_media_cmd(
+    state: State<AppState>,
+    item_id: String,
+    raw_bytes: Vec<u8>,
+) -> Result<MediaFile, String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    media::save_image_media(&mut conn, ".", &item_id, &raw_bytes, &state.device_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_item_media_cmd(
+    state: State<AppState>,
+    item_id: String,
+) -> Result<Vec<MediaFile>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    media::get_media_by_item_id(&conn, &item_id).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("omnivault.db")
@@ -175,6 +200,8 @@ pub fn run() {
             update_item_cmd,
             move_item_cmd,
             delete_item_cmd,
+            save_image_media_cmd,
+            get_item_media_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

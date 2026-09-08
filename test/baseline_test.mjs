@@ -43,7 +43,9 @@ const requiredFiles = [
   "src/components/inbox/QuickInboxView.tsx",
   "src/utils/markdown.tsx",
   "src/components/editor/MarkdownToolbar.tsx",
-  "src/components/editor/NoteEditorModal.tsx"
+  "src/components/editor/NoteEditorModal.tsx",
+  "src/components/media/ImageLightbox.tsx",
+  "src/hooks/useClipboardPaste.ts"
 ];
 
 for (const relPath of requiredFiles) {
