@@ -45,7 +45,10 @@ const requiredFiles = [
   "src/components/editor/MarkdownToolbar.tsx",
   "src/components/editor/NoteEditorModal.tsx",
   "src/components/media/ImageLightbox.tsx",
-  "src/hooks/useClipboardPaste.ts"
+  "src/hooks/useClipboardPaste.ts",
+  "src/utils/tickerDetector.ts",
+  "src/utils/linkDetector.ts",
+  "src/components/research/SmartMarketLauncher.tsx"
 ];
 
 for (const relPath of requiredFiles) {

@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Check, Columns2, Eye, FileText, Pin, Trash2, X } from "lucide-react";
 import { Folder, ItemType, VaultItem } from "../../types";
 import { MarkdownToolbar } from "./MarkdownToolbar";
 import { renderMarkdown } from "../../utils/markdown";
+import { extractTickers } from "../../utils/tickerDetector";
+import { extractLinks } from "../../utils/linkDetector";
+import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
 import { Button } from "../common/Button";
 import { Badge } from "../common/Badge";
 import { cn } from "../../utils/cn";
@@ -136,6 +139,9 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
   const activeFolders = folders.filter((f) => !f.is_deleted);
+
+  const detectedTickers = useMemo(() => extractTickers(`${title} ${content}`), [title, content]);
+  const detectedLinks = useMemo(() => extractLinks(content), [content]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs select-none">
@@ -291,6 +297,18 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Live Detected Market Symbols Bar */}
+        {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
+          <div className="px-4 py-2 border-t border-vault-border/60 bg-vault-bg/40 flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-vault-muted uppercase tracking-wider shrink-0">
+              Detected Symbols:
+            </span>
+            <div className="flex-1 overflow-x-auto">
+              <SmartMarketLauncher tickers={detectedTickers} links={detectedLinks} />
+            </div>
+          </div>
+        )}
 
         {/* Editor Footer */}
         <div className="px-4 py-2.5 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">

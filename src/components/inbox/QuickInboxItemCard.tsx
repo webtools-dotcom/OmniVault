@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
-  ExternalLink,
   FileText,
   FolderInput,
   Image as ImageIcon,
@@ -14,6 +13,9 @@ import { VaultItem } from "../../types";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { cn } from "../../utils/cn";
+import { extractTickers } from "../../utils/tickerDetector";
+import { extractLinks } from "../../utils/linkDetector";
+import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
 
 export interface QuickInboxItemCardProps {
   item: VaultItem;
@@ -47,29 +49,14 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   const isLink = item.item_type === "link";
   const isImage = item.item_type === "image";
 
-  // Parse ticker or link URL if present
-  let tickerSymbol: string | null = null;
-  let linkUrl: string | null = null;
+  // Auto-detect any stock/crypto tickers and web links in the item
+  const detectedTickers = useMemo(() => {
+    return extractTickers(`${item.title} ${item.content}`);
+  }, [item.title, item.content]);
 
-  if (isTicker && item.metadata) {
-    try {
-      tickerSymbol = JSON.parse(item.metadata).ticker || null;
-    } catch {
-      tickerSymbol = item.title.replace(/^\$/, "");
-    }
-  }
-
-  if (isLink) {
-    if (item.metadata) {
-      try {
-        linkUrl = JSON.parse(item.metadata).url || null;
-      } catch {
-        linkUrl = item.content;
-      }
-    } else if (item.content.startsWith("http")) {
-      linkUrl = item.content;
-    }
-  }
+  const detectedLinks = useMemo(() => {
+    return extractLinks(item.content);
+  }, [item.content]);
 
   return (
     <div
@@ -161,37 +148,15 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
 
       {/* Card Text Content (if not an image or if note) */}
       {!isImage && item.content && (
-        <p className="text-xs text-vault-secondary line-clamp-3 leading-relaxed mb-3 font-normal">
+        <p className="text-xs text-vault-secondary line-clamp-3 leading-relaxed mb-2 font-normal">
           {item.content}
         </p>
       )}
 
-      {/* Ticker / Link Special Actions */}
-      {isTicker && tickerSymbol && (
-        <div className="mb-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <a
-            href={`https://www.tradingview.com/symbols/${tickerSymbol}/`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-vault-elevated text-vault-accent text-[11px] font-medium border border-vault-border hover:border-vault-border-active transition-colors"
-          >
-            <ExternalLink className="w-3 h-3" />
-            <span>TradingView: {tickerSymbol}</span>
-          </a>
-        </div>
-      )}
-
-      {isLink && linkUrl && (
-        <div className="mb-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <a
-            href={linkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-vault-elevated text-vault-accent text-[11px] font-medium border border-vault-border hover:border-vault-border-active truncate max-w-full transition-colors"
-          >
-            <ExternalLink className="w-3 h-3 shrink-0" />
-            <span className="truncate">{linkUrl}</span>
-          </a>
+      {/* Smart Ticker & Link Launchers (Auto-detected) */}
+      {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
+        <div className="mb-2">
+          <SmartMarketLauncher tickers={detectedTickers} links={detectedLinks} />
         </div>
       )}
 
