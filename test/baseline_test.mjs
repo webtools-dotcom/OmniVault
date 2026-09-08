@@ -66,4 +66,19 @@ const tauriConfig = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "src-
 assert.strictEqual(tauriConfig.productName, "OmniVault");
 assert.strictEqual(tauriConfig.identifier, "com.omnivault.app");
 
-console.log("✅ All baseline structure assertions passed successfully!");
+// 4. Verify P4-T03 drag-and-drop triage and filing capabilities
+const itemCardContent = fs.readFileSync(path.resolve(process.cwd(), "src/components/inbox/QuickInboxItemCard.tsx"), "utf-8");
+assert.ok(itemCardContent.includes("draggable"), "QuickInboxItemCard missing draggable attribute");
+assert.ok(itemCardContent.includes("application/x-omnivault-item"), "QuickInboxItemCard missing drag data type");
+
+const treeItemContent = fs.readFileSync(path.resolve(process.cwd(), "src/components/folders/FolderTreeItem.tsx"), "utf-8");
+assert.ok(treeItemContent.includes("onDragOver"), "FolderTreeItem missing onDragOver drop target handler");
+assert.ok(treeItemContent.includes("onDrop"), "FolderTreeItem missing onDrop drop target handler");
+assert.ok(treeItemContent.includes("onMoveItem"), "FolderTreeItem missing onMoveItem prop");
+
+const moveModalContent = fs.readFileSync(path.resolve(process.cwd(), "src/components/inbox/MoveItemModal.tsx"), "utf-8");
+assert.ok(moveModalContent.includes("handleDirectMove"), "MoveItemModal missing 1-click handleDirectMove triage handler");
+assert.ok(moveModalContent.includes("folderPaths"), "MoveItemModal missing hierarchical folderPaths computation");
+
+console.log("✅ All baseline structure and triage assertions passed successfully!");
+

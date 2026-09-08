@@ -22,6 +22,7 @@ export interface FolderTreeItemProps {
   onOpenRename: (folder: Folder) => void;
   onOpenMove: (folder: Folder) => void;
   onOpenDelete: (folder: Folder) => void;
+  onMoveItem?: (itemId: string, targetFolderId: string | null) => Promise<void> | void;
 }
 
 export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
@@ -34,9 +35,12 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
   onOpenRename,
   onOpenMove,
   onOpenDelete,
+  onMoveItem,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dragHoverTimerRef = useRef<number | null>(null);
 
   const { folder, children, depth } = node;
   const hasChildren = children.length > 0;
@@ -55,13 +59,71 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  // Clean up drag hover expand timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dragHoverTimerRef.current) {
+        clearTimeout(dragHoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (
+      e.dataTransfer.types.includes("application/x-omnivault-item") ||
+      e.dataTransfer.types.includes("text/plain")
+    ) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!isDragOver) {
+        setIsDragOver(true);
+        // Auto-expand folder after hovering for 500ms if it has children and is collapsed
+        if (hasChildren && !isExpanded) {
+          dragHoverTimerRef.current = window.setTimeout(() => {
+            onToggleExpand(folder.id);
+          }, 500);
+        }
+      }
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+      if (dragHoverTimerRef.current) {
+        clearTimeout(dragHoverTimerRef.current);
+        dragHoverTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (dragHoverTimerRef.current) {
+      clearTimeout(dragHoverTimerRef.current);
+      dragHoverTimerRef.current = null;
+    }
+    const itemId =
+      e.dataTransfer.getData("application/x-omnivault-item") ||
+      e.dataTransfer.getData("text/plain");
+    if (itemId && onMoveItem) {
+      await onMoveItem(itemId, folder.id);
+    }
+  };
+
   return (
     <div className="select-none">
       {/* Folder Row */}
       <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
           "group relative flex items-center h-8 pr-1.5 rounded-md text-xs transition-colors cursor-pointer",
-          isActive
+          isDragOver
+            ? "bg-vault-accent/20 text-vault-primary font-medium border-2 border-vault-accent shadow-xs scale-[1.01]"
+            : isActive
             ? "bg-vault-elevated text-vault-primary font-medium border-l-2 border-vault-accent"
             : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/50"
         )}
@@ -222,6 +284,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
               onOpenRename={onOpenRename}
               onOpenMove={onOpenMove}
               onOpenDelete={onOpenDelete}
+              onMoveItem={onMoveItem}
             />
           ))}
         </div>

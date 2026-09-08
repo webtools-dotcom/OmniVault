@@ -26,6 +26,7 @@ export interface SidebarProps {
   onRenameFolder: (folderId: string, newName: string) => Promise<void> | void;
   onMoveFolder: (folderId: string, newParentId: string | null) => Promise<void> | void;
   onDeleteFolder: (folderId: string) => Promise<void> | void;
+  onMoveItem?: (itemId: string, targetFolderId: string | null) => Promise<void> | void;
   folders?: Folder[];
   inboxCount: number;
   meshState: MeshSyncState;
@@ -44,12 +45,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenameFolder,
   onMoveFolder,
   onDeleteFolder,
+  onMoveItem,
   folders = [],
   inboxCount,
   meshState,
   onOpenPairing,
 }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isInboxDragOver, setIsInboxDragOver] = useState(false);
   const isInboxActive = activeView.type === "inbox";
   const activeFolderId = activeView.type === "folder" ? activeView.folderId : null;
 
@@ -114,9 +117,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           <button
             onClick={onSelectInbox}
+            onDragOver={(e) => {
+              if (
+                e.dataTransfer.types.includes("application/x-omnivault-item") ||
+                e.dataTransfer.types.includes("text/plain")
+              ) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setIsInboxDragOver(true);
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setIsInboxDragOver(false);
+              }
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              setIsInboxDragOver(false);
+              const itemId =
+                e.dataTransfer.getData("application/x-omnivault-item") ||
+                e.dataTransfer.getData("text/plain");
+              if (itemId && onMoveItem) {
+                await onMoveItem(itemId, null);
+              }
+            }}
             className={cn(
               "w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-left",
-              isInboxActive
+              isInboxDragOver
+                ? "bg-vault-accent/20 text-vault-primary font-medium border-2 border-vault-accent shadow-xs scale-[1.01]"
+                : isInboxActive
                 ? "bg-vault-elevated text-vault-primary font-medium border-l-2 border-vault-accent shadow-xs"
                 : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/60"
             )}
@@ -124,10 +154,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Inbox
               className={cn(
                 "w-4 h-4 shrink-0",
-                isInboxActive ? "text-vault-accent" : "text-vault-secondary"
+                isInboxDragOver || isInboxActive ? "text-vault-accent" : "text-vault-secondary"
               )}
             />
-            <span className="flex-1">Quick Inbox</span>
+            <span className="flex-1">
+              {isInboxDragOver ? "Drop to unfile" : "Quick Inbox"}
+            </span>
             <Badge
               variant={inboxCount > 0 ? "accent" : "default"}
               size="sm"
@@ -162,6 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onRenameFolder={onRenameFolder}
             onMoveFolder={onMoveFolder}
             onDeleteFolder={onDeleteFolder}
+            onMoveItem={onMoveItem}
             isCreateModalOpen={isCreateOpen}
             onCloseCreateModal={() => setIsCreateOpen(false)}
           />

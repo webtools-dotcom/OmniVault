@@ -1,7 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FileText,
   FolderInput,
+  GripVertical,
   Image as ImageIcon,
   Link2,
   Maximize2,
@@ -45,6 +46,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   onSelectItem,
   onViewImage,
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
   const isTicker = item.item_type === "ticker";
   const isLink = item.item_type === "link";
   const isImage = item.item_type === "image";
@@ -58,12 +60,28 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
     return extractLinks(item.content);
   }, [item.content]);
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/x-omnivault-item", item.id);
+    e.dataTransfer.setData("text/plain", item.id);
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={() => onSelectItem?.(item)}
       className={cn(
         "group relative bg-vault-card border rounded-xl p-4 transition-all duration-150 shadow-xs hover:shadow-md cursor-pointer",
-        item.is_pinned
+        isDragging
+          ? "opacity-40 ring-2 ring-vault-accent/50 scale-[0.98]"
+          : item.is_pinned
           ? "border-vault-accent/40 bg-vault-card/90"
           : "border-vault-border hover:border-vault-border-active/60"
       )}
@@ -71,6 +89,15 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       {/* Card Header */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Drag Handle */}
+          <div
+            className="text-vault-muted/40 group-hover:text-vault-muted cursor-grab active:cursor-grabbing p-0.5 -ml-1 transition-colors shrink-0"
+            title="Drag to file into folder"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </div>
+
           {/* Format Icon */}
           <div
             className={cn(

@@ -17,6 +17,7 @@ export interface FolderTreeProps {
   onRenameFolder: (folderId: string, newName: string) => Promise<void> | void;
   onMoveFolder: (folderId: string, newParentId: string | null) => Promise<void> | void;
   onDeleteFolder: (folderId: string) => Promise<void> | void;
+  onMoveItem?: (itemId: string, targetFolderId: string | null) => Promise<void> | void;
   isCreateModalOpen?: boolean;
   onCloseCreateModal?: () => void;
 }
@@ -29,6 +30,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   onRenameFolder,
   onMoveFolder,
   onDeleteFolder,
+  onMoveItem,
   isCreateModalOpen = false,
   onCloseCreateModal,
 }) => {
@@ -128,6 +130,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
               onOpenRename={setTargetRenameFolder}
               onOpenMove={setTargetMoveFolder}
               onOpenDelete={setTargetDeleteFolder}
+              onMoveItem={onMoveItem}
             />
           ))}
         </div>

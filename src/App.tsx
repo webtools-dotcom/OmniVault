@@ -268,6 +268,7 @@ export function App() {
           onRenameFolder={handleRenameFolder}
           onMoveFolder={handleMoveFolder}
           onDeleteFolder={handleDeleteFolder}
+          onMoveItem={handleMoveItem}
           folders={folders}
           inboxCount={inboxItems.length}
           meshState={meshState}
