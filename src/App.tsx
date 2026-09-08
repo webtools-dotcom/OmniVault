@@ -11,6 +11,7 @@ import { QuickInboxView } from "./components/inbox/QuickInboxView";
 import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
 import { MoveItemModal } from "./components/inbox/MoveItemModal";
 import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
+import { NoteEditorModal } from "./components/editor/NoteEditorModal";
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>({ type: "inbox" });
@@ -19,6 +20,11 @@ export function App() {
   const [folderItems, setFolderItems] = useState<VaultItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetMoveFolderItem, setTargetMoveFolderItem] = useState<VaultItem | null>(null);
+
+  // Note Editor State
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editorItem, setEditorItem] = useState<VaultItem | null>(null);
+
   const [meshState] = useState<MeshSyncState>({
     status: "standby",
     peerCount: 0,
@@ -189,6 +195,36 @@ export function App() {
     }
   };
 
+  // Editor Save handler
+  const handleSaveEditorItem = async (
+    itemId: string | null,
+    title: string,
+    content: string,
+    targetFolderId: string | null,
+    itemType: ItemType,
+    metadata?: string | null
+  ) => {
+    if (itemId) {
+      const updated = await StorageService.updateItem(itemId, title, content, metadata);
+      if (updated.folder_id !== targetFolderId) {
+        await StorageService.moveItem(itemId, targetFolderId);
+      }
+    } else {
+      await StorageService.createItem(
+        targetFolderId,
+        itemType,
+        title,
+        content,
+        metadata || null
+      );
+    }
+
+    await refreshInboxItems();
+    if (activeView.type === "folder") {
+      await refreshFolderItems(activeView.folderId);
+    }
+  };
+
   const currentItemCount =
     activeView.type === "inbox" ? inboxItems.length : folderItems.length;
 
@@ -228,11 +264,14 @@ export function App() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => {}}
+              onClick={() => {
+                setEditorItem(null);
+                setIsEditorOpen(true);
+              }}
               className="font-medium"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>New Capture</span>
+              <span>New Note</span>
             </Button>
           }
         >
@@ -245,6 +284,10 @@ export function App() {
               onTogglePin={handleTogglePin}
               onMoveItem={handleMoveItem}
               onDeleteItem={handleDeleteItem}
+              onSelectItem={(item) => {
+                setEditorItem(item);
+                setIsEditorOpen(true);
+              }}
               searchQuery={searchQuery}
             />
           ) : (
@@ -277,6 +320,10 @@ export function App() {
                       onTogglePin={handleTogglePin}
                       onOpenMove={setTargetMoveFolderItem}
                       onDeleteItem={handleDeleteItem}
+                      onSelectItem={(item) => {
+                        setEditorItem(item);
+                        setIsEditorOpen(true);
+                      }}
                     />
                   ))}
                 </div>
@@ -292,6 +339,21 @@ export function App() {
               />
             </div>
           )}
+
+          {/* Dedicated Note & Idea Editor Modal */}
+          <NoteEditorModal
+            item={editorItem}
+            isOpen={isEditorOpen}
+            onClose={() => {
+              setIsEditorOpen(false);
+              setEditorItem(null);
+            }}
+            onSave={handleSaveEditorItem}
+            onDelete={handleDeleteItem}
+            onTogglePin={handleTogglePin}
+            folders={folders}
+            initialFolderId={activeView.type === "folder" ? activeView.folderId : null}
+          />
         </ContentPane>
       )}
     </AppLayout>

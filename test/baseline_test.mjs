@@ -40,7 +40,10 @@ const requiredFiles = [
   "src/components/inbox/QuickCaptureBar.tsx",
   "src/components/inbox/QuickInboxItemCard.tsx",
   "src/components/inbox/MoveItemModal.tsx",
-  "src/components/inbox/QuickInboxView.tsx"
+  "src/components/inbox/QuickInboxView.tsx",
+  "src/utils/markdown.tsx",
+  "src/components/editor/MarkdownToolbar.tsx",
+  "src/components/editor/NoteEditorModal.tsx"
 ];
 
 for (const relPath of requiredFiles) {
