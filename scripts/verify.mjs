@@ -24,6 +24,10 @@ const steps = [
     name: "Frontend Production Bundle Smoke Test",
     command: "node test/preview_check.mjs",
   },
+  {
+    name: "Windows Release Packaging & Asset Integrity Check",
+    command: "node scripts/package_windows.mjs",
+  },
 ];
 
 let allPassed = true;
@@ -36,15 +40,19 @@ for (const [index, step] of steps.entries()) {
 
   try {
     const execCwd = step.cwd ? path.resolve(process.cwd(), step.cwd) : process.cwd();
-    try {
-      execSync(step.command, { cwd: execCwd, stdio: "pipe", encoding: "utf-8" });
-    } catch (initialErr) {
-      // Windows MSVC link.exe transient lock recovery (LNK1104)
-      if (initialErr.stdout?.includes("LNK1104") || initialErr.stderr?.includes("LNK1104")) {
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
         execSync(step.command, { cwd: execCwd, stdio: "pipe", encoding: "utf-8" });
-      } else {
-        throw initialErr;
+        break;
+      } catch (err) {
+        attempts++;
+        const outStr = String(err.stdout || "") + String(err.stderr || "") + String(err.message || "");
+        if (outStr.includes("LNK1104") && attempts < 3) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
+          continue;
+        }
+        throw err;
       }
     }
     const stepDuration = ((performance.now() - stepStart) / 1000).toFixed(2);

@@ -54,7 +54,9 @@ const requiredFiles = [
   "src/components/pairing/QrConnectModal.tsx",
   "public/manifest.json",
   "public/sw.js",
-  "scripts/package_windows.mjs"
+  "scripts/package_windows.mjs",
+  "README.md",
+  "LICENSE"
 ];
 
 for (const relPath of requiredFiles) {
@@ -151,7 +153,21 @@ if (fs.existsSync(releaseExe)) {
   assert.ok(stat.size < 15 * 1024 * 1024, `Release binary must be < 15MB. Actual: ${(stat.size / (1024 * 1024)).toFixed(2)} MB`);
 }
 
-console.log("✅ All baseline structure, triage, HTTP server, QR modal, PWA, and release packaging assertions passed successfully!");
+// 9. Verify P6-T02 V1 Release & Documentation Preparation
+const readmeContent = fs.readFileSync(path.resolve(process.cwd(), "README.md"), "utf-8");
+assert.ok(readmeContent.includes("OmniVault"), "README.md missing OmniVault title");
+assert.ok(readmeContent.includes("Architecture"), "README.md missing Architecture section");
+assert.ok(readmeContent.includes("Quick Start"), "README.md missing Quick Start section");
+assert.ok(readmeContent.includes("Local REST API Reference"), "README.md missing REST API reference");
+assert.ok(readmeContent.includes("Keyboard Shortcuts"), "README.md missing Keyboard Shortcuts table");
+
+const licenseContent = fs.readFileSync(path.resolve(process.cwd(), "LICENSE"), "utf-8");
+assert.ok(licenseContent.includes("MIT License"), "LICENSE missing MIT License header");
+
+const verifyScriptContent = fs.readFileSync(path.resolve(process.cwd(), "scripts/verify.mjs"), "utf-8");
+assert.ok(verifyScriptContent.includes("Windows Release Packaging"), "verify.mjs missing release packaging verification step");
+
+console.log("✅ All baseline structure, triage, HTTP server, QR modal, PWA, packaging, and V1 release assertions passed successfully!");
 
 
 
