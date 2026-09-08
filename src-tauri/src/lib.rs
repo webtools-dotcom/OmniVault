@@ -1,18 +1,21 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 use tauri::State;
 
 pub mod db;
 pub mod sync;
+pub mod http_server;
 
 use crate::db::media;
 use crate::db::models::{Folder, MediaFile, VaultItem};
 use crate::db::schema;
 use crate::db::storage;
 
+#[derive(Clone)]
 pub struct AppState {
-    pub db: Mutex<Connection>,
+    pub db: Arc<Mutex<Connection>>,
     pub device_id: String,
+    pub server_port: u16,
 }
 
 #[tauri::command]
@@ -172,6 +175,11 @@ fn get_item_media_cmd(
     media::get_media_by_item_id(&conn, &item_id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnectionInfo {
+    http_server::get_lan_connection_info(state.server_port)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("omnivault.db")
@@ -180,9 +188,17 @@ pub fn run() {
     schema::initialize_schema(&conn).expect("failed to init schema");
     let device_id = storage::get_or_create_device_id(&conn).expect("failed to get device_id");
 
+    let db = Arc::new(Mutex::new(conn));
+
+    // Start embedded HTTP server on background thread (default port 42420)
+    let server_handle = http_server::start_http_server(db.clone(), device_id.clone(), 42420)
+        .expect("failed to start embedded http server");
+    let server_port = server_handle.port;
+
     let state = AppState {
-        db: Mutex::new(conn),
+        db: db.clone(),
         device_id,
+        server_port,
     };
 
     tauri::Builder::default()
@@ -202,6 +218,7 @@ pub fn run() {
             delete_item_cmd,
             save_image_media_cmd,
             get_item_media_cmd,
+            get_lan_connection_info_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

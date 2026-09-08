@@ -234,7 +234,7 @@ mod tests {
         let mut node_b = setup_node_db();
 
         let dev_a = "device-phone-a";
-        let dev_b = "device-laptop-b";
+        let _dev_b = "device-laptop-b";
 
         // 1. On Node A (Phone while outside): User creates folder and items
         let folder = create_folder(&mut node_a, "Stock Research", None, Some("#2F81F7"), dev_a).unwrap();

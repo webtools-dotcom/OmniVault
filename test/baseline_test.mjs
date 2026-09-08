@@ -48,7 +48,8 @@ const requiredFiles = [
   "src/hooks/useClipboardPaste.ts",
   "src/utils/tickerDetector.ts",
   "src/utils/linkDetector.ts",
-  "src/components/research/SmartMarketLauncher.tsx"
+  "src/components/research/SmartMarketLauncher.tsx",
+  "src-tauri/src/http_server.rs"
 ];
 
 for (const relPath of requiredFiles) {
@@ -80,5 +81,17 @@ const moveModalContent = fs.readFileSync(path.resolve(process.cwd(), "src/compon
 assert.ok(moveModalContent.includes("handleDirectMove"), "MoveItemModal missing 1-click handleDirectMove triage handler");
 assert.ok(moveModalContent.includes("folderPaths"), "MoveItemModal missing hierarchical folderPaths computation");
 
-console.log("✅ All baseline structure and triage assertions passed successfully!");
+// 5. Verify P5-T01 Embedded HTTP server capabilities
+const httpServerContent = fs.readFileSync(path.resolve(process.cwd(), "src-tauri/src/http_server.rs"), "utf-8");
+assert.ok(httpServerContent.includes("start_http_server"), "http_server.rs missing start_http_server function");
+assert.ok(httpServerContent.includes("get_lan_connection_info"), "http_server.rs missing get_lan_connection_info function");
+assert.ok(httpServerContent.includes("/api/lan-info"), "http_server.rs missing /api/lan-info route");
+assert.ok(httpServerContent.includes("/api/health"), "http_server.rs missing /api/health route");
+
+const libContent = fs.readFileSync(path.resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf-8");
+assert.ok(libContent.includes("get_lan_connection_info_cmd"), "lib.rs missing get_lan_connection_info_cmd Tauri command");
+assert.ok(libContent.includes("start_http_server"), "lib.rs missing start_http_server call");
+
+console.log("✅ All baseline structure, triage, and embedded HTTP server assertions passed successfully!");
+
 
