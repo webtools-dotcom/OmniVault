@@ -1,4 +1,5 @@
 pub mod db;
+pub mod sync;
 
 #[tauri::command]
 fn get_system_status() -> String {

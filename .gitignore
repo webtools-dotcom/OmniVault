@@ -11,6 +11,10 @@ build/
 *.db-journal
 media_storage/
 
-# System files
+# System & IDE files
+.agent/
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+
