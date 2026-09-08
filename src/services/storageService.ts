@@ -1,4 +1,4 @@
-import { Folder, VaultItem } from "../types";
+import { Folder, ItemType, VaultItem } from "../types";
 
 const STORAGE_KEY_FOLDERS = "omnivault_folders_v1";
 const STORAGE_KEY_ITEMS = "omnivault_items_v1";
@@ -51,6 +51,48 @@ const DEFAULT_FOLDERS: Folder[] = [
   },
 ];
 
+const DEFAULT_ITEMS: VaultItem[] = [
+  {
+    id: "item-init-1",
+    folder_id: null, // Quick Inbox
+    item_type: "note",
+    title: "OmniVault Offline Mesh Architecture",
+    content: "Capture notes instantly without internet connectivity. Revisions sync asynchronously via mDNS & local TCP mesh when peers reconnect.",
+    metadata: null,
+    is_pinned: true,
+    is_archived: false,
+    is_deleted: false,
+    created_at: Date.now() - 1200000,
+    updated_at: Date.now() - 1200000,
+  },
+  {
+    id: "item-init-2",
+    folder_id: null, // Quick Inbox
+    item_type: "ticker",
+    title: "$NVDA",
+    content: "AI infrastructure demand acceleration. Potential consolidation setup near weekly highs.",
+    metadata: JSON.stringify({ ticker: "NVDA", exchange: "NASDAQ" }),
+    is_pinned: false,
+    is_archived: false,
+    is_deleted: false,
+    created_at: Date.now() - 3600000,
+    updated_at: Date.now() - 3600000,
+  },
+  {
+    id: "item-init-3",
+    folder_id: null, // Quick Inbox
+    item_type: "link",
+    title: "Local-First Software Foundations",
+    content: "https://www.inkandswitch.com/local-first/",
+    metadata: JSON.stringify({ url: "https://www.inkandswitch.com/local-first/" }),
+    is_pinned: false,
+    is_archived: false,
+    is_deleted: false,
+    created_at: Date.now() - 5400000,
+    updated_at: Date.now() - 5400000,
+  },
+];
+
 // Helper to check if Tauri runtime is present
 export function isTauriEnvironment(): boolean {
   return (
@@ -77,12 +119,36 @@ function saveLocalFolders(folders: Folder[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(folders));
   } catch {
-    // Ignore localStorage quota errors
+    // Ignore quota errors
   }
 }
 
-// Unified Folder Storage API
+function getLocalItems(): VaultItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ITEMS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(DEFAULT_ITEMS));
+      return DEFAULT_ITEMS;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return DEFAULT_ITEMS;
+  }
+}
+
+function saveLocalItems(items: VaultItem[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
+  } catch {
+    // Ignore quota errors
+  }
+}
+
+// Unified Storage API
 export const StorageService = {
+  // -------------------------------------------------------------------------
+  // Folders
+  // -------------------------------------------------------------------------
   async getFolders(): Promise<Folder[]> {
     if (isTauriEnvironment()) {
       try {
@@ -192,7 +258,6 @@ export const StorageService = {
     const folders = getLocalFolders();
     const now = Date.now();
 
-    // Mark folder and any descendants as soft deleted
     const toDeleteIds = new Set<string>([folderId]);
     let added = true;
     while (added) {
@@ -215,26 +280,171 @@ export const StorageService = {
     saveLocalFolders(folders);
   },
 
-  // Vault Items (Inbox / Folder items)
+  // -------------------------------------------------------------------------
+  // Vault Items (Quick Inbox & Folder Items)
+  // -------------------------------------------------------------------------
   async getInboxItems(): Promise<VaultItem[]> {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_ITEMS);
-      if (!raw) return [];
-      const items: VaultItem[] = JSON.parse(raw);
-      return items.filter((item) => item.folder_id === null && !item.is_deleted);
-    } catch {
-      return [];
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem[]>("list_inbox_items_cmd");
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
     }
+    const items = getLocalItems();
+    return items
+      .filter((item) => item.folder_id === null && !item.is_deleted && !item.is_archived)
+      .sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        return b.updated_at - a.updated_at;
+      });
   },
 
   async getFolderItems(folderId: string): Promise<VaultItem[]> {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_ITEMS);
-      if (!raw) return [];
-      const items: VaultItem[] = JSON.parse(raw);
-      return items.filter((item) => item.folder_id === folderId && !item.is_deleted);
-    } catch {
-      return [];
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem[]>("list_folder_items_cmd", { folderId });
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+    const items = getLocalItems();
+    return items
+      .filter((item) => item.folder_id === folderId && !item.is_deleted)
+      .sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        return b.updated_at - a.updated_at;
+      });
+  },
+
+  async createItem(
+    folderId: string | null,
+    itemType: ItemType,
+    title: string,
+    content: string,
+    metadata: string | null = null
+  ): Promise<VaultItem> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem>("create_item_cmd", {
+          folderId,
+          itemType,
+          title,
+          content,
+          metadata,
+        });
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+
+    const items = getLocalItems();
+    const now = Date.now();
+    const newItem: VaultItem = {
+      id: `item-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      folder_id: folderId,
+      item_type: itemType,
+      title: title.trim(),
+      content: content.trim(),
+      metadata,
+      is_pinned: false,
+      is_archived: false,
+      is_deleted: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    items.unshift(newItem);
+    saveLocalItems(items);
+    return newItem;
+  },
+
+  async updateItem(
+    itemId: string,
+    title: string,
+    content: string,
+    metadata: string | null = null
+  ): Promise<VaultItem> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem>("update_item_cmd", {
+          id: itemId,
+          title,
+          content,
+          metadata,
+        });
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+
+    const items = getLocalItems();
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error("Item not found");
+
+    item.title = title.trim();
+    item.content = content.trim();
+    item.metadata = metadata;
+    item.updated_at = Date.now();
+    saveLocalItems(items);
+    return item;
+  },
+
+  async moveItem(itemId: string, newFolderId: string | null): Promise<VaultItem> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<VaultItem>("move_item_cmd", {
+          id: itemId,
+          folderId: newFolderId,
+        });
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+
+    const items = getLocalItems();
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error("Item not found");
+
+    item.folder_id = newFolderId;
+    item.updated_at = Date.now();
+    saveLocalItems(items);
+    return item;
+  },
+
+  async togglePinItem(itemId: string): Promise<VaultItem> {
+    const items = getLocalItems();
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error("Item not found");
+
+    item.is_pinned = !item.is_pinned;
+    item.updated_at = Date.now();
+    saveLocalItems(items);
+    return item;
+  },
+
+  async deleteItem(itemId: string): Promise<void> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("delete_item_cmd", { id: itemId });
+        return;
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to local storage:", err);
+      }
+    }
+
+    const items = getLocalItems();
+    const item = items.find((i) => i.id === itemId);
+    if (item) {
+      item.is_deleted = true;
+      item.updated_at = Date.now();
+      saveLocalItems(items);
     }
   },
 };

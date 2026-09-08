@@ -1,24 +1,30 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FolderGit2, Inbox, Plus, Sparkles } from "lucide-react";
-import { ActiveView, BreadcrumbItem, Folder, MeshSyncState } from "./types";
+import { FolderGit2, Plus } from "lucide-react";
+import { ActiveView, BreadcrumbItem, Folder, ItemType, MeshSyncState, VaultItem } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
 import { Button } from "./components/common/Button";
 import { getFolderPath } from "./utils/folderTree";
 import { StorageService } from "./services/storageService";
+import { QuickInboxView } from "./components/inbox/QuickInboxView";
+import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
+import { MoveItemModal } from "./components/inbox/MoveItemModal";
+import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
 
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>({ type: "inbox" });
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [inboxItems, setInboxItems] = useState<VaultItem[]>([]);
+  const [folderItems, setFolderItems] = useState<VaultItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [inboxCount] = useState(0);
+  const [targetMoveFolderItem, setTargetMoveFolderItem] = useState<VaultItem | null>(null);
   const [meshState] = useState<MeshSyncState>({
     status: "standby",
     peerCount: 0,
   });
 
-  // Load initial folders from storage service
+  // Load folders and items
   const refreshFolders = useCallback(async () => {
     try {
       const data = await StorageService.getFolders();
@@ -28,9 +34,34 @@ export function App() {
     }
   }, []);
 
+  const refreshInboxItems = useCallback(async () => {
+    try {
+      const items = await StorageService.getInboxItems();
+      setInboxItems(items);
+    } catch (err) {
+      console.error("Failed to load inbox items:", err);
+    }
+  }, []);
+
+  const refreshFolderItems = useCallback(async (folderId: string) => {
+    try {
+      const items = await StorageService.getFolderItems(folderId);
+      setFolderItems(items);
+    } catch (err) {
+      console.error("Failed to load folder items:", err);
+    }
+  }, []);
+
   useEffect(() => {
     refreshFolders();
-  }, [refreshFolders]);
+    refreshInboxItems();
+  }, [refreshFolders, refreshInboxItems]);
+
+  useEffect(() => {
+    if (activeView.type === "folder") {
+      refreshFolderItems(activeView.folderId);
+    }
+  }, [activeView, refreshFolderItems]);
 
   // Find active folder details if folder view
   const activeFolder = useMemo(() => {
@@ -69,6 +100,7 @@ export function App() {
     return "OmniVault Workspace";
   }, [activeView, activeFolder]);
 
+  // Navigation handlers
   const handleSelectInbox = () => {
     setActiveView({ type: "inbox" });
   };
@@ -77,6 +109,7 @@ export function App() {
     setActiveView({ type: "folder", folderId });
   };
 
+  // Folder CRUD handlers
   const handleCreateFolder = async (
     name: string,
     parentId: string | null,
@@ -108,6 +141,57 @@ export function App() {
     }
   };
 
+  // Item CRUD handlers
+  const handleCaptureItem = async (
+    itemType: ItemType,
+    title: string,
+    content: string,
+    metadata?: string
+  ) => {
+    const currentFolderId = activeView.type === "folder" ? activeView.folderId : null;
+    await StorageService.createItem(
+      currentFolderId,
+      itemType,
+      title,
+      content,
+      metadata || null
+    );
+    if (currentFolderId) {
+      await refreshFolderItems(currentFolderId);
+    } else {
+      await refreshInboxItems();
+    }
+  };
+
+  const handleTogglePin = async (itemId: string) => {
+    await StorageService.togglePinItem(itemId);
+    if (activeView.type === "folder") {
+      await refreshFolderItems(activeView.folderId);
+    } else {
+      await refreshInboxItems();
+    }
+  };
+
+  const handleMoveItem = async (itemId: string, newFolderId: string | null) => {
+    await StorageService.moveItem(itemId, newFolderId);
+    await refreshInboxItems();
+    if (activeView.type === "folder") {
+      await refreshFolderItems(activeView.folderId);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    await StorageService.deleteItem(itemId);
+    if (activeView.type === "folder") {
+      await refreshFolderItems(activeView.folderId);
+    } else {
+      await refreshInboxItems();
+    }
+  };
+
+  const currentItemCount =
+    activeView.type === "inbox" ? inboxItems.length : folderItems.length;
+
   return (
     <AppLayout
       sidebar={({ isOpen, isMobile, onClose, onToggleCollapse }) => (
@@ -124,7 +208,7 @@ export function App() {
           onMoveFolder={handleMoveFolder}
           onDeleteFolder={handleDeleteFolder}
           folders={folders}
-          inboxCount={inboxCount}
+          inboxCount={inboxItems.length}
           meshState={meshState}
         />
       )}
@@ -137,7 +221,7 @@ export function App() {
           onToggleSidebar={onToggleSidebar}
           isMobile={isMobile}
           title={viewTitle}
-          itemCount={activeView.type === "inbox" ? inboxCount : 0}
+          itemCount={currentItemCount}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           headerActions={
@@ -148,44 +232,64 @@ export function App() {
               className="font-medium"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>New Note</span>
+              <span>New Capture</span>
             </Button>
           }
         >
           {/* Content Body */}
           {activeView.type === "inbox" ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-4 text-vault-accent shadow-sm">
-                <Inbox className="w-8 h-8" />
-              </div>
-              <h2 className="text-lg font-semibold text-vault-primary mb-1">
-                Quick Inbox is Empty
-              </h2>
-              <p className="text-sm text-vault-secondary max-w-md mb-6">
-                Capture quick thoughts, links, and screenshots in under 2 seconds. Items stay here until you triage them into folders.
-              </p>
-              <div className="flex items-center gap-3">
-                <Button variant="secondary" size="md" onClick={() => {}}>
-                  <Sparkles className="w-4 h-4 text-vault-accent mr-1.5" />
-                  <span>Capture Note</span>
-                </Button>
-              </div>
-            </div>
+            <QuickInboxView
+              items={inboxItems}
+              folders={folders}
+              onCapture={handleCaptureItem}
+              onTogglePin={handleTogglePin}
+              onMoveItem={handleMoveItem}
+              onDeleteItem={handleDeleteItem}
+              searchQuery={searchQuery}
+            />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-4 text-vault-accent shadow-sm">
-                <FolderGit2 className="w-8 h-8" />
-              </div>
-              <h2 className="text-lg font-semibold text-vault-primary mb-1">
-                {activeFolder?.name || "Folder"} is Empty
-              </h2>
-              <p className="text-sm text-vault-secondary max-w-md mb-6">
-                No items in this folder yet. Create notes, save links, or drag items here from Quick Inbox.
-              </p>
-              <Button variant="secondary" size="md" onClick={() => {}}>
-                <Plus className="w-4 h-4 text-vault-accent mr-1.5" />
-                <span>Add Item to Folder</span>
-              </Button>
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Direct Folder Capture Bar */}
+              <QuickCaptureBar
+                onCapture={handleCaptureItem}
+                folderId={activeFolder?.id}
+              />
+
+              {/* Folder Items Grid */}
+              {folderItems.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center rounded-2xl border border-dashed border-vault-border bg-vault-card/30 p-8">
+                  <div className="w-14 h-14 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-3 text-vault-accent shadow-xs">
+                    <FolderGit2 className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-vault-primary mb-1">
+                    {activeFolder?.name || "Folder"} is Empty
+                  </h3>
+                  <p className="text-xs text-vault-secondary max-w-sm mb-4">
+                    Capture directly into this folder above, or file items here from your Quick Inbox.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {folderItems.map((item) => (
+                    <QuickInboxItemCard
+                      key={item.id}
+                      item={item}
+                      onTogglePin={handleTogglePin}
+                      onOpenMove={setTargetMoveFolderItem}
+                      onDeleteItem={handleDeleteItem}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Move Item Modal */}
+              <MoveItemModal
+                item={targetMoveFolderItem}
+                isOpen={!!targetMoveFolderItem}
+                onClose={() => setTargetMoveFolderItem(null)}
+                onMove={handleMoveItem}
+                folders={folders}
+              />
             </div>
           )}
         </ContentPane>

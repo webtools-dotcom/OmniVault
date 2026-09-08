@@ -5,7 +5,7 @@ use tauri::State;
 pub mod db;
 pub mod sync;
 
-use crate::db::models::Folder;
+use crate::db::models::{Folder, VaultItem};
 use crate::db::schema;
 use crate::db::storage;
 
@@ -18,6 +18,10 @@ pub struct AppState {
 fn get_system_status() -> String {
     "OmniVault Core Ready".into()
 }
+
+// ---------------------------------------------------------------------------
+// Folder Commands
+// ---------------------------------------------------------------------------
 
 #[tauri::command]
 fn list_folders_cmd(state: State<AppState>) -> Result<Vec<Folder>, String> {
@@ -69,6 +73,80 @@ fn delete_folder_cmd(state: State<AppState>, id: String) -> Result<(), String> {
     storage::delete_folder(&mut conn, &id, &state.device_id).map_err(|e| e.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Item Commands (Quick Inbox & Folders)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn list_inbox_items_cmd(state: State<AppState>) -> Result<Vec<VaultItem>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::list_inbox_items(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_folder_items_cmd(state: State<AppState>, folder_id: String) -> Result<Vec<VaultItem>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::list_items_by_folder(&conn, &folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_item_cmd(
+    state: State<AppState>,
+    folder_id: Option<String>,
+    item_type: String,
+    title: String,
+    content: String,
+    metadata: Option<String>,
+) -> Result<VaultItem, String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::create_item(
+        &mut conn,
+        folder_id.as_deref(),
+        &item_type,
+        &title,
+        &content,
+        metadata.as_deref(),
+        &state.device_id,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn update_item_cmd(
+    state: State<AppState>,
+    id: String,
+    title: String,
+    content: String,
+    metadata: Option<String>,
+) -> Result<VaultItem, String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::update_item(
+        &mut conn,
+        &id,
+        &title,
+        &content,
+        metadata.as_deref(),
+        &state.device_id,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn move_item_cmd(
+    state: State<AppState>,
+    id: String,
+    folder_id: Option<String>,
+) -> Result<VaultItem, String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::move_item(&mut conn, &id, folder_id.as_deref(), &state.device_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_item_cmd(state: State<AppState>, id: String) -> Result<(), String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::delete_item(&mut conn, &id, &state.device_id).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("omnivault.db")
@@ -91,6 +169,12 @@ pub fn run() {
             rename_folder_cmd,
             move_folder_cmd,
             delete_folder_cmd,
+            list_inbox_items_cmd,
+            list_folder_items_cmd,
+            create_item_cmd,
+            update_item_cmd,
+            move_item_cmd,
+            delete_item_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

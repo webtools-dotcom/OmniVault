@@ -36,7 +36,11 @@ const requiredFiles = [
   "src/components/folders/CreateFolderModal.tsx",
   "src/components/folders/RenameFolderModal.tsx",
   "src/components/folders/MoveFolderModal.tsx",
-  "src/components/folders/DeleteFolderModal.tsx"
+  "src/components/folders/DeleteFolderModal.tsx",
+  "src/components/inbox/QuickCaptureBar.tsx",
+  "src/components/inbox/QuickInboxItemCard.tsx",
+  "src/components/inbox/MoveItemModal.tsx",
+  "src/components/inbox/QuickInboxView.tsx"
 ];
 
 for (const relPath of requiredFiles) {
