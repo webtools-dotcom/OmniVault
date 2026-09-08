@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FolderGit2, Plus } from "lucide-react";
+import { FolderGit2, Plus, QrCode } from "lucide-react";
 import { ActiveView, BreadcrumbItem, Folder, ItemType, MeshSyncState, VaultItem } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -13,6 +13,7 @@ import { MoveItemModal } from "./components/inbox/MoveItemModal";
 import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
 import { NoteEditorModal } from "./components/editor/NoteEditorModal";
 import { ImageLightbox } from "./components/media/ImageLightbox";
+import { QrConnectModal } from "./components/pairing/QrConnectModal";
 import { useClipboardPaste } from "./hooks/useClipboardPaste";
 
 export function App() {
@@ -29,6 +30,9 @@ export function App() {
 
   // Lightbox State
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
+
+  // QR Mobile Connect Modal State
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const [meshState] = useState<MeshSyncState>({
     status: "standby",
@@ -272,6 +276,7 @@ export function App() {
           folders={folders}
           inboxCount={inboxItems.length}
           meshState={meshState}
+          onOpenPairing={() => setIsQrModalOpen(true)}
         />
       )}
     >
@@ -287,18 +292,30 @@ export function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           headerActions={
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setEditorItem(null);
-                setIsEditorOpen(true);
-              }}
-              className="font-medium"
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>New Note</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsQrModalOpen(true)}
+                title="Connect mobile / tablet via QR code"
+                className="font-medium text-xs text-vault-secondary hover:text-vault-primary"
+              >
+                <QrCode className="w-3.5 h-3.5 mr-1 text-vault-accent" />
+                <span className="hidden sm:inline">Connect Mobile</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setEditorItem(null);
+                  setIsEditorOpen(true);
+                }}
+                className="font-medium text-xs"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>New Note</span>
+              </Button>
+            </div>
           }
         >
           {/* Content Body */}
@@ -401,6 +418,12 @@ export function App() {
             onClose={() => setLightboxImage(null)}
             imageUrl={lightboxImage?.url || ""}
             title={lightboxImage?.title}
+          />
+
+          {/* QR Code Mobile & Tablet Connection Modal */}
+          <QrConnectModal
+            isOpen={isQrModalOpen}
+            onClose={() => setIsQrModalOpen(false)}
           />
         </ContentPane>
       )}

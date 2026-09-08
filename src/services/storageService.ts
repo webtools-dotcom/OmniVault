@@ -447,4 +447,24 @@ export const StorageService = {
       saveLocalItems(items);
     }
   },
+
+  async getLanConnectionInfo(): Promise<{ ip: string; port: number; url: string }> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<{ ip: string; port: number; url: string }>("get_lan_connection_info_cmd");
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back to window host:", err);
+      }
+    }
+
+    const host = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1";
+    const port = 42420;
+    const ip = host === "localhost" || host === "127.0.0.1" ? "192.168.1.10" : host;
+    return {
+      ip,
+      port,
+      url: `http://${ip}:${port}`,
+    };
+  },
 };

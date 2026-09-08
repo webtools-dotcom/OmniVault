@@ -49,7 +49,9 @@ const requiredFiles = [
   "src/utils/tickerDetector.ts",
   "src/utils/linkDetector.ts",
   "src/components/research/SmartMarketLauncher.tsx",
-  "src-tauri/src/http_server.rs"
+  "src-tauri/src/http_server.rs",
+  "src/utils/qrCode.ts",
+  "src/components/pairing/QrConnectModal.tsx"
 ];
 
 for (const relPath of requiredFiles) {
@@ -92,6 +94,21 @@ const libContent = fs.readFileSync(path.resolve(process.cwd(), "src-tauri/src/li
 assert.ok(libContent.includes("get_lan_connection_info_cmd"), "lib.rs missing get_lan_connection_info_cmd Tauri command");
 assert.ok(libContent.includes("start_http_server"), "lib.rs missing start_http_server call");
 
-console.log("✅ All baseline structure, triage, and embedded HTTP server assertions passed successfully!");
+// 6. Verify P5-T02 QR code connection modal capabilities
+const qrCodeContent = fs.readFileSync(path.resolve(process.cwd(), "src/utils/qrCode.ts"), "utf-8");
+assert.ok(qrCodeContent.includes("generateQrMatrix"), "qrCode.ts missing generateQrMatrix function");
+assert.ok(qrCodeContent.includes("generateQrPath"), "qrCode.ts missing generateQrPath function");
+
+const qrModalContent = fs.readFileSync(path.resolve(process.cwd(), "src/components/pairing/QrConnectModal.tsx"), "utf-8");
+assert.ok(qrModalContent.includes("QrConnectModal"), "QrConnectModal.tsx missing QrConnectModal component");
+assert.ok(qrModalContent.includes("generateQrMatrix"), "QrConnectModal.tsx missing QR matrix generator integration");
+assert.ok(qrModalContent.includes("handleCopyUrl"), "QrConnectModal.tsx missing 1-click handleCopyUrl action");
+
+const appContent = fs.readFileSync(path.resolve(process.cwd(), "src/App.tsx"), "utf-8");
+assert.ok(appContent.includes("QrConnectModal"), "App.tsx missing QrConnectModal invocation");
+assert.ok(appContent.includes("isQrModalOpen"), "App.tsx missing isQrModalOpen state");
+
+console.log("✅ All baseline structure, triage, HTTP server, and QR connection modal assertions passed successfully!");
+
 
 
