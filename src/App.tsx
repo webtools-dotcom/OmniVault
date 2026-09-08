@@ -1,70 +1,192 @@
-import { FolderGit2, Inbox, ShieldCheck, Wifi } from "lucide-react";
+import { useState, useMemo } from "react";
+import { FolderGit2, Inbox, Plus, Sparkles } from "lucide-react";
+import { ActiveView, BreadcrumbItem, Folder, MeshSyncState } from "./types";
+import { AppLayout } from "./components/layout/AppLayout";
+import { Sidebar } from "./components/layout/Sidebar";
+import { ContentPane } from "./components/layout/ContentPane";
+import { Button } from "./components/common/Button";
+
+// Initial folder hierarchy for scaffolding preview & navigation testing
+const INITIAL_FOLDERS: Folder[] = [
+  {
+    id: "fld-research",
+    parent_id: null,
+    name: "Research & Notes",
+    color: "#2F81F7",
+    created_at: Date.now() - 3600000,
+    updated_at: Date.now() - 3600000,
+    is_deleted: false,
+  },
+  {
+    id: "fld-trading",
+    parent_id: null,
+    name: "Market Setups & Charts",
+    color: "#238636",
+    created_at: Date.now() - 7200000,
+    updated_at: Date.now() - 7200000,
+    is_deleted: false,
+  },
+  {
+    id: "fld-ideas",
+    parent_id: null,
+    name: "Product Ideas",
+    color: "#D29922",
+    created_at: Date.now() - 10800000,
+    updated_at: Date.now() - 10800000,
+    is_deleted: false,
+  },
+];
 
 export function App() {
+  const [activeView, setActiveView] = useState<ActiveView>({ type: "inbox" });
+  const [folders, setFolders] = useState<Folder[]>(INITIAL_FOLDERS);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [inboxCount] = useState(0);
+  const [meshState] = useState<MeshSyncState>({
+    status: "standby",
+    peerCount: 0,
+  });
+
+  // Find active folder details if folder view
+  const activeFolder = useMemo(() => {
+    if (activeView.type === "folder") {
+      return folders.find((f) => f.id === activeView.folderId) || null;
+    }
+    return null;
+  }, [activeView, folders]);
+
+  // Compute breadcrumbs hierarchy based on active view
+  const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
+    if (activeView.type === "inbox") {
+      return [{ id: "inbox", label: "Quick Inbox", active: true }];
+    }
+
+    if (activeView.type === "folder" && activeFolder) {
+      // If folder has parent, in future can traverse chain; currently single level
+      return [
+        {
+          id: "folders",
+          label: "Folders",
+          onClick: () => setActiveView({ type: "inbox" }),
+        },
+        { id: activeFolder.id, label: activeFolder.name, active: true },
+      ];
+    }
+
+    return [{ id: "root", label: "Workspace", active: true }];
+  }, [activeView, activeFolder]);
+
+  // View title
+  const viewTitle = useMemo(() => {
+    if (activeView.type === "inbox") return "Quick Inbox";
+    if (activeView.type === "folder" && activeFolder) return activeFolder.name;
+    return "OmniVault Workspace";
+  }, [activeView, activeFolder]);
+
+  const handleSelectInbox = () => {
+    setActiveView({ type: "inbox" });
+  };
+
+  const handleSelectFolder = (folderId: string) => {
+    setActiveView({ type: "folder", folderId });
+  };
+
+  const handleCreateFolder = () => {
+    const name = window.prompt("Folder name:");
+    if (!name?.trim()) return;
+    const newFolder: Folder = {
+      id: `fld-${Date.now()}`,
+      parent_id: null,
+      name: name.trim(),
+      color: "#2F81F7",
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      is_deleted: false,
+    };
+    setFolders((prev) => [...prev, newFolder]);
+    setActiveView({ type: "folder", folderId: newFolder.id });
+  };
+
   return (
-    <div className="flex h-screen w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-vault-border bg-vault-card flex flex-col">
-        <div className="p-4 border-b border-vault-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-vault-accent" />
-            <span className="font-semibold text-base tracking-tight">OmniVault</span>
-          </div>
-          <span className="text-[11px] px-2 py-0.5 rounded bg-vault-elevated text-vault-secondary border border-vault-border">
-            v0.1.0
-          </span>
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1">
-          <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md bg-vault-elevated text-vault-primary font-medium text-sm">
-            <Inbox className="w-4 h-4 text-vault-accent" />
-            <span>Quick Inbox</span>
-            <span className="ml-auto text-xs px-1.5 py-0.2 bg-vault-card rounded text-vault-secondary">
-              0
-            </span>
-          </button>
-          
-          <div className="pt-4 pb-2 px-3 text-xs font-semibold text-vault-secondary uppercase tracking-wider">
-            Folders
-          </div>
-          
-          <div className="px-3 py-4 text-center text-xs text-vault-muted border border-dashed border-vault-border rounded-md">
-            No folders yet.<br />Ready for Phase 1.
-          </div>
-        </nav>
-
-        {/* Sync Status Footer */}
-        <div className="p-3 border-t border-vault-border flex items-center gap-2 text-xs text-vault-secondary bg-vault-card">
-          <Wifi className="w-4 h-4 text-vault-success" />
-          <span>Local Mesh: Standby</span>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col bg-vault-bg">
-        <header className="h-14 border-b border-vault-border px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-vault-secondary">
-            <span>OmniVault</span>
-            <span>/</span>
-            <span className="text-vault-primary font-medium">Quick Inbox</span>
-          </div>
-        </header>
-
-        <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-4 text-vault-accent shadow-sm">
-            <FolderGit2 className="w-8 h-8" />
-          </div>
-          <h2 className="text-lg font-semibold text-vault-primary mb-1">OmniVault Workspace Initialized</h2>
-          <p className="text-sm text-vault-secondary max-w-md mb-6">
-            Private, local-first store-and-forward sync across mobile, tablet, and laptop. All data stored on local hardware.
-          </p>
-          <div className="flex items-center gap-2 text-xs text-vault-muted">
-            <span className="w-2 h-2 rounded-full bg-vault-success inline-block"></span>
-            <span>Frontend & Rust scaffolding verified</span>
-          </div>
-        </div>
-      </main>
-    </div>
+    <AppLayout
+      sidebar={({ isOpen, isMobile, onClose, onToggleCollapse }) => (
+        <Sidebar
+          isOpen={isOpen}
+          isMobile={isMobile}
+          onClose={onClose}
+          onToggleCollapse={onToggleCollapse}
+          activeView={activeView}
+          onSelectInbox={handleSelectInbox}
+          onSelectFolder={handleSelectFolder}
+          onCreateFolder={handleCreateFolder}
+          folders={folders}
+          inboxCount={inboxCount}
+          meshState={meshState}
+        />
+      )}
+    >
+      {({ isSidebarOpen, isMobile, onToggleSidebar }) => (
+        <ContentPane
+          breadcrumbs={breadcrumbs}
+          onNavigateHome={handleSelectInbox}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={onToggleSidebar}
+          isMobile={isMobile}
+          title={viewTitle}
+          itemCount={activeView.type === "inbox" ? inboxCount : 0}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          headerActions={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {}}
+              className="font-medium"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              <span>New Note</span>
+            </Button>
+          }
+        >
+          {/* Content Body */}
+          {activeView.type === "inbox" ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-4 text-vault-accent shadow-sm">
+                <Inbox className="w-8 h-8" />
+              </div>
+              <h2 className="text-lg font-semibold text-vault-primary mb-1">
+                Quick Inbox is Empty
+              </h2>
+              <p className="text-sm text-vault-secondary max-w-md mb-6">
+                Capture quick thoughts, links, and screenshots in under 2 seconds. Items stay here until you triage them into folders.
+              </p>
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" size="md" onClick={() => {}}>
+                  <Sparkles className="w-4 h-4 text-vault-accent mr-1.5" />
+                  <span>Capture Note</span>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center mb-4 text-vault-accent shadow-sm">
+                <FolderGit2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-lg font-semibold text-vault-primary mb-1">
+                {activeFolder?.name || "Folder"} is Empty
+              </h2>
+              <p className="text-sm text-vault-secondary max-w-md mb-6">
+                No items in this folder yet. Create notes, save links, or drag items here from Quick Inbox.
+              </p>
+              <Button variant="secondary" size="md" onClick={() => {}}>
+                <Plus className="w-4 h-4 text-vault-accent mr-1.5" />
+                <span>Add Item to Folder</span>
+              </Button>
+            </div>
+          )}
+        </ContentPane>
+      )}
+    </AppLayout>
   );
 }
 

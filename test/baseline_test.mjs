@@ -21,7 +21,14 @@ const requiredFiles = [
   "src-tauri/src/lib.rs",
   "src/App.tsx",
   "src/main.tsx",
-  "src/index.css"
+  "src/index.css",
+  "src/types/index.ts",
+  "src/components/layout/AppLayout.tsx",
+  "src/components/layout/Sidebar.tsx",
+  "src/components/layout/Breadcrumbs.tsx",
+  "src/components/layout/ContentPane.tsx",
+  "src/components/common/Button.tsx",
+  "src/components/common/Badge.tsx"
 ];
 
 for (const relPath of requiredFiles) {
