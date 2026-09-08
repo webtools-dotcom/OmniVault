@@ -178,6 +178,30 @@ export function App() {
     }
   };
 
+  // Mobile Web Share Target: ingest shared links or text from mobile OS share sheet
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedTitle = params.get("title");
+    const sharedText = params.get("text");
+    const sharedUrl = params.get("url");
+
+    if (sharedTitle || sharedText || sharedUrl) {
+      const title = sharedTitle || (sharedUrl ? "Shared Link" : "Shared Note");
+      const contentParts: string[] = [];
+      if (sharedText) contentParts.push(sharedText);
+      if (sharedUrl) contentParts.push(sharedUrl);
+      const content = contentParts.join("\n\n");
+      const itemType = sharedUrl && !sharedText ? "link" : "note";
+
+      handleCaptureItem(itemType, title, content).then(() => {
+        // Clean up URL parameters after capture without reloading
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      });
+    }
+  }, []);
+
   // Automatic Clipboard Paste Listener: capture pasted screenshot directly
   useClipboardPaste({
     enabled: !isEditorOpen && !lightboxImage,

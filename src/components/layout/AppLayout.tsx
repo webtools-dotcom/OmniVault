@@ -61,6 +61,44 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Touch gesture listeners for mobile drawer swipe
+  useEffect(() => {
+    if (!isMobile) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Only trigger if horizontal swipe is dominant
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 60) {
+        if (deltaX > 0 && touchStartX < 50 && !sidebarOpen) {
+          // Swipe right from left edge: Open sidebar
+          setSidebarOpen(true);
+        } else if (deltaX < 0 && sidebarOpen) {
+          // Swipe left anywhere while open: Close sidebar
+          setSidebarOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isMobile, sidebarOpen]);
+
   const handleCloseSidebar = () => setSidebarOpen(false);
   const handleToggleSidebar = () => setSidebarOpen((prev) => !prev);
 

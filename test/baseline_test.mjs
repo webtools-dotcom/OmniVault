@@ -51,7 +51,9 @@ const requiredFiles = [
   "src/components/research/SmartMarketLauncher.tsx",
   "src-tauri/src/http_server.rs",
   "src/utils/qrCode.ts",
-  "src/components/pairing/QrConnectModal.tsx"
+  "src/components/pairing/QrConnectModal.tsx",
+  "public/manifest.json",
+  "public/sw.js"
 ];
 
 for (const relPath of requiredFiles) {
@@ -108,7 +110,27 @@ const appContent = fs.readFileSync(path.resolve(process.cwd(), "src/App.tsx"), "
 assert.ok(appContent.includes("QrConnectModal"), "App.tsx missing QrConnectModal invocation");
 assert.ok(appContent.includes("isQrModalOpen"), "App.tsx missing isQrModalOpen state");
 
-console.log("✅ All baseline structure, triage, HTTP server, and QR connection modal assertions passed successfully!");
+// 7. Verify P5-T03 Mobile PWA & Touch Gestures
+const manifestContent = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "public/manifest.json"), "utf-8"));
+assert.strictEqual(manifestContent.display, "standalone", "manifest.json missing standalone display mode");
+assert.ok(manifestContent.share_target, "manifest.json missing share_target definition");
+assert.ok(manifestContent.icons.length >= 2, "manifest.json must have at least 2 icon sizes");
+
+const swContent = fs.readFileSync(path.resolve(process.cwd(), "public/sw.js"), "utf-8");
+assert.ok(swContent.includes("addEventListener(\"fetch\""), "sw.js missing fetch listener for offline caching");
+assert.ok(swContent.includes("caches.open"), "sw.js missing cache opening logic");
+
+const indexHtmlContent = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+assert.ok(indexHtmlContent.includes("rel=\"manifest\""), "index.html missing manifest link");
+assert.ok(indexHtmlContent.includes("viewport-fit=cover"), "index.html missing viewport-fit=cover for mobile display");
+
+const appLayoutContent = fs.readFileSync(path.resolve(process.cwd(), "src/components/layout/AppLayout.tsx"), "utf-8");
+assert.ok(appLayoutContent.includes("touchstart"), "AppLayout missing touch gesture listener");
+
+assert.ok(appContent.includes("sharedTitle") || appContent.includes("sharedUrl"), "App.tsx missing mobile share target ingestion handler");
+
+console.log("✅ All baseline structure, triage, HTTP server, QR modal, and PWA mobile assertions passed successfully!");
+
 
 
 
