@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { Folder, ItemType, VaultItem } from "../types";
 
 const STORAGE_KEY_FOLDERS = "omnivault_folders_v1";
@@ -226,7 +227,6 @@ export const StorageService = {
   async getFolders(): Promise<Folder[]> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<Folder[]>("list_folders_cmd");
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
@@ -248,7 +248,6 @@ export const StorageService = {
   ): Promise<Folder> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<Folder>("create_folder_cmd", {
           name,
           parentId,
@@ -290,7 +289,6 @@ export const StorageService = {
   async renameFolder(folderId: string, newName: string): Promise<Folder> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<Folder>("rename_folder_cmd", {
           id: folderId,
           name: newName,
@@ -327,7 +325,6 @@ export const StorageService = {
   ): Promise<Folder> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<Folder>("move_folder_cmd", {
           id: folderId,
           parentId: newParentId,
@@ -361,7 +358,6 @@ export const StorageService = {
   async deleteFolder(folderId: string): Promise<void> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         await invoke("delete_folder_cmd", { id: folderId });
         return;
       } catch (err) {
@@ -406,7 +402,6 @@ export const StorageService = {
   async getInboxItems(): Promise<VaultItem[]> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem[]>("list_inbox_items_cmd");
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
@@ -430,7 +425,6 @@ export const StorageService = {
   async getFolderItems(folderId: string): Promise<VaultItem[]> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem[]>("list_folder_items_cmd", { folderId });
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
@@ -459,7 +453,6 @@ export const StorageService = {
   ): Promise<VaultItem> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem>("create_item_cmd", {
           folderId,
           itemType,
@@ -519,7 +512,6 @@ export const StorageService = {
   ): Promise<VaultItem> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem>("update_item_cmd", {
           id: itemId,
           title,
@@ -562,7 +554,6 @@ export const StorageService = {
   async moveItem(itemId: string, newFolderId: string | null): Promise<VaultItem> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem>("move_item_cmd", {
           id: itemId,
           folderId: newFolderId,
@@ -599,7 +590,6 @@ export const StorageService = {
   async togglePinItem(itemId: string): Promise<VaultItem> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<VaultItem>("toggle_pin_item_cmd", { id: itemId });
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
@@ -630,7 +620,6 @@ export const StorageService = {
   async deleteItem(itemId: string): Promise<void> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         await invoke("delete_item_cmd", { id: itemId });
         return;
       } catch (err) {
@@ -656,7 +645,6 @@ export const StorageService = {
   async getLanConnectionInfo(): Promise<{ ip: string; port: number; url: string }> {
     if (isTauriEnvironment()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         return await invoke<{ ip: string; port: number; url: string }>("get_lan_connection_info_cmd");
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to window host:", err);

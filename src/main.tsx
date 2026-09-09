@@ -2,15 +2,78 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { isTauriEnvironment } from "./services/storageService";
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("OmniVault App crashed:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-screen w-screen items-center justify-center bg-[#0E0E11] p-6 text-[#EDEDED] font-mono select-none">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#141418] p-6 shadow-2xl">
+            <div className="flex items-center gap-2 text-red-400 mb-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]" />
+              <span className="text-xs font-bold uppercase tracking-wider">Workspace Runtime Exception</span>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4 leading-relaxed font-sans">
+              An unexpected runtime state occurred while rendering the workspace.
+            </p>
+            <div className="p-3 bg-[#18181D] border border-white/[0.06] rounded-xl text-[11px] text-zinc-300 font-mono mb-4 break-all max-h-32 overflow-auto">
+              {this.state.error?.message || "Unknown error"}
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.reload();
+                }}
+                className="h-8 px-4 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors cursor-pointer"
+              >
+                Reload Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
 
-// Register PWA service worker in browser environments
-if ("serviceWorker" in navigator) {
+// In desktop Tauri WebView2, ensure any rogue service workers are purged
+if (isTauriEnvironment() && typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister().catch(() => {});
+    }
+  }).catch(() => {});
+}
+
+// Register PWA service worker ONLY in non-Tauri mobile / tablet browser environments
+if (!isTauriEnvironment() && typeof navigator !== "undefined" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((err) => {
       console.warn("ServiceWorker registration failed:", err);
