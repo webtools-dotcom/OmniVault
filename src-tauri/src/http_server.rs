@@ -70,8 +70,64 @@ fn default_item_type() -> String {
     "note".to_string()
 }
 
+#[derive(Debug, Deserialize)]
+pub struct IdRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RenameFolderRequest {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MoveFolderRequest {
+    pub id: String,
+    pub parent_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MoveItemRequest {
+    pub id: String,
+    pub folder_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateItemRequest {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub metadata: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PairRequest {
+    pub pin: String,
+    pub device_name: Option<String>,
+}
+
 /// Discovers the compiled frontend static directory (`dist/`).
 pub fn find_dist_dir() -> Option<PathBuf> {
+    // 1. Check relative to current running executable (for release / portable packages)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let exe_dist = exe_dir.join("dist");
+            if exe_dist.exists() && exe_dist.is_dir() && exe_dist.join("index.html").exists() {
+                return Some(exe_dist);
+            }
+            let exe_parent_dist = exe_dir.join("../dist");
+            if exe_parent_dist.exists() && exe_parent_dist.is_dir() && exe_parent_dist.join("index.html").exists() {
+                return Some(exe_parent_dist);
+            }
+            let exe_grandparent_dist = exe_dir.join("../../dist");
+            if exe_grandparent_dist.exists() && exe_grandparent_dist.is_dir() && exe_grandparent_dist.join("index.html").exists() {
+                return Some(exe_grandparent_dist);
+            }
+        }
+    }
+
+    // 2. Check relative to current working directory
     let candidates = ["dist", "../dist", "../../dist"];
     for candidate in candidates {
         let path = PathBuf::from(candidate);
@@ -358,6 +414,160 @@ fn handle_connection(
                         )?;
                     }
                 }
+                return Ok(());
+            }
+        }
+    }
+
+    if path == "/api/items/toggle-pin" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::toggle_pin_item(&mut conn, &req.id, device_id) {
+                Ok(item) => {
+                    let json = serde_json::to_vec(&item).unwrap_or_default();
+                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/items/delete" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::delete_item(&mut conn, &req.id, device_id) {
+                Ok(()) => {
+                    send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/items/move" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<MoveItemRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::move_item(&mut conn, &req.id, req.folder_id.as_deref(), device_id) {
+                Ok(item) => {
+                    let json = serde_json::to_vec(&item).unwrap_or_default();
+                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/items/update" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<UpdateItemRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::update_item(
+                &mut conn,
+                &req.id,
+                &req.title,
+                &req.content,
+                req.metadata.as_deref(),
+                device_id,
+            ) {
+                Ok(item) => {
+                    let json = serde_json::to_vec(&item).unwrap_or_default();
+                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/folders/rename" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<RenameFolderRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::rename_folder(&mut conn, &req.id, &req.name, device_id) {
+                Ok(folder) => {
+                    let json = serde_json::to_vec(&folder).unwrap_or_default();
+                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/folders/move" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<MoveFolderRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::move_folder(&mut conn, &req.id, req.parent_id.as_deref(), device_id) {
+                Ok(folder) => {
+                    let json = serde_json::to_vec(&folder).unwrap_or_default();
+                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/folders/delete" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
+            let mut conn = db.lock().unwrap();
+            match storage::delete_folder(&mut conn, &req.id, device_id) {
+                Ok(()) => {
+                    send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    if path == "/api/pair" && method == "POST" {
+        if let Ok(req) = serde_json::from_slice::<PairRequest>(&body) {
+            let clean_pin = req.pin.replace(' ', "");
+            if clean_pin.len() >= 4 {
+                let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
+                let now = chrono::Utc::now().timestamp_millis();
+                let peer_id = uuid::Uuid::new_v4().to_string();
+                let auth_token = uuid::Uuid::new_v4().to_string();
+                let conn = db.lock().unwrap();
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![peer_id, dev_name, auth_token, now, now],
+                );
+                let resp = serde_json::json!({
+                    "status": "authorized",
+                    "device_id": peer_id,
+                    "auth_token": auth_token,
+                    "server_device_id": device_id,
+                });
+                send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
+                return Ok(());
+            } else {
+                let err_json = serde_json::json!({ "error": "Invalid PIN format" });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
                 return Ok(());
             }
         }

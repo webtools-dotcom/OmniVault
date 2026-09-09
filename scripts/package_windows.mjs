@@ -35,10 +35,18 @@ if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
 }
 console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ PASS`);
 
-// 3. Create release directory & copy standalone binary
+// 3. Create release directory & copy standalone binary and web dist assets
 fs.mkdirSync(releaseDistDir, { recursive: true });
 fs.copyFileSync(releaseExePath, targetExePath);
 fs.copyFileSync(releaseExePath, path.resolve(rootDir, "release/omnivault.exe"));
+
+// Copy compiled web assets (dist/) for embedded LAN server PWA
+const sourceDistDir = path.resolve(rootDir, "dist");
+if (fs.existsSync(sourceDistDir)) {
+  fs.cpSync(sourceDistDir, path.resolve(releaseDistDir, "dist"), { recursive: true });
+  fs.cpSync(sourceDistDir, path.resolve(rootDir, "release/dist"), { recursive: true });
+  console.log("      Copied web PWA static assets (dist/) to release packages.");
+}
 
 const readmeContent = `OmniVault v0.1.0 - Windows Release (x86_64)
 ==============================================

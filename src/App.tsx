@@ -5,7 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
 import { getFolderPath } from "./utils/folderTree";
-import { StorageService } from "./services/storageService";
+import { StorageService, isTauriEnvironment } from "./services/storageService";
 import { QuickInboxView } from "./components/inbox/QuickInboxView";
 import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
 import { MoveItemModal } from "./components/inbox/MoveItemModal";
@@ -13,6 +13,7 @@ import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
 import { NoteEditorModal } from "./components/editor/NoteEditorModal";
 import { ImageLightbox } from "./components/media/ImageLightbox";
 import { QrConnectModal } from "./components/pairing/QrConnectModal";
+import { PeerPinModal } from "./components/pairing/PeerPinModal";
 import { useClipboardPaste } from "./hooks/useClipboardPaste";
 
 export function App() {
@@ -30,8 +31,14 @@ export function App() {
   // Lightbox State
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
-  // QR Mobile Connect Modal State
+  // QR Mobile Connect Modal State (Desktop host)
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  // Web Peer / Tablet Pairing Modal State
+  const [isPeerPinModalOpen, setIsPeerPinModalOpen] = useState(() => {
+    return !isTauriEnvironment() && !StorageService.isPaired();
+  });
+  const [isPaired, setIsPaired] = useState(() => StorageService.isPaired());
 
   // BridgeMind Stream Filter State (Stream | Notes | Markets)
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
@@ -339,15 +346,37 @@ export function App() {
           onStreamFilterChange={setStreamFilter}
           headerActions={
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsQrModalOpen(true)}
-                title="Connect mobile / tablet via QR code"
-                className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#18181D] hover:bg-[#22222A] border border-white/[0.08] rounded-lg transition-colors cursor-pointer"
-              >
-                <QrCode className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="hidden sm:inline">Connect</span>
-              </button>
+              {!isTauriEnvironment() ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPeerPinModalOpen(true)}
+                  title={isPaired ? "Device paired with desktop vault" : "Enter 6-digit desktop PIN to link"}
+                  className={`h-7 px-2.5 flex items-center gap-1.5 text-xs font-mono rounded-lg transition-colors cursor-pointer border ${
+                    isPaired
+                      ? "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25"
+                      : "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/25 animate-pulse"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isPaired
+                        ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                        : "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]"
+                    }`}
+                  />
+                  <span>{isPaired ? "Linked Peer" : "Enter PIN"}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsQrModalOpen(true)}
+                  title="Connect mobile / tablet via QR code"
+                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#18181D] hover:bg-[#22222A] border border-white/[0.08] rounded-lg transition-colors cursor-pointer"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="hidden sm:inline">Connect</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -480,6 +509,17 @@ export function App() {
           <QrConnectModal
             isOpen={isQrModalOpen}
             onClose={() => setIsQrModalOpen(false)}
+          />
+
+          {/* Tablet & Mobile Web Peer PIN Authorization Modal */}
+          <PeerPinModal
+            isOpen={isPeerPinModalOpen}
+            onClose={() => setIsPeerPinModalOpen(false)}
+            onPaired={() => {
+              setIsPaired(true);
+              refreshFolders();
+              refreshInboxItems();
+            }}
           />
         </ContentPane>
       )}
