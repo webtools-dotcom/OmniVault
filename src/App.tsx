@@ -113,13 +113,14 @@ export function App() {
 
   const isPollingRef = useRef(false);
 
-  // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation
+  // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation + Android shares
   useEffect(() => {
     const handleRevalidate = async () => {
       // Avoid interrupting active note drafting or stacking up overlapping polls
       if (isEditorOpen || isPollingRef.current) return;
       isPollingRef.current = true;
       try {
+        await StorageService.checkPendingShares();
         await refreshInboxItems();
         if (activeView.type === "folder") {
           await refreshFolderItems(activeView.folderId);
@@ -128,6 +129,11 @@ export function App() {
       } finally {
         isPollingRef.current = false;
       }
+    };
+
+    // Global Android Share Target callback
+    (window as unknown as { __onOmniVaultShare?: () => void }).__onOmniVaultShare = () => {
+      handleRevalidate();
     };
 
     window.addEventListener("focus", handleRevalidate);
@@ -141,6 +147,7 @@ export function App() {
     const interval = setInterval(handleRevalidate, 2500);
 
     return () => {
+      delete (window as unknown as { __onOmniVaultShare?: () => void }).__onOmniVaultShare;
       window.removeEventListener("focus", handleRevalidate);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);

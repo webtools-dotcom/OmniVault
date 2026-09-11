@@ -199,6 +199,7 @@ fn save_media_to_downloads_cmd(
     media_url_or_hash: String,
     suggested_filename: Option<String>,
 ) -> Result<String, String> {
+    let _ = &state;
     let clean_hash = media_url_or_hash
         .split('?')
         .next()
@@ -286,6 +287,92 @@ fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
         }
         Ok(())
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct PendingShareResult {
+    pub count: usize,
+    pub items: Vec<VaultItem>,
+}
+
+#[tauri::command]
+fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<PendingShareResult, String> {
+    let mut processed_items = Vec::new();
+    let shares_dir = state.base_dir.join("incoming_shares");
+    if !shares_dir.exists() {
+        return Ok(PendingShareResult { count: 0, items: processed_items });
+    }
+
+    let entries = match std::fs::read_dir(&shares_dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(PendingShareResult { count: 0, items: processed_items }),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let share_type = v.get("type").and_then(|s| s.as_str()).unwrap_or("text");
+                    let title = v.get("title").and_then(|s| s.as_str()).unwrap_or("Shared capture");
+                    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+
+                    if share_type == "text" {
+                        let text = v.get("content").and_then(|s| s.as_str()).unwrap_or("");
+                        let item_type = if text.starts_with("http://") || text.starts_with("https://") {
+                            "link"
+                        } else {
+                            "note"
+                        };
+                        if let Ok(item) = storage::create_item(
+                            &mut conn,
+                            None,
+                            item_type,
+                            title,
+                            text,
+                            None,
+                            &state.device_id,
+                        ) {
+                            processed_items.push(item);
+                        }
+                    } else if share_type == "image" {
+                        if let Some(bin_file) = v.get("bin_file").and_then(|s| s.as_str()) {
+                            let bin_path = std::path::PathBuf::from(bin_file);
+                            if bin_path.exists() {
+                                if let Ok(raw_bytes) = std::fs::read(&bin_path) {
+                                    if let Ok(item) = storage::create_item(
+                                        &mut conn,
+                                        None,
+                                        "image",
+                                        title,
+                                        "",
+                                        None,
+                                        &state.device_id,
+                                    ) {
+                                        let _ = media::save_image_media(
+                                            &mut conn,
+                                            &state.base_dir,
+                                            &item.id,
+                                            &raw_bytes,
+                                            &state.device_id,
+                                        );
+                                        processed_items.push(item);
+                                    }
+                                }
+                                let _ = std::fs::remove_file(&bin_path);
+                            }
+                        }
+                    }
+                }
+            }
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+
+    Ok(PendingShareResult {
+        count: processed_items.len(),
+        items: processed_items,
+    })
 }
 
 pub fn resolve_app_base_dir() -> std::path::PathBuf {
@@ -427,6 +514,7 @@ pub fn run() {
             get_lan_connection_info_cmd,
             save_media_to_downloads_cmd,
             open_file_in_folder_cmd,
+            check_and_process_pending_shares_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

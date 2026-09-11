@@ -863,4 +863,18 @@ export const StorageService = {
       }
     }
   },
+
+  async checkPendingShares(): Promise<VaultItem[]> {
+    if (isTauriEnvironment()) {
+      try {
+        const res = await invoke<{ count: number; items: VaultItem[] }>("check_and_process_pending_shares_cmd");
+        if (res && res.count > 0 && Array.isArray(res.items)) {
+          return res.items;
+        }
+      } catch (err) {
+        console.warn("Failed to check pending shares via Tauri IPC:", err);
+      }
+    }
+    return [];
+  },
 };
