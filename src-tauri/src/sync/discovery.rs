@@ -71,7 +71,7 @@ pub fn create_multicast_socket(port: u16) -> std::io::Result<std::net::UdpSocket
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "android")))]
     {
         let _ = socket.set_reuse_port(true);
     }
