@@ -30,6 +30,71 @@ async fn get_discovered_peers_cmd(state: State<'_, AppState>) -> Result<Vec<sync
     Ok(state.peer_registry.get_active_peers().await)
 }
 
+#[tauri::command]
+async fn trigger_mesh_sync_cmd(state: State<'_, AppState>) -> Result<usize, String> {
+    let peers = state.peer_registry.get_active_peers().await;
+    let mut total_applied = 0;
+    for peer in peers {
+        let db = state.db.clone();
+        let dev_id = state.device_id.clone();
+        let b_dir = state.base_dir.clone();
+        let p = peer.clone();
+        if let Ok(applied) = tokio::task::spawn_blocking(move || {
+            sync::mesh_sync::sync_with_peer(db, &dev_id, &p, &b_dir)
+        }).await.unwrap_or_else(|e| Err(e.to_string())) {
+            total_applied += applied;
+        }
+    }
+    Ok(total_applied)
+}
+
+#[tauri::command]
+async fn get_mesh_sync_status_cmd(state: State<'_, AppState>) -> Result<sync::mesh_sync::MeshSyncStatus, String> {
+    let peers = state.peer_registry.get_active_peers().await;
+    let last_sync_at = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT MAX(last_sync_at) FROM paired_devices",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(None)
+    };
+    Ok(sync::mesh_sync::MeshSyncStatus {
+        is_syncing: false,
+        last_sync_at,
+        peer_count: peers.len(),
+        peers,
+    })
+}
+
+#[tauri::command]
+async fn pair_with_peer_cmd(
+    state: State<'_, AppState>,
+    peer_ip: String,
+    peer_port: u16,
+    pin: String,
+) -> Result<sync::pairing::PairedDevice, String> {
+    let db = state.db.clone();
+    let dev_id = state.device_id.clone();
+    #[cfg(target_os = "android")]
+    let dev_name = format!("OmniVault Mobile ({})", &dev_id[..6.min(dev_id.len())]);
+    #[cfg(not(target_os = "android"))]
+    let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
+
+    tokio::task::spawn_blocking(move || {
+        sync::mesh_sync::pair_with_remote_peer(
+            db,
+            &dev_id,
+            &dev_name,
+            &peer_ip,
+            peer_port,
+            &pin,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ---------------------------------------------------------------------------
 // Folder Commands
 // ---------------------------------------------------------------------------
@@ -428,8 +493,18 @@ pub fn run() {
 
     let db = Arc::new(Mutex::new(conn));
 
+    // Start P2P Mesh Discovery on background thread with Tokio runtime
+    let peer_registry = sync::discovery::PeerRegistry::new();
+    let peer_reg_clone = peer_registry.clone();
+    let peer_reg_sync = peer_registry.clone();
+
     // Start embedded HTTP server on background thread (default port 42420)
-    let server_port = match http_server::start_http_server(db.clone(), device_id.clone(), 42420) {
+    let server_port = match http_server::start_http_server_with_peers(
+        db.clone(),
+        device_id.clone(),
+        42420,
+        Some(peer_registry.clone()),
+    ) {
         Ok(handle) => handle.port,
         Err(err) => {
             eprintln!("Warning: Failed to start embedded http server: {err}");
@@ -437,11 +512,15 @@ pub fn run() {
         }
     };
 
-    // Start P2P Mesh Discovery on background thread with Tokio runtime
-    let peer_registry = sync::discovery::PeerRegistry::new();
-    let peer_reg_clone = peer_registry.clone();
     let dev_id_broadcaster = device_id.clone();
     let dev_id_listener = device_id.clone();
+    let dev_id_sync = device_id.clone();
+    let db_sync = db.clone();
+    let base_dir_sync = base_dir.clone();
+
+    #[cfg(target_os = "android")]
+    let dev_name = format!("OmniVault Mobile ({})", &device_id[..6.min(device_id.len())]);
+    #[cfg(not(target_os = "android"))]
     let dev_name = format!("OmniVault Desktop ({})", &device_id[..6.min(device_id.len())]);
 
     std::thread::spawn(move || {
@@ -459,6 +538,7 @@ pub fn run() {
         rt.block_on(async move {
             let (_stop_tx, stop_rx1) = tokio::sync::watch::channel(false);
             let stop_rx2 = stop_rx1.clone();
+            let stop_rx3 = stop_rx1.clone();
 
             let b_dev_name = dev_name.clone();
             tokio::spawn(async move {
@@ -476,6 +556,16 @@ pub fn run() {
                     dev_id_listener,
                     peer_reg_clone,
                     stop_rx2,
+                ).await;
+            });
+
+            tokio::spawn(async move {
+                sync::mesh_sync::run_mesh_sync_loop(
+                    db_sync,
+                    dev_id_sync,
+                    peer_reg_sync,
+                    base_dir_sync,
+                    stop_rx3,
                 ).await;
             });
 
@@ -497,6 +587,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_system_status,
             get_discovered_peers_cmd,
+            trigger_mesh_sync_cmd,
+            get_mesh_sync_status_cmd,
+            pair_with_peer_cmd,
             list_folders_cmd,
             create_folder_cmd,
             rename_folder_cmd,

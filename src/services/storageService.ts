@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, ItemType, VaultItem } from "../types";
+import { Folder, ItemType, VaultItem, PeerInfo, MeshSyncState } from "../types";
 
 const STORAGE_KEY_FOLDERS = "omnivault_folders_v1";
 const STORAGE_KEY_ITEMS = "omnivault_items_v1";
@@ -246,6 +246,78 @@ export const StorageService = {
       return await res.json();
     } catch {
       return null;
+    }
+  },
+
+  async getDiscoveredPeers(): Promise<PeerInfo[]> {
+    if (isTauriEnvironment()) {
+      try {
+        return await invoke<PeerInfo[]>("get_discovered_peers_cmd");
+      } catch (err) {
+        console.warn("Failed to get discovered peers:", err);
+        return [];
+      }
+    } else {
+      const res = await apiFetch<{ peers: PeerInfo[]; count: number }>("/api/sync/peers");
+      return res?.peers || [];
+    }
+  },
+
+  async getMeshSyncStatus(): Promise<MeshSyncState> {
+    if (isTauriEnvironment()) {
+      try {
+        const raw = await invoke<{
+          is_syncing: boolean;
+          last_sync_at: number | null;
+          peer_count: number;
+          peers: PeerInfo[];
+        }>("get_mesh_sync_status_cmd");
+        return {
+          status: raw.is_syncing ? "syncing" : raw.peer_count > 0 ? "synced" : "standby",
+          peerCount: raw.peer_count,
+          lastSyncTimestamp: raw.last_sync_at || undefined,
+          peers: raw.peers,
+        };
+      } catch {
+        return { status: "standby", peerCount: 0 };
+      }
+    } else {
+      const res = await apiFetch<{
+        status: string;
+        paired_devices_count: number;
+      }>("/api/sync/status");
+      const peersRes = await apiFetch<{ peers: PeerInfo[]; count: number }>("/api/sync/peers");
+      const peers = peersRes?.peers || [];
+      return {
+        status: peers.length > 0 ? "synced" : "standby",
+        peerCount: peers.length || (res?.paired_devices_count ?? 0),
+        peers,
+      };
+    }
+  },
+
+  async triggerMeshSync(): Promise<number> {
+    if (isTauriEnvironment()) {
+      try {
+        return await invoke<number>("trigger_mesh_sync_cmd");
+      } catch (err) {
+        console.warn("Trigger mesh sync failed:", err);
+        return 0;
+      }
+    }
+    return 0;
+  },
+
+  async pairWithPeer(ip: string, port: number, pin: string): Promise<{ success: boolean; error?: string }> {
+    if (isTauriEnvironment()) {
+      try {
+        await invoke("pair_with_peer_cmd", { peerIp: ip, peerPort: port, pin });
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    } else {
+      return this.pairDevice(pin);
     }
   },
 

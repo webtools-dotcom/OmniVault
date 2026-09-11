@@ -2,7 +2,7 @@ use std::fs;
 use std::io::Cursor;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use image::{ImageFormat, Rgba, RgbaImage};
@@ -15,8 +15,10 @@ use omnivault_lib::db::storage::{
     create_folder, create_item, get_item_by_id, list_folders, list_inbox_items,
     list_items_by_folder, update_item,
 };
+use omnivault_lib::http_server;
 use omnivault_lib::sync::blob_stream::{download_blob_over_tcp, handle_blob_request};
 use omnivault_lib::sync::discovery::{PeerInfo, PeerRegistry};
+use omnivault_lib::sync::mesh_sync::{pair_with_remote_peer, send_http_request, sync_with_peer};
 use omnivault_lib::sync::pairing::{is_device_paired, store_paired_device, PairingManager};
 use omnivault_lib::sync::protocol::{apply_remote_revisions, query_revisions_since};
 
@@ -292,3 +294,117 @@ async fn test_headless_two_node_sync_e2e() {
     assert_eq!(final_nvda_on_phone.title, "$NVDA Breakout (Laptop Newest Edit)");
     assert_eq!(final_nvda_on_laptop.title, "$NVDA Breakout (Laptop Newest Edit)");
 }
+
+#[tokio::test]
+async fn test_store_and_forward_mesh_sync_http_and_webp() {
+    let mut phone_conn = Connection::open_in_memory().unwrap();
+    initialize_schema(&phone_conn).unwrap();
+    let phone_storage = std::env::temp_dir().join(format!("omnivault_test_phone_{}", Uuid::new_v4()));
+    fs::create_dir_all(phone_storage.join("media")).unwrap();
+
+    let laptop_conn = Connection::open_in_memory().unwrap();
+    initialize_schema(&laptop_conn).unwrap();
+    let laptop_storage = std::env::temp_dir().join(format!("omnivault_test_laptop_{}", Uuid::new_v4()));
+    fs::create_dir_all(laptop_storage.join("media")).unwrap();
+
+    let phone_dev_id = "device-android-phone";
+    let laptop_dev_id = "device-windows-laptop";
+
+    // 1. Outdoors: Phone captures a folder, note, and WebP photo while offline
+    let folder = create_folder(&mut phone_conn, "Solar Tech", None, Some("#10B981"), phone_dev_id).unwrap();
+    let note = create_item(
+        &mut phone_conn,
+        Some(&folder.id),
+        "note",
+        "Inverter In-Field Test",
+        "Measured 98.2% conversion efficiency at 45 deg angle",
+        None,
+        phone_dev_id,
+    ).unwrap();
+
+    let synthetic_png = create_synthetic_png_bytes(64, 64);
+    let _photo = save_image_media(
+        &mut phone_conn,
+        &phone_storage,
+        &note.id,
+        &synthetic_png,
+        phone_dev_id,
+    ).unwrap();
+
+    // Verify phone has 3 revisions
+    let phone_revs = query_revisions_since(&phone_conn, 0, None).unwrap();
+    assert_eq!(phone_revs.len(), 3);
+
+    // 2. Both nodes come home and start their HTTP servers
+    let phone_db = Arc::new(Mutex::new(phone_conn));
+    let laptop_db = Arc::new(Mutex::new(laptop_conn));
+
+    let _phone_server = http_server::start_http_server(phone_db.clone(), phone_dev_id.to_string(), 0).unwrap();
+    let laptop_server = http_server::start_http_server(laptop_db.clone(), laptop_dev_id.to_string(), 0).unwrap();
+
+    // 3. One-time pairing handshake: Phone pairs with Laptop
+    let session_resp = send_http_request(
+        format!("127.0.0.1:{}", laptop_server.port).parse().unwrap(),
+        "GET",
+        "/api/pair/session",
+        &[],
+        None,
+        Duration::from_secs(5),
+    ).unwrap();
+    assert_eq!(session_resp.status, 200);
+
+    #[derive(serde::Deserialize)]
+    struct Sess { pin: String }
+    let sess: Sess = serde_json::from_slice(&session_resp.body).unwrap();
+
+    // Phone initiates pairing with Laptop using the PIN
+    let paired_device = pair_with_remote_peer(
+        phone_db.clone(),
+        phone_dev_id,
+        "OmniVault Mobile",
+        "127.0.0.1",
+        laptop_server.port,
+        &sess.pin,
+    ).unwrap();
+
+    assert_eq!(paired_device.device_id, laptop_dev_id);
+
+    // Assert Laptop recorded Phone in paired_devices via the pairing handshake
+    {
+        let l_conn = laptop_db.lock().unwrap();
+        assert!(is_device_paired(&l_conn, phone_dev_id).unwrap());
+    }
+
+    // 4. Trigger Store-and-Forward Mesh Sync: Phone syncs with Laptop
+    let laptop_peer_info = PeerInfo {
+        device_id: laptop_dev_id.to_string(),
+        device_name: "OmniVault Desktop".to_string(),
+        sync_port: laptop_server.port,
+        addr: "127.0.0.1".parse().unwrap(),
+        last_seen: chrono::Utc::now().timestamp(),
+    };
+
+    let _applied = sync_with_peer(
+        phone_db.clone(),
+        phone_dev_id,
+        &laptop_peer_info,
+        &phone_storage,
+    ).unwrap();
+
+    // Revisions pushed from Phone to Laptop: Laptop now has the folder and note in SQLite!
+    {
+        let l_conn = laptop_db.lock().unwrap();
+        let l_folders = list_folders(&l_conn, false).unwrap();
+        assert_eq!(l_folders.len(), 1);
+        assert_eq!(l_folders[0].name, "Solar Tech");
+
+        let l_items = list_items_by_folder(&l_conn, &folder.id).unwrap();
+        assert_eq!(l_items.len(), 1);
+        assert_eq!(l_items[0].title, "Inverter In-Field Test");
+    }
+
+    // Clean up temporary test storage directories
+    let _ = fs::remove_dir_all(&phone_storage);
+    let _ = fs::remove_dir_all(&laptop_storage);
+}
+

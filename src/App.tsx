@@ -43,7 +43,7 @@ export function App() {
   // BridgeMind Stream Filter State (Stream | Notes | Markets)
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
 
-  const [meshState] = useState<MeshSyncState>({
+  const [meshState, setMeshState] = useState<MeshSyncState>({
     status: "standby",
     peerCount: 0,
   });
@@ -121,6 +121,8 @@ export function App() {
       isPollingRef.current = true;
       try {
         await StorageService.checkPendingShares();
+        const syncStatus = await StorageService.getMeshSyncStatus();
+        setMeshState(syncStatus);
         await refreshInboxItems();
         if (activeView.type === "folder") {
           await refreshFolderItems(activeView.folderId);

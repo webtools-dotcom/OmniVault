@@ -59,9 +59,19 @@ export interface BreadcrumbItem {
 
 export type MeshSyncStatus = 'standby' | 'discovering' | 'syncing' | 'synced' | 'error';
 
+export interface PeerInfo {
+  device_id: string;
+  device_name: string;
+  sync_port: number;
+  addr: string;
+  last_seen: number;
+}
+
 export interface MeshSyncState {
   status: MeshSyncStatus;
   peerCount: number;
   lastSyncTimestamp?: number;
   errorMessage?: string;
+  peers?: PeerInfo[];
 }
+

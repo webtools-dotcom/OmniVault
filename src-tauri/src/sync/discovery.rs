@@ -65,6 +65,18 @@ impl PeerRegistry {
         let lock = self.peers.read().await;
         lock.len()
     }
+
+    pub fn try_get_active_peers(&self) -> Vec<PeerInfo> {
+        let now = Utc::now().timestamp();
+        if let Ok(lock) = self.peers.try_read() {
+            lock.values()
+                .filter(|p| (now - p.last_seen) < PEER_EXPIRY_SECONDS)
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 pub fn create_multicast_socket(port: u16) -> std::io::Result<std::net::UdpSocket> {

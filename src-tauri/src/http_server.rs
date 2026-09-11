@@ -105,6 +105,7 @@ pub struct UpdateItemRequest {
 #[derive(Debug, Deserialize)]
 pub struct PairRequest {
     pub pin: String,
+    pub device_id: Option<String>,
     pub device_name: Option<String>,
 }
 
@@ -299,6 +300,15 @@ pub fn start_http_server(
     device_id: String,
     preferred_port: u16,
 ) -> std::io::Result<HttpServerHandle> {
+    start_http_server_with_peers(db, device_id, preferred_port, None)
+}
+
+pub fn start_http_server_with_peers(
+    db: Arc<Mutex<Connection>>,
+    device_id: String,
+    preferred_port: u16,
+    peer_registry: Option<crate::sync::discovery::PeerRegistry>,
+) -> std::io::Result<HttpServerHandle> {
     let (listener, actual_port) = bind_listener(preferred_port)?;
     listener.set_nonblocking(true)?;
 
@@ -307,7 +317,7 @@ pub fn start_http_server(
     let pairing_session = Arc::new(Mutex::new(None));
 
     thread::spawn(move || {
-        run_server_loop(listener, stop_receiver, db, device_id, dist_dir, pairing_session);
+        run_server_loop(listener, stop_receiver, db, device_id, dist_dir, pairing_session, peer_registry);
     });
 
     Ok(HttpServerHandle {
@@ -341,6 +351,7 @@ fn run_server_loop(
     device_id: String,
     dist_dir: Option<PathBuf>,
     pairing_session: Arc<Mutex<Option<ActivePairingSession>>>,
+    peer_registry: Option<crate::sync::discovery::PeerRegistry>,
 ) {
     loop {
         // Check for shutdown signal
@@ -354,9 +365,10 @@ fn run_server_loop(
                 let dev_id_clone = device_id.clone();
                 let dist_clone = dist_dir.clone();
                 let pair_clone = pairing_session.clone();
+                let reg_clone = peer_registry.clone();
 
                 thread::spawn(move || {
-                    let _ = handle_connection(stream, db_clone, &dev_id_clone, dist_clone.as_deref(), pair_clone);
+                    let _ = handle_connection(stream, db_clone, &dev_id_clone, dist_clone.as_deref(), pair_clone, reg_clone);
                 });
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -375,6 +387,7 @@ fn handle_connection(
     device_id: &str,
     dist_dir: Option<&Path>,
     pairing_session: Arc<Mutex<Option<ActivePairingSession>>>,
+    peer_registry: Option<crate::sync::discovery::PeerRegistry>,
 ) -> std::io::Result<()> {
     // Windows inherits non-blocking mode from the listener to accepted streams.
     // Explicitly restore blocking mode with timeouts so multi-packet LAN requests
@@ -871,7 +884,7 @@ fn handle_connection(
         }
 
         let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
-        let peer_id = uuid::Uuid::new_v4().to_string();
+        let peer_id = req.device_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let auth_token = uuid::Uuid::new_v4().to_string();
         let conn = db.lock().unwrap();
         let _ = conn.execute(
@@ -886,6 +899,141 @@ fn handle_connection(
             "server_device_id": device_id,
         });
         send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
+        return Ok(());
+    }
+
+    // Delta Sync Query: GET /api/sync/deltas?since=...&device_id=...&auth_token=...
+    if path == "/api/sync/deltas" && method == "GET" {
+        let since: i64 = query
+            .and_then(|q| {
+                for pair in q.split('&') {
+                    if let Some((k, v)) = pair.split_once('=') {
+                        if k == "since" {
+                            return v.parse::<i64>().ok();
+                        }
+                    }
+                }
+                None
+            })
+            .unwrap_or(0);
+
+        let caller_device_id = query.and_then(|q| {
+            for pair in q.split('&') {
+                if let Some((k, v)) = pair.split_once('=') {
+                    if k == "device_id" {
+                        return Some(v.to_string());
+                    }
+                }
+            }
+            None
+        }).or_else(|| headers.get("x-device-id").cloned());
+
+        let auth_token = query.and_then(|q| {
+            for pair in q.split('&') {
+                if let Some((k, v)) = pair.split_once('=') {
+                    if k == "auth_token" {
+                        return Some(v.to_string());
+                    }
+                }
+            }
+            None
+        }).or_else(|| headers.get("x-auth-token").cloned());
+
+        let conn = db.lock().unwrap();
+
+        // If credentials provided, validate authorization
+        if let (Some(ref dev_id), Some(ref token)) = (&caller_device_id, &auth_token) {
+            let is_valid = crate::sync::pairing::validate_peer_auth_token(&conn, dev_id, token).unwrap_or(false);
+            if !is_valid {
+                let err_json = serde_json::json!({ "error": "Unauthorized peer or invalid auth token" });
+                send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        }
+
+        let revisions = crate::sync::protocol::query_revisions_since(&conn, since, caller_device_id.as_deref()).unwrap_or_default();
+        let latest_ts = revisions.last().map(|r| r.timestamp).unwrap_or(since);
+
+        let resp = serde_json::json!({
+            "device_id": device_id,
+            "revisions": revisions,
+            "latest_timestamp": latest_ts,
+        });
+
+        let json = serde_json::to_vec(&resp).unwrap_or_default();
+        send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+        return Ok(());
+    }
+
+    // Delta Sync Apply: POST /api/sync/deltas
+    if path == "/api/sync/deltas" && method == "POST" {
+        #[derive(Deserialize)]
+        struct DeltaApplyRequest {
+            device_id: String,
+            auth_token: Option<String>,
+            revisions: Vec<crate::db::models::Revision>,
+        }
+
+        let req = match serde_json::from_slice::<DeltaApplyRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON delta payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+
+        let mut conn = db.lock().unwrap();
+
+        if let Some(ref token) = req.auth_token {
+            let is_valid = crate::sync::pairing::validate_peer_auth_token(&conn, &req.device_id, token).unwrap_or(false);
+            if !is_valid {
+                let err_json = serde_json::json!({ "error": "Unauthorized peer or invalid auth token" });
+                send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        }
+
+        let applied = crate::sync::protocol::apply_remote_revisions(&mut conn, &req.revisions).unwrap_or(0);
+        let _ = crate::sync::pairing::update_peer_last_sync(&conn, &req.device_id);
+
+        let resp = serde_json::json!({
+            "status": "ok",
+            "applied": applied,
+            "received_count": req.revisions.len(),
+        });
+        let json = serde_json::to_vec(&resp).unwrap_or_default();
+        send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+        return Ok(());
+    }
+
+    // Sync Status & Discovered Peers: GET /api/sync/status and GET /api/sync/peers
+    if path == "/api/sync/status" && method == "GET" {
+        let conn = db.lock().unwrap();
+        let paired = crate::sync::pairing::list_paired_devices(&conn).unwrap_or_default();
+        let resp = serde_json::json!({
+            "status": "ready",
+            "device_id": device_id,
+            "paired_devices_count": paired.len(),
+            "paired_devices": paired,
+        });
+        let json = serde_json::to_vec(&resp).unwrap_or_default();
+        send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+        return Ok(());
+    }
+
+    if path == "/api/sync/peers" && method == "GET" {
+        let active_peers = if let Some(ref reg) = peer_registry {
+            reg.try_get_active_peers()
+        } else {
+            Vec::new()
+        };
+        let resp = serde_json::json!({
+            "peers": active_peers,
+            "count": active_peers.len(),
+        });
+        let json = serde_json::to_vec(&resp).unwrap_or_default();
+        send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
         return Ok(());
     }
 
