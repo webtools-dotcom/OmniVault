@@ -37,8 +37,25 @@ console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ 
 
 // 3. Create release directory & copy standalone binary and web dist assets
 fs.mkdirSync(releaseDistDir, { recursive: true });
-fs.copyFileSync(releaseExePath, targetExePath);
-fs.copyFileSync(releaseExePath, path.resolve(rootDir, "release/omnivault.exe"));
+try {
+  fs.copyFileSync(releaseExePath, targetExePath);
+} catch (err) {
+  if (err && err.code === "EBUSY") {
+    console.warn("⚠️ Notice: Target release executable is currently running and locked. Preserved running binary.");
+  } else {
+    throw err;
+  }
+}
+
+try {
+  fs.copyFileSync(releaseExePath, path.resolve(rootDir, "release/omnivault.exe"));
+} catch (err) {
+  if (err && err.code === "EBUSY") {
+    console.warn("⚠️ Notice: release/omnivault.exe is currently running and locked. Preserved running binary.");
+  } else {
+    throw err;
+  }
+}
 
 // Copy compiled web assets (dist/) for embedded LAN server PWA
 const sourceDistDir = path.resolve(rootDir, "dist");

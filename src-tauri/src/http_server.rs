@@ -109,32 +109,46 @@ pub struct PairRequest {
 
 /// Discovers the compiled frontend static directory (`dist/`).
 pub fn find_dist_dir() -> Option<PathBuf> {
-    // 1. Check relative to current running executable (for release / portable packages)
+    // 1. Check relative to current running executable (traversing up to 8 parent levels)
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            let exe_dist = exe_dir.join("dist");
-            if exe_dist.exists() && exe_dist.is_dir() && exe_dist.join("index.html").exists() {
-                return Some(exe_dist);
-            }
-            let exe_parent_dist = exe_dir.join("../dist");
-            if exe_parent_dist.exists() && exe_parent_dist.is_dir() && exe_parent_dist.join("index.html").exists() {
-                return Some(exe_parent_dist);
-            }
-            let exe_grandparent_dist = exe_dir.join("../../dist");
-            if exe_grandparent_dist.exists() && exe_grandparent_dist.is_dir() && exe_grandparent_dist.join("index.html").exists() {
-                return Some(exe_grandparent_dist);
+        let mut curr = exe.parent();
+        for _ in 0..8 {
+            if let Some(dir) = curr {
+                let direct = dir.join("dist");
+                if direct.is_dir() && direct.join("index.html").exists() {
+                    return Some(direct);
+                }
+                let release_dist = dir.join("release").join("dist");
+                if release_dist.is_dir() && release_dist.join("index.html").exists() {
+                    return Some(release_dist);
+                }
+                curr = dir.parent();
+            } else {
+                break;
             }
         }
     }
 
-    // 2. Check relative to current working directory
-    let candidates = ["dist", "../dist", "../../dist"];
-    for candidate in candidates {
-        let path = PathBuf::from(candidate);
-        if path.exists() && path.is_dir() && path.join("index.html").exists() {
-            return Some(path);
+    // 2. Check relative to current working directory (traversing up to 8 parent levels)
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = Some(cwd.as_path());
+        for _ in 0..8 {
+            if let Some(dir) = curr {
+                let direct = dir.join("dist");
+                if direct.is_dir() && direct.join("index.html").exists() {
+                    return Some(direct);
+                }
+                let release_dist = dir.join("release").join("dist");
+                if release_dist.is_dir() && release_dist.join("index.html").exists() {
+                    return Some(release_dist);
+                }
+                curr = dir.parent();
+            } else {
+                break;
+            }
         }
     }
+
     None
 }
 
@@ -241,6 +255,15 @@ fn handle_connection(
     device_id: &str,
     dist_dir: Option<&Path>,
 ) -> std::io::Result<()> {
+    let dist_fallback;
+    let dist_dir = match dist_dir {
+        Some(d) => Some(d),
+        None => {
+            dist_fallback = find_dist_dir();
+            dist_fallback.as_deref()
+        }
+    };
+
     let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line)? == 0 {
