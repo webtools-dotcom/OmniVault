@@ -1,9 +1,16 @@
 import React, { useState, useRef } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { ItemType } from "../../types";
+import { ItemType, VaultItem } from "../../types";
+import { StorageService, cacheLocalMedia } from "../../services/storageService";
 
 export interface QuickCaptureBarProps {
-  onCapture: (itemType: ItemType, title: string, content: string, metadata?: string) => Promise<void> | void;
+  onCapture: (
+    itemType: ItemType,
+    title: string,
+    content: string,
+    metadata?: string,
+    existingItem?: VaultItem
+  ) => Promise<void> | void;
   folderId?: string | null;
 }
 
@@ -48,12 +55,50 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       } else if (itemType === "image") {
         finalTitle = cleanTitle || imageInfo?.name || "Screenshot / Image Capture";
         if (imagePreview) {
-          finalContent = imagePreview;
-          metadata = JSON.stringify({
-            isImage: true,
-            mimeType: "image/webp",
-            capturedAt: Date.now(),
+          const currentPreview = imagePreview;
+          // Upload media to disk storage on host
+          const uploadRes = await StorageService.uploadMedia(currentPreview, {
+            title: finalTitle,
+            folderId: _folderId,
           });
+
+          if (uploadRes) {
+            // Pre-cache preview in memory so the local image card renders in 0ms without re-downloading across Wi-Fi
+            if (uploadRes.url) {
+              cacheLocalMedia(uploadRes.url, currentPreview);
+            }
+            if (uploadRes.file_hash) {
+              cacheLocalMedia(uploadRes.file_hash, currentPreview);
+            }
+
+            // Immediately clear inputs and dismiss "Syncing..."
+            setTitle("");
+            setImagePreview(null);
+            setImageInfo(null);
+            setIsSubmitting(false);
+            setJustSynced(true);
+            setTimeout(() => setJustSynced(false), 2000);
+            inputRef.current?.focus();
+
+            // Hand off already-created item to parent for 0ms optimistic UI update (avoids duplicate POST)
+            if (uploadRes.item) {
+              await onCapture(
+                "image",
+                uploadRes.item.title,
+                uploadRes.item.content,
+                uploadRes.item.metadata || undefined,
+                uploadRes.item
+              );
+            }
+            return;
+          } else {
+            finalContent = currentPreview;
+            metadata = JSON.stringify({
+              isImage: true,
+              mimeType: "image/webp",
+              capturedAt: Date.now(),
+            });
+          }
         }
       }
 

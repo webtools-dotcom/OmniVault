@@ -123,9 +123,27 @@ if (typeof window !== "undefined" && isTauriEnvironment()) {
   }
 }
 
+// Fast in-memory cache for recently captured/uploaded images to avoid re-fetching large blobs across Wi-Fi
+const localMediaCache = new Map<string, string>();
+let hasRunDataUrlMigration = false;
+
+export function cacheLocalMedia(key: string, dataUrl: string): void {
+  if (!key || !dataUrl) return;
+  localMediaCache.set(key, dataUrl);
+  const clean = key.startsWith("/") ? key : `/${key}`;
+  localMediaCache.set(clean, dataUrl);
+  const withoutExt = clean.replace(/\.webp$/i, "");
+  localMediaCache.set(withoutExt, dataUrl);
+  const justHash = clean.split("/").pop()?.replace(/\.webp$/i, "");
+  if (justHash) {
+    localMediaCache.set(justHash, dataUrl);
+    localMediaCache.set(`/api/media/${justHash}.webp`, dataUrl);
+  }
+}
+
 /**
  * Resolves a media URL to an absolute or relative URL accessible by the current runtime.
- * Handles desktop Tauri (translates /api/media/... to http://127.0.0.1:42420/api/media/...),
+ * Handles fast local memory cache, desktop Tauri (translates /api/media/... to http://127.0.0.1:42420/api/media/...),
  * tablet/mobile web (relative to current origin), and raw data URLs.
  */
 export function resolveMediaUrl(url: string | null | undefined): string {
@@ -139,6 +157,13 @@ export function resolveMediaUrl(url: string | null | undefined): string {
     return url;
   }
   const clean = url.startsWith("/") ? url : `/${url}`;
+  if (localMediaCache.has(clean)) {
+    return localMediaCache.get(clean)!;
+  }
+  const justHash = clean.split("/").pop()?.replace(/\.webp$/i, "");
+  if (justHash && localMediaCache.has(justHash)) {
+    return localMediaCache.get(justHash)!;
+  }
   if (isTauriEnvironment()) {
     return `http://127.0.0.1:${cachedServerPort}${clean}`;
   }
@@ -487,6 +512,12 @@ export const StorageService = {
       }
 
       const result = await res.json();
+      if (result && result.url) {
+        cacheLocalMedia(result.url, b64Data);
+        if (result.file_hash) {
+          cacheLocalMedia(result.file_hash, b64Data);
+        }
+      }
       if (result && result.item) {
         const items = getLocalItems().filter((i) => i.id !== result.item.id);
         items.unshift(result.item);
@@ -503,8 +534,9 @@ export const StorageService = {
   // Vault Items (Quick Inbox & Folder Items)
   // -------------------------------------------------------------------------
   async getInboxItems(): Promise<VaultItem[]> {
-    // Background migration of any legacy stuck base64 data-URL items
-    if (typeof window !== "undefined") {
+    // Background migration of any legacy stuck base64 data-URL items (runs at most once per session)
+    if (typeof window !== "undefined" && !hasRunDataUrlMigration) {
+      hasRunDataUrlMigration = true;
       setTimeout(() => {
         try {
           const items = getLocalItems();

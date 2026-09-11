@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Plus, QrCode } from "lucide-react";
 import { ActiveView, BreadcrumbItem, Folder, ItemType, MeshSyncState, VaultItem } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -111,16 +111,23 @@ export function App() {
     }
   }, [activeView, refreshFolderItems]);
 
+  const isPollingRef = useRef(false);
+
   // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation
   useEffect(() => {
-    const handleRevalidate = () => {
-      // Avoid interrupting active note drafting
-      if (isEditorOpen) return;
-      refreshInboxItems();
-      if (activeView.type === "folder") {
-        refreshFolderItems(activeView.folderId);
+    const handleRevalidate = async () => {
+      // Avoid interrupting active note drafting or stacking up overlapping polls
+      if (isEditorOpen || isPollingRef.current) return;
+      isPollingRef.current = true;
+      try {
+        await refreshInboxItems();
+        if (activeView.type === "folder") {
+          await refreshFolderItems(activeView.folderId);
+        }
+        await refreshFolders();
+      } finally {
+        isPollingRef.current = false;
       }
-      refreshFolders();
     };
 
     window.addEventListener("focus", handleRevalidate);
@@ -223,20 +230,34 @@ export function App() {
     itemType: ItemType,
     title: string,
     content: string,
-    metadata?: string
+    metadata?: string,
+    existingItem?: VaultItem
   ) => {
     const currentFolderId = activeView.type === "folder" ? activeView.folderId : null;
-    await StorageService.createItem(
+    if (existingItem) {
+      // Item was already created by media upload; update UI state immediately with 0ms delay
+      if (currentFolderId) {
+        setFolderItems((prev) => [existingItem, ...prev.filter((i) => i.id !== existingItem.id)]);
+      } else {
+        setInboxItems((prev) => [existingItem, ...prev.filter((i) => i.id !== existingItem.id)]);
+      }
+      return;
+    }
+
+    const created = await StorageService.createItem(
       currentFolderId,
       itemType,
       title,
       content,
       metadata || null
     );
-    if (currentFolderId) {
-      await refreshFolderItems(currentFolderId);
-    } else {
-      await refreshInboxItems();
+
+    if (created) {
+      if (currentFolderId) {
+        setFolderItems((prev) => [created, ...prev.filter((i) => i.id !== created.id)]);
+      } else {
+        setInboxItems((prev) => [created, ...prev.filter((i) => i.id !== created.id)]);
+      }
     }
   };
 

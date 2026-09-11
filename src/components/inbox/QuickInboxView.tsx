@@ -7,7 +7,13 @@ import { MoveItemModal } from "./MoveItemModal";
 export interface QuickInboxViewProps {
   items: VaultItem[];
   folders: Folder[];
-  onCapture: (itemType: ItemType, title: string, content: string, metadata?: string) => Promise<void> | void;
+  onCapture: (
+    itemType: ItemType,
+    title: string,
+    content: string,
+    metadata?: string,
+    existingItem?: VaultItem
+  ) => Promise<void> | void;
   onTogglePin: (itemId: string) => Promise<void> | void;
   onMoveItem: (itemId: string, folderId: string | null) => Promise<void> | void;
   onDeleteItem: (itemId: string) => Promise<void> | void;
