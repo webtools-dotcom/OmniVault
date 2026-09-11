@@ -16,6 +16,7 @@ pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
     pub device_id: String,
     pub server_port: u16,
+    pub base_dir: std::path::PathBuf,
 }
 
 #[tauri::command]
@@ -168,7 +169,7 @@ fn save_image_media_cmd(
     raw_bytes: Vec<u8>,
 ) -> Result<MediaFile, String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
-    media::save_image_media(&mut conn, ".", &item_id, &raw_bytes, &state.device_id)
+    media::save_image_media(&mut conn, &state.base_dir, &item_id, &raw_bytes, &state.device_id)
         .map_err(|e| e.to_string())
 }
 
@@ -188,7 +189,15 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut conn = Connection::open("omnivault.db")
+    let base_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let db_path = base_dir.join("omnivault.db");
+
+    let mut conn = Connection::open(&db_path)
+        .or_else(|_| Connection::open("omnivault.db"))
         .or_else(|_| Connection::open_in_memory())
         .expect("failed to open database");
     schema::initialize_schema(&conn).expect("failed to init schema");
@@ -198,14 +207,19 @@ pub fn run() {
     let db = Arc::new(Mutex::new(conn));
 
     // Start embedded HTTP server on background thread (default port 42420)
-    let server_handle = http_server::start_http_server(db.clone(), device_id.clone(), 42420)
-        .expect("failed to start embedded http server");
-    let server_port = server_handle.port;
+    let server_port = match http_server::start_http_server(db.clone(), device_id.clone(), 42420) {
+        Ok(handle) => handle.port,
+        Err(err) => {
+            eprintln!("Warning: Failed to start embedded http server: {err}");
+            42420
+        }
+    };
 
     let state = AppState {
         db: db.clone(),
         device_id,
         server_port,
+        base_dir,
     };
 
     tauri::Builder::default()
