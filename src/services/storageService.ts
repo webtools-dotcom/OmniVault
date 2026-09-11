@@ -4,95 +4,23 @@ import { Folder, ItemType, VaultItem } from "../types";
 const STORAGE_KEY_FOLDERS = "omnivault_folders_v1";
 const STORAGE_KEY_ITEMS = "omnivault_items_v1";
 
-const DEFAULT_FOLDERS: Folder[] = [
-  {
-    id: "fld-research",
-    parent_id: null,
-    name: "Research & Notes",
-    color: "#2F81F7",
-    created_at: Date.now() - 7200000,
-    updated_at: Date.now() - 7200000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-sub-saas",
-    parent_id: "fld-research",
-    name: "SaaS Architecture",
-    color: "#388BFD",
-    created_at: Date.now() - 3600000,
-    updated_at: Date.now() - 3600000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-trading",
-    parent_id: null,
-    name: "Market Setups & Charts",
-    color: "#238636",
-    created_at: Date.now() - 10800000,
-    updated_at: Date.now() - 10800000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-crypto",
-    parent_id: "fld-trading",
-    name: "Crypto Trends",
-    color: "#D29922",
-    created_at: Date.now() - 1800000,
-    updated_at: Date.now() - 1800000,
-    is_deleted: false,
-  },
-  {
-    id: "fld-ideas",
-    parent_id: null,
-    name: "Product Ideas",
-    color: "#A371F7",
-    created_at: Date.now() - 14400000,
-    updated_at: Date.now() - 14400000,
-    is_deleted: false,
-  },
-];
+const DEFAULT_FOLDERS: Folder[] = [];
+const DEFAULT_ITEMS: VaultItem[] = [];
 
-const DEFAULT_ITEMS: VaultItem[] = [
-  {
-    id: "item-init-1",
-    folder_id: null, // Quick Inbox
-    item_type: "note",
-    title: "OmniVault Offline Mesh Architecture",
-    content: "Capture notes instantly without internet connectivity. Revisions sync asynchronously via mDNS & local TCP mesh when peers reconnect.",
-    metadata: null,
-    is_pinned: true,
-    is_archived: false,
-    is_deleted: false,
-    created_at: Date.now() - 1200000,
-    updated_at: Date.now() - 1200000,
-  },
-  {
-    id: "item-init-2",
-    folder_id: null, // Quick Inbox
-    item_type: "ticker",
-    title: "$NVDA",
-    content: "AI infrastructure demand acceleration. Potential consolidation setup near weekly highs.",
-    metadata: JSON.stringify({ ticker: "NVDA", exchange: "NASDAQ" }),
-    is_pinned: false,
-    is_archived: false,
-    is_deleted: false,
-    created_at: Date.now() - 3600000,
-    updated_at: Date.now() - 3600000,
-  },
-  {
-    id: "item-init-3",
-    folder_id: null, // Quick Inbox
-    item_type: "link",
-    title: "Local-First Software Foundations",
-    content: "https://www.inkandswitch.com/local-first/",
-    metadata: JSON.stringify({ url: "https://www.inkandswitch.com/local-first/" }),
-    is_pinned: false,
-    is_archived: false,
-    is_deleted: false,
-    created_at: Date.now() - 5400000,
-    updated_at: Date.now() - 5400000,
-  },
-];
+const DUMMY_ITEM_IDS = new Set(["item-init-1", "item-init-2", "item-init-3"]);
+const DUMMY_FOLDER_IDS = new Set(["fld-research", "fld-sub-saas", "fld-trading", "fld-crypto", "fld-ideas"]);
+const DUMMY_TITLES = new Set([
+  "OmniVault Offline Mesh Architecture",
+  "OmniVault Local Mesh Architecture",
+  "$NVDA",
+  "NVIDIA Corp ($NVDA)",
+  "Bitcoin ($BTC)",
+  "TradingView Advanced Financial Charts",
+  "TradingView Charts",
+  "Quick Capture & Hotkeys",
+  "Quick Capture Guide",
+  "Local-First Software Foundations",
+]);
 
 const STORAGE_KEY_PAIRED = "omnivault_paired";
 const STORAGE_KEY_AUTH_TOKEN = "omnivault_auth_token";
@@ -195,10 +123,27 @@ function getLocalFolders(): Folder[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_FOLDERS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(DEFAULT_FOLDERS));
       return DEFAULT_FOLDERS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Folder[];
+    const cleaned = parsed.filter(
+      (f) =>
+        !DUMMY_FOLDER_IDS.has(f.id) &&
+        ![
+          "Research & Notes",
+          "Research & Architecture",
+          "SaaS Infrastructure",
+          "SaaS Architecture",
+          "Market Setups & Charts",
+          "Crypto Trends",
+          "Product Ideas",
+          "Product Roadmaps",
+        ].includes(f.name)
+    );
+    if (cleaned.length !== parsed.length) {
+      saveLocalFolders(cleaned);
+    }
+    return cleaned;
   } catch {
     return DEFAULT_FOLDERS;
   }
@@ -216,10 +161,16 @@ function getLocalItems(): VaultItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ITEMS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(DEFAULT_ITEMS));
       return DEFAULT_ITEMS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as VaultItem[];
+    const cleaned = parsed.filter(
+      (item) => !DUMMY_ITEM_IDS.has(item.id) && !DUMMY_TITLES.has(item.title)
+    );
+    if (cleaned.length !== parsed.length) {
+      saveLocalItems(cleaned);
+    }
+    return cleaned;
   } catch {
     return DEFAULT_ITEMS;
   }

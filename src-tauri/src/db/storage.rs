@@ -527,81 +527,8 @@ pub fn get_item_by_id(conn: &Connection, item_id: &str) -> Result<Option<VaultIt
     }
 }
 
-pub fn seed_defaults_if_empty(conn: &mut Connection, device_id: &str) -> Result<()> {
-    let folder_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM folders WHERE is_deleted = 0",
-        [],
-        |row| row.get(0),
-    )?;
-
-    let item_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM vault_items WHERE is_deleted = 0",
-        [],
-        |row| row.get(0),
-    )?;
-
-    if folder_count == 0 && item_count == 0 {
-        // Seed default folders
-        let fld_research = create_folder(conn, "Research & Architecture", None, Some("#3B82F6"), device_id)?;
-        let _fld_saas = create_folder(conn, "SaaS Infrastructure", Some(&fld_research.id), Some("#60A5FA"), device_id)?;
-        let fld_markets = create_folder(conn, "Market Setups & Charts", None, Some("#10B981"), device_id)?;
-        let _fld_crypto = create_folder(conn, "Crypto Trends", Some(&fld_markets.id), Some("#F59E0B"), device_id)?;
-        let _fld_ideas = create_folder(conn, "Product Roadmaps", None, Some("#8B5CF6"), device_id)?;
-
-        // Seed default items into Quick Inbox (folder_id = None)
-        let item1 = create_item(
-            conn,
-            None,
-            "note",
-            "OmniVault Local Mesh Architecture",
-            "Decentralized peer-to-peer storage engine.\n\n- Pure Rust core with embedded SQLite persistence\n- mDNS automatic local network peer discovery\n- Asynchronous store-and-forward revision sync\n- Zero cloud dependencies and 100% offline autonomy",
-            None,
-            device_id,
-        )?;
-        set_item_pin(conn, &item1.id, true, device_id)?;
-
-        let item2 = create_item(
-            conn,
-            None,
-            "ticker",
-            "NVIDIA Corp ($NVDA)",
-            "Data center AI accelerator demand acceleration. Critical resistance pivot at 135.",
-            None,
-            device_id,
-        )?;
-        set_item_pin(conn, &item2.id, true, device_id)?;
-
-        let _item3 = create_item(
-            conn,
-            None,
-            "ticker",
-            "Bitcoin ($BTC)",
-            "Institutional liquidity accumulation within cyclical multi-month range.",
-            None,
-            device_id,
-        )?;
-
-        let _item4 = create_item(
-            conn,
-            None,
-            "link",
-            "TradingView Advanced Financial Charts",
-            "https://www.tradingview.com",
-            None,
-            device_id,
-        )?;
-
-        let _item5 = create_item(
-            conn,
-            None,
-            "note",
-            "Quick Capture & Hotkeys",
-            "- Enter: Save quick capture from prompt\n- Ctrl+V: Instant screenshot paste as compressed WebP\n- Ctrl+B: Toggle sidebar drawer\n- Connect button: Pair phone or tablet via local Wi-Fi QR code",
-            None,
-            device_id,
-        )?;
-    }
-
+pub fn seed_defaults_if_empty(_conn: &mut Connection, _device_id: &str) -> Result<()> {
+    // Default test entries removed per user request. Fresh databases start completely clean.
     Ok(())
 }
 

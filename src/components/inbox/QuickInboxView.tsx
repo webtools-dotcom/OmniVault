@@ -73,31 +73,11 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
                 : "Your local knowledge stream is clear. All data is persisted locally in SQLite with zero cloud dependencies."}
             </p>
             {!searchQuery && (
-              <div className="pt-2 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => onCapture("note", "Quick Capture Guide", "- Type in the top prompt to save notes\n- Ctrl+V to paste screenshots\n- Pin cards to keep them at top")}
-                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
-                >
-                  <span className="text-blue-400 group-hover:text-blue-300 block font-semibold mb-1 font-mono">↵ + Starter Note</span>
-                  <span className="text-zinc-500 font-sans">Click to create a quick reference note in your stream.</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCapture("ticker", "$NVDA", "NVIDIA Corporation - Breakout watch above 135.")}
-                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
-                >
-                  <span className="text-emerald-400 group-hover:text-emerald-300 block font-semibold mb-1 font-mono">$ + Watch $NVDA</span>
-                  <span className="text-zinc-500 font-sans">Click to create an interactive TradingView chart card.</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCapture("link", "TradingView Charts", "https://www.tradingview.com")}
-                  className="p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.12] text-left transition-all cursor-pointer group"
-                >
-                  <span className="text-purple-400 group-hover:text-purple-300 block font-semibold mb-1 font-mono">🌐 + Web Link</span>
-                  <span className="text-zinc-500 font-sans">Click to create a web link card with 1-click launcher.</span>
-                </button>
+              <div className="pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">💡 Tip:</span> Type above to save notes, paste screenshots with Ctrl+V, or drop images directly.
+                </span>
+                <span className="text-zinc-600">Press Enter to capture</span>
               </div>
             )}
           </div>
