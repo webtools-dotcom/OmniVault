@@ -172,21 +172,7 @@ pub fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
 }
 
 pub fn get_storage_base_dir() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            if parent.join("omnivault.db").exists() || parent.join("media").exists() {
-                return parent.to_path_buf();
-            }
-        }
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        let release_dir = cwd.join("release");
-        if release_dir.join("omnivault.db").exists() || release_dir.join("media").exists() {
-            return release_dir;
-        }
-        return cwd;
-    }
-    PathBuf::from(".")
+    crate::resolve_app_base_dir()
 }
 
 pub fn find_media_file(clean_hash: &str, dist_dir: Option<&Path>) -> Option<PathBuf> {

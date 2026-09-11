@@ -195,7 +195,7 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
 
 #[tauri::command]
 fn save_media_to_downloads_cmd(
-    _state: State<AppState>,
+    state: State<AppState>,
     media_url_or_hash: String,
     suggested_filename: Option<String>,
 ) -> Result<String, String> {
@@ -216,6 +216,21 @@ fn save_media_to_downloads_cmd(
     let src_path = http_server::find_media_file(clean_hash, None)
         .ok_or_else(|| format!("Media file for hash '{}' not found on disk", clean_hash))?;
 
+    #[cfg(target_os = "android")]
+    let downloads_dir = {
+        let pub_dl = std::path::PathBuf::from("/sdcard/Download");
+        if pub_dl.exists() {
+            pub_dl
+        } else {
+            let emulated = std::path::PathBuf::from("/storage/emulated/0/Download");
+            if emulated.exists() {
+                emulated
+            } else {
+                state.base_dir.join("downloads")
+            }
+        }
+    };
+    #[cfg(not(target_os = "android"))]
     let downloads_dir = std::env::var("USERPROFILE")
         .map(|p| std::path::PathBuf::from(p).join("Downloads"))
         .or_else(|_| std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads")))
@@ -239,14 +254,9 @@ fn save_media_to_downloads_cmd(
             format!("omnivault_{}", short)
         });
 
-    let clean_name = if base_name.to_lowercase().ends_with(".webp") {
-        base_name
-    } else {
-        format!("{}.webp", base_name)
-    };
-
-    let mut dest_path = downloads_dir.join(&clean_name);
+    let mut dest_path = downloads_dir.join(format!("{}.webp", base_name));
     let mut counter = 1;
+    let clean_name = format!("{}.webp", base_name);
     let stem = clean_name.trim_end_matches(".webp");
     while dest_path.exists() {
         dest_path = downloads_dir.join(format!("{} ({}).webp", stem, counter));
@@ -278,12 +288,46 @@ fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
     }
 }
 
+pub fn resolve_app_base_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        let primary_dir = std::path::PathBuf::from("/data/data/com.omnivault.app/files");
+        if let Ok(_) = std::fs::create_dir_all(&primary_dir) {
+            if primary_dir.exists() {
+                return primary_dir;
+            }
+        }
+        let fallback_user0 = std::path::PathBuf::from("/data/user/0/com.omnivault.app/files");
+        if let Ok(_) = std::fs::create_dir_all(&fallback_user0) {
+            if fallback_user0.exists() {
+                return fallback_user0;
+            }
+        }
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            if parent.join("omnivault.db").exists() || parent.join("media").exists() {
+                return parent.to_path_buf();
+            }
+            return parent.to_path_buf();
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        let release_dir = cwd.join("release");
+        if release_dir.join("omnivault.db").exists() || release_dir.join("media").exists() {
+            return release_dir;
+        }
+        return cwd;
+    }
+    std::path::PathBuf::from(".")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let base_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let base_dir = resolve_app_base_dir();
+    let media_dir = base_dir.join("media");
+    let _ = std::fs::create_dir_all(&media_dir);
 
     let db_path = base_dir.join("omnivault.db");
 
