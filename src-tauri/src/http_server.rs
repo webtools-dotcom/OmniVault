@@ -125,7 +125,7 @@ pub fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
     } else {
         clean
     };
-    let clean = clean.replace(['\r', '\n', ' ', '\t'], "");
+    let mut clean = clean.replace(['\r', '\n', ' ', '\t'], "");
 
     fn char_val(c: u8) -> Result<u8, String> {
         match c {
@@ -139,14 +139,19 @@ pub fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
         }
     }
 
-    let bytes = clean.as_bytes();
-    if bytes.is_empty() {
+    if clean.is_empty() {
         return Ok(Vec::new());
     }
-    if bytes.len() % 4 != 0 {
-        return Err("Base64 string length must be a multiple of 4".to_string());
+
+    // Modern browsers and canvas data URLs may omit trailing '=' padding.
+    // Pad clean string with '=' until its length is a multiple of 4.
+    let remainder = clean.len() % 4;
+    if remainder != 0 {
+        let pad_needed = 4 - remainder;
+        clean.extend(std::iter::repeat('=').take(pad_needed));
     }
 
+    let bytes = clean.as_bytes();
     let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
     for chunk in bytes.chunks_exact(4) {
         let b0 = char_val(chunk[0])?;
@@ -185,6 +190,16 @@ pub fn get_storage_base_dir() -> PathBuf {
 }
 
 pub fn find_media_file(clean_hash: &str, dist_dir: Option<&Path>) -> Option<PathBuf> {
+    // Path traversal defense: clean_hash must strictly be non-empty ASCII alphanumeric, hyphen, or underscore
+    if clean_hash.is_empty()
+        || clean_hash.contains("..")
+        || clean_hash.contains('/')
+        || clean_hash.contains('\\')
+        || !clean_hash.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return None;
+    }
+
     let filename = format!("{}.webp", clean_hash);
     let mut candidates = Vec::new();
 
@@ -286,6 +301,12 @@ pub struct HttpServerHandle {
     pub stop_sender: Sender<()>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActivePairingSession {
+    pub pin: String,
+    pub expires_at: i64,
+}
+
 /// Spawns the embedded HTTP server on a background thread.
 pub fn start_http_server(
     db: Arc<Mutex<Connection>>,
@@ -297,9 +318,10 @@ pub fn start_http_server(
 
     let (stop_sender, stop_receiver) = channel::<()>();
     let dist_dir = find_dist_dir();
+    let pairing_session = Arc::new(Mutex::new(None));
 
     thread::spawn(move || {
-        run_server_loop(listener, stop_receiver, db, device_id, dist_dir);
+        run_server_loop(listener, stop_receiver, db, device_id, dist_dir, pairing_session);
     });
 
     Ok(HttpServerHandle {
@@ -332,6 +354,7 @@ fn run_server_loop(
     db: Arc<Mutex<Connection>>,
     device_id: String,
     dist_dir: Option<PathBuf>,
+    pairing_session: Arc<Mutex<Option<ActivePairingSession>>>,
 ) {
     loop {
         // Check for shutdown signal
@@ -344,9 +367,10 @@ fn run_server_loop(
                 let db_clone = db.clone();
                 let dev_id_clone = device_id.clone();
                 let dist_clone = dist_dir.clone();
+                let pair_clone = pairing_session.clone();
 
                 thread::spawn(move || {
-                    let _ = handle_connection(stream, db_clone, &dev_id_clone, dist_clone.as_deref());
+                    let _ = handle_connection(stream, db_clone, &dev_id_clone, dist_clone.as_deref(), pair_clone);
                 });
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -364,6 +388,7 @@ fn handle_connection(
     db: Arc<Mutex<Connection>>,
     device_id: &str,
     dist_dir: Option<&Path>,
+    pairing_session: Arc<Mutex<Option<ActivePairingSession>>>,
 ) -> std::io::Result<()> {
     // Windows inherits non-blocking mode from the listener to accepted streams.
     // Explicitly restore blocking mode with timeouts so multi-packet LAN requests
@@ -401,18 +426,43 @@ fn handle_connection(
         (raw_target, None)
     };
 
-    // Parse headers
+    // Parse headers with strict limits: max 100 headers, max 8KB per header line
     let mut headers = HashMap::new();
     let mut content_length: usize = 0;
+    let mut header_count = 0;
 
     loop {
         let mut line = String::new();
-        if reader.read_line(&mut line)? == 0 {
+        let bytes_read = (&mut reader).take(8192).read_line(&mut line)?;
+        if bytes_read == 0 {
             break;
+        }
+        if line.len() >= 8192 && !line.ends_with('\n') {
+            send_response(
+                &mut stream,
+                431,
+                "Request Header Fields Too Large",
+                "text/plain",
+                b"Request Header Fields Too Large",
+                &[],
+            )?;
+            return Ok(());
         }
         let trimmed = line.trim();
         if trimmed.is_empty() {
             break;
+        }
+        header_count += 1;
+        if header_count > 100 {
+            send_response(
+                &mut stream,
+                431,
+                "Request Header Fields Too Large",
+                "text/plain",
+                b"Too many request headers",
+                &[],
+            )?;
+            return Ok(());
         }
         if let Some((k, v)) = trimmed.split_once(':') {
             let key = k.trim().to_lowercase();
@@ -424,6 +474,26 @@ fn handle_connection(
             }
             headers.insert(key, val);
         }
+    }
+
+    // Enforce Content-Length bounds: max 50MB for media upload, max 2MB for standard endpoints
+    let max_allowed_body = if path == "/api/media/upload" || path == "/api/media" {
+        50 * 1024 * 1024 // 50 MB
+    } else {
+        2 * 1024 * 1024 // 2 MB
+    };
+
+    if content_length > max_allowed_body {
+        let err_json = serde_json::json!({ "error": "Payload Too Large: exceeds maximum permitted size" });
+        send_response(
+            &mut stream,
+            413,
+            "Payload Too Large",
+            "application/json",
+            &err_json.to_string().into_bytes(),
+            &[],
+        )?;
+        return Ok(());
     }
 
     // Read body if Content-Length specified
@@ -473,33 +543,39 @@ fn handle_connection(
             send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
             return Ok(());
         } else if method == "POST" {
-            if let Ok(req) = serde_json::from_slice::<CreateFolderRequest>(&body) {
-                let mut conn = db.lock().unwrap();
-                match storage::create_folder(
-                    &mut conn,
-                    &req.name,
-                    req.parent_id.as_deref(),
-                    req.color.as_deref(),
-                    device_id,
-                ) {
-                    Ok(folder) => {
-                        let json = serde_json::to_vec(&folder).unwrap_or_default();
-                        send_response(&mut stream, 201, "Created", "application/json", &json, &[])?;
-                    }
-                    Err(e) => {
-                        let err_json = serde_json::json!({ "error": e.to_string() });
-                        send_response(
-                            &mut stream,
-                            400,
-                            "Bad Request",
-                            "application/json",
-                            &err_json.to_string().into_bytes(),
-                            &[],
-                        )?;
-                    }
+            let req = match serde_json::from_slice::<CreateFolderRequest>(&body) {
+                Ok(r) => r,
+                Err(err) => {
+                    let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                    return Ok(());
                 }
-                return Ok(());
+            };
+            let mut conn = db.lock().unwrap();
+            match storage::create_folder(
+                &mut conn,
+                &req.name,
+                req.parent_id.as_deref(),
+                req.color.as_deref(),
+                device_id,
+            ) {
+                Ok(folder) => {
+                    let json = serde_json::to_vec(&folder).unwrap_or_default();
+                    send_response(&mut stream, 201, "Created", "application/json", &json, &[])?;
+                }
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": e.to_string() });
+                    send_response(
+                        &mut stream,
+                        400,
+                        "Bad Request",
+                        "application/json",
+                        &err_json.to_string().into_bytes(),
+                        &[],
+                    )?;
+                }
             }
+            return Ok(());
         }
     }
 
@@ -527,94 +603,19 @@ fn handle_connection(
             send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
             return Ok(());
         } else if method == "POST" {
-            if let Ok(req) = serde_json::from_slice::<CreateItemRequest>(&body) {
-                let mut conn = db.lock().unwrap();
-                match storage::create_item(
-                    &mut conn,
-                    req.folder_id.as_deref(),
-                    &req.item_type,
-                    &req.title,
-                    &req.content,
-                    req.metadata.as_deref(),
-                    device_id,
-                ) {
-                    Ok(item) => {
-                        let json = serde_json::to_vec(&item).unwrap_or_default();
-                        send_response(&mut stream, 201, "Created", "application/json", &json, &[])?;
-                    }
-                    Err(e) => {
-                        let err_json = serde_json::json!({ "error": e.to_string() });
-                        send_response(
-                            &mut stream,
-                            400,
-                            "Bad Request",
-                            "application/json",
-                            &err_json.to_string().into_bytes(),
-                            &[],
-                        )?;
-                    }
-                }
-                return Ok(());
-            }
-        }
-    }
-
-    if path == "/api/items/toggle-pin" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::toggle_pin_item(&mut conn, &req.id, device_id) {
-                Ok(item) => {
-                    let json = serde_json::to_vec(&item).unwrap_or_default();
-                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
+            let req = match serde_json::from_slice::<CreateItemRequest>(&body) {
+                Ok(r) => r,
+                Err(err) => {
+                    let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
                     send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                    return Ok(());
                 }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/items/delete" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
+            };
             let mut conn = db.lock().unwrap();
-            match storage::delete_item(&mut conn, &req.id, device_id) {
-                Ok(()) => {
-                    send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/items/move" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<MoveItemRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::move_item(&mut conn, &req.id, req.folder_id.as_deref(), device_id) {
-                Ok(item) => {
-                    let json = serde_json::to_vec(&item).unwrap_or_default();
-                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/items/update" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<UpdateItemRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::update_item(
+            match storage::create_item(
                 &mut conn,
-                &req.id,
+                req.folder_id.as_deref(),
+                &req.item_type,
                 &req.title,
                 &req.content,
                 req.metadata.as_deref(),
@@ -622,95 +623,284 @@ fn handle_connection(
             ) {
                 Ok(item) => {
                     let json = serde_json::to_vec(&item).unwrap_or_default();
-                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+                    send_response(&mut stream, 201, "Created", "application/json", &json, &[])?;
                 }
                 Err(e) => {
                     let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                    send_response(
+                        &mut stream,
+                        400,
+                        "Bad Request",
+                        "application/json",
+                        &err_json.to_string().into_bytes(),
+                        &[],
+                    )?;
                 }
             }
             return Ok(());
         }
     }
 
-    if path == "/api/folders/rename" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<RenameFolderRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::rename_folder(&mut conn, &req.id, &req.name, device_id) {
-                Ok(folder) => {
-                    let json = serde_json::to_vec(&folder).unwrap_or_default();
-                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/folders/move" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<MoveFolderRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::move_folder(&mut conn, &req.id, req.parent_id.as_deref(), device_id) {
-                Ok(folder) => {
-                    let json = serde_json::to_vec(&folder).unwrap_or_default();
-                    send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/folders/delete" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<IdRequest>(&body) {
-            let mut conn = db.lock().unwrap();
-            match storage::delete_folder(&mut conn, &req.id, device_id) {
-                Ok(()) => {
-                    send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
-                }
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": e.to_string() });
-                    send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                }
-            }
-            return Ok(());
-        }
-    }
-
-    if path == "/api/pair" && method == "POST" {
-        if let Ok(req) = serde_json::from_slice::<PairRequest>(&body) {
-            let clean_pin = req.pin.replace(' ', "");
-            if clean_pin.len() >= 4 {
-                let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
-                let now = chrono::Utc::now().timestamp_millis();
-                let peer_id = uuid::Uuid::new_v4().to_string();
-                let auth_token = uuid::Uuid::new_v4().to_string();
-                let conn = db.lock().unwrap();
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    rusqlite::params![peer_id, dev_name, auth_token, now, now],
-                );
-                let resp = serde_json::json!({
-                    "status": "authorized",
-                    "device_id": peer_id,
-                    "auth_token": auth_token,
-                    "server_device_id": device_id,
-                });
-                send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
-                return Ok(());
-            } else {
-                let err_json = serde_json::json!({ "error": "Invalid PIN format" });
+    if path == "/api/items/toggle-pin" && method == "POST" {
+        let req = match serde_json::from_slice::<IdRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
                 send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
                 return Ok(());
             }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::toggle_pin_item(&mut conn, &req.id, device_id) {
+            Ok(item) => {
+                let json = serde_json::to_vec(&item).unwrap_or_default();
+                send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
         }
+        return Ok(());
+    }
+
+    if path == "/api/items/delete" && method == "POST" {
+        let req = match serde_json::from_slice::<IdRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::delete_item(&mut conn, &req.id, device_id) {
+            Ok(()) => {
+                send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    if path == "/api/items/move" && method == "POST" {
+        let req = match serde_json::from_slice::<MoveItemRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::move_item(&mut conn, &req.id, req.folder_id.as_deref(), device_id) {
+            Ok(item) => {
+                let json = serde_json::to_vec(&item).unwrap_or_default();
+                send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    if path == "/api/items/update" && method == "POST" {
+        let req = match serde_json::from_slice::<UpdateItemRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::update_item(
+            &mut conn,
+            &req.id,
+            &req.title,
+            &req.content,
+            req.metadata.as_deref(),
+            device_id,
+        ) {
+            Ok(item) => {
+                let json = serde_json::to_vec(&item).unwrap_or_default();
+                send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    if path == "/api/folders/rename" && method == "POST" {
+        let req = match serde_json::from_slice::<RenameFolderRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::rename_folder(&mut conn, &req.id, &req.name, device_id) {
+            Ok(folder) => {
+                let json = serde_json::to_vec(&folder).unwrap_or_default();
+                send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    if path == "/api/folders/move" && method == "POST" {
+        let req = match serde_json::from_slice::<MoveFolderRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::move_folder(&mut conn, &req.id, req.parent_id.as_deref(), device_id) {
+            Ok(folder) => {
+                let json = serde_json::to_vec(&folder).unwrap_or_default();
+                send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    if path == "/api/folders/delete" && method == "POST" {
+        let req = match serde_json::from_slice::<IdRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let mut conn = db.lock().unwrap();
+        match storage::delete_folder(&mut conn, &req.id, device_id) {
+            Ok(()) => {
+                send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
+    // Active Pairing Session: GET /api/pair/session
+    if path == "/api/pair/session" && method == "GET" {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut session_lock = pairing_session.lock().unwrap();
+
+        let valid_session = if let Some(ref current) = *session_lock {
+            if current.expires_at > now + 15_000 {
+                Some(current.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let session = if let Some(s) = valid_session {
+            s
+        } else {
+            let entropy = (chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0).abs() as u128) ^ 0x5DEECE66D;
+            let num = (entropy % 900_000) + 100_000;
+            let pin_raw = format!("{:06}", num);
+            let formatted_pin = format!("{} {}", &pin_raw[0..3], &pin_raw[3..6]);
+            let new_session = ActivePairingSession {
+                pin: formatted_pin,
+                expires_at: now + 120_000,
+            };
+            *session_lock = Some(new_session.clone());
+            new_session
+        };
+
+        let remaining_sec = ((session.expires_at - now) / 1000).max(1);
+        let resp = serde_json::json!({
+            "pin": session.pin,
+            "expires_in": remaining_sec,
+        });
+        send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
+        return Ok(());
+    }
+
+    if path == "/api/pair" && method == "POST" {
+        let req = match serde_json::from_slice::<PairRequest>(&body) {
+            Ok(r) => r,
+            Err(err) => {
+                let err_json = serde_json::json!({ "error": format!("Invalid JSON payload: {}", err) });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        };
+        let clean_pin = req.pin.replace(' ', "");
+        if clean_pin.len() < 4 {
+            let err_json = serde_json::json!({ "error": "Invalid PIN format" });
+            send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            return Ok(());
+        }
+
+        let now = chrono::Utc::now().timestamp_millis();
+        let session_lock = pairing_session.lock().unwrap();
+
+        // Verify against active session if one exists
+        let is_valid = if let Some(ref active) = *session_lock {
+            if now > active.expires_at {
+                false
+            } else {
+                let clean_active = active.pin.replace(' ', "");
+                clean_pin == clean_active
+            }
+        } else {
+            // Fallback for direct local testing or initial pairing if no session was requested
+            true
+        };
+
+        if !is_valid {
+            let err_json = serde_json::json!({ "error": "Invalid or expired authorization PIN. Please check the PIN displayed on the desktop." });
+            send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            return Ok(());
+        }
+
+        let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
+        let peer_id = uuid::Uuid::new_v4().to_string();
+        let auth_token = uuid::Uuid::new_v4().to_string();
+        let conn = db.lock().unwrap();
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![peer_id, dev_name, auth_token, now, now],
+        );
+        let resp = serde_json::json!({
+            "status": "authorized",
+            "device_id": peer_id,
+            "auth_token": auth_token,
+            "server_device_id": device_id,
+        });
+        send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
+        return Ok(());
     }
 
     // Media Upload Route: POST /api/media/upload or POST /api/media
@@ -790,27 +980,46 @@ fn handle_connection(
             None
         };
 
+        let file_hash = media::compute_sha256(&raw_bytes);
+
         let target_item_id = if let Some(item) = existing_item {
             item.id
         } else {
-            let item_title = upload_title.unwrap_or_else(|| {
-                let now = chrono::Local::now();
-                format!("Screenshot ({})", now.format("%H:%M"))
-            });
-            match storage::create_item(
-                &mut conn,
-                upload_folder_id.as_deref(),
-                "image",
-                &item_title,
-                "",
-                None,
-                device_id,
-            ) {
-                Ok(item) => item.id,
-                Err(e) => {
-                    let err_json = serde_json::json!({ "error": format!("Failed to create item for media: {}", e) });
-                    send_response(&mut stream, 500, "Internal Server Error", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                    return Ok(());
+            // Deduplication: If this exact image was uploaded within the last 5 seconds without an item_id,
+            // reuse the existing item to avoid duplicate records from rapid double-clicks or touch events.
+            let five_sec_ago = chrono::Utc::now().timestamp_millis() - 5000;
+            let recent_item_id: Option<String> = conn.query_row(
+                "SELECT v.id
+                 FROM vault_items v
+                 JOIN media_files m ON m.item_id = v.id
+                 WHERE m.file_hash = ?1 AND v.created_at >= ?2 AND v.is_deleted = 0
+                 ORDER BY v.created_at DESC LIMIT 1",
+                rusqlite::params![&file_hash, five_sec_ago],
+                |row| row.get(0),
+            ).ok();
+
+            if let Some(reused_id) = recent_item_id {
+                reused_id
+            } else {
+                let item_title = upload_title.unwrap_or_else(|| {
+                    let now = chrono::Local::now();
+                    format!("Screenshot ({})", now.format("%H:%M"))
+                });
+                match storage::create_item(
+                    &mut conn,
+                    upload_folder_id.as_deref(),
+                    "image",
+                    &item_title,
+                    "",
+                    None,
+                    device_id,
+                ) {
+                    Ok(item) => item.id,
+                    Err(e) => {
+                        let err_json = serde_json::json!({ "error": format!("Failed to create item for media: {}", e) });
+                        send_response(&mut stream, 500, "Internal Server Error", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                        return Ok(());
+                    }
                 }
             }
         };
@@ -935,16 +1144,51 @@ fn handle_connection(
         }
     }
 
+    // Catch unhandled API routes: never let any /api/* route fall through to static index.html
+    if path.starts_with("/api/") {
+        let err_json = serde_json::json!({ "error": format!("API endpoint not found or method not allowed: {} {}", method, path) });
+        send_response(
+            &mut stream,
+            404,
+            "Not Found",
+            "application/json",
+            &err_json.to_string().into_bytes(),
+            &[],
+        )?;
+        return Ok(());
+    }
+
     // Static Assets & SPA Fallback Serving
     if let Some(dist) = dist_dir {
         let relative_path = path.trim_start_matches('/');
+
+        // Path traversal defense: block any traversal attempts
+        if relative_path.contains("..") || relative_path.contains('\\') {
+            send_response(
+                &mut stream,
+                403,
+                "Forbidden",
+                "text/plain",
+                b"Access Denied: Path traversal is forbidden",
+                &[],
+            )?;
+            return Ok(());
+        }
+
         let target_file = if relative_path.is_empty() {
             dist.join("index.html")
         } else {
             dist.join(relative_path)
         };
 
-        if target_file.exists() && target_file.is_file() {
+        // Canonical verification: ensure resolved path is strictly contained within dist directory
+        let is_safe = if let (Ok(canonical_target), Ok(canonical_dist)) = (target_file.canonicalize(), dist.canonicalize()) {
+            canonical_target.starts_with(&canonical_dist)
+        } else {
+            false
+        };
+
+        if is_safe && target_file.exists() && target_file.is_file() {
             if let Ok(bytes) = fs::read(&target_file) {
                 let mime = get_mime_type(&target_file);
                 send_response(&mut stream, 200, "OK", mime, &bytes, &[])?;
@@ -952,12 +1196,14 @@ fn handle_connection(
             }
         }
 
-        // SPA Fallback: Serve index.html for all client-side routes
-        let fallback_index = dist.join("index.html");
-        if fallback_index.exists() {
-            if let Ok(bytes) = fs::read(&fallback_index) {
-                send_response(&mut stream, 200, "OK", "text/html; charset=utf-8", &bytes, &[])?;
-                return Ok(());
+        // SPA Fallback: Serve index.html for client-side GET routes (never API calls)
+        if method == "GET" && !path.starts_with("/api/") {
+            let fallback_index = dist.join("index.html");
+            if fallback_index.exists() {
+                if let Ok(bytes) = fs::read(&fallback_index) {
+                    send_response(&mut stream, 200, "OK", "text/html; charset=utf-8", &bytes, &[])?;
+                    return Ok(());
+                }
             }
         }
     }
@@ -1153,6 +1399,40 @@ mod tests {
         assert!(resp.contains("201 Created"));
         assert!(resp.contains(r#""status":"ok""#));
         assert!(resp.contains("/api/media/"));
+
+        // 9. Test Path Traversal Protection (must be 403 Forbidden)
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /../../Cargo.toml HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("403 Forbidden"), "Path traversal attempt should be rejected with 403 Forbidden");
+
+        // 10. Test Unpadded Base64 Decoding
+        let unpadded_b64 = "SGVsbG8"; // "Hello" without '='
+        let decoded = decode_base64(unpadded_b64).unwrap();
+        assert_eq!(decoded, b"Hello");
+
+        // 11. Test Invalid JSON POST returning 400 Bad Request
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"POST /api/folders HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 13\r\nConnection: close\r\n\r\n{invalid_json}")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("400 Bad Request"), "Malformed JSON payload must return 400 Bad Request");
+        assert!(!resp.contains("<!DOCTYPE"), "Malformed JSON must never fall through to HTML");
+
+        // 12. Test Unknown API Route returning 404 Not Found
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /api/nonexistent-route HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("404 Not Found"), "Unknown API route must return 404 Not Found");
+        assert!(!resp.contains("<!DOCTYPE"), "Unknown API route must never fall through to HTML");
 
         // Clean shutdown
         let _ = handle.stop_sender.send(());

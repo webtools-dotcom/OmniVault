@@ -20,6 +20,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageInfo, setImageInfo] = useState<{ name: string; sizeStr: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [justSynced, setJustSynced] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,14 +33,16 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   const handleCapture = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const cleanTitle = title.trim();
+    if (e) e.preventDefault();
+    if (isSubmittingRef.current) return;
 
+    const cleanTitle = title.trim();
     if (!cleanTitle && !imagePreview) return;
-    if (isSubmitting) return;
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
-      setIsSubmitting(true);
       let metadata: string | null = null;
       let finalTitle = cleanTitle;
       let finalContent = cleanTitle;
@@ -71,11 +74,10 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               cacheLocalMedia(uploadRes.file_hash, currentPreview);
             }
 
-            // Immediately clear inputs and dismiss "Syncing..."
+            // Immediately clear inputs and indicate sync
             setTitle("");
             setImagePreview(null);
             setImageInfo(null);
-            setIsSubmitting(false);
             setJustSynced(true);
             setTimeout(() => setJustSynced(false), 2000);
             inputRef.current?.focus();
@@ -113,6 +115,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       console.error("Quick capture failed:", err);
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -178,12 +181,6 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleCapture();
-            }
-          }}
           placeholder={
             itemType === "ticker"
               ? "Enter ticker symbol (e.g. $NVDA, BTC)..."
@@ -227,7 +224,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="h-7 px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
+          className="h-8 sm:h-7 px-3 sm:px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
         >
           {isSubmitting ? (
             <>

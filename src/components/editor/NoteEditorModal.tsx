@@ -47,6 +47,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [isPinned, setIsPinned] = useState(false);
 
+  const [currentId, setCurrentId] = useState<string | null>(item?.id || null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<number | null>(null);
   const isInitialMount = useRef(true);
@@ -55,12 +56,14 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (item) {
+        setCurrentId(item.id);
         setTitle(item.title);
         setContent(item.content);
         setFolderId(item.folder_id);
         setItemType(item.item_type as ItemType);
         setIsPinned(item.is_pinned);
       } else {
+        setCurrentId(null);
         setTitle("");
         setContent("");
         setFolderId(initialFolderId);
@@ -90,13 +93,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
         const finalTitle = title.trim() || "Untitled Note";
-        await onSave(
-          item ? item.id : null,
+        const saved = await onSave(
+          currentId,
           finalTitle,
           content,
           folderId,
           itemType
         );
+        if (saved && saved.id) {
+          setCurrentId(saved.id);
+        }
         setSaveStatus("saved");
       } catch (err) {
         console.error("Auto-save failed:", err);
@@ -108,7 +114,10 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         window.clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, content, folderId, itemType, isOpen, item, onSave]);
+  }, [title, content, folderId, itemType, isOpen, currentId, onSave]);
+
+  const detectedTickers = useMemo(() => extractTickers(`${title} ${content}`), [title, content]);
+  const detectedLinks = useMemo(() => extractLinks(content), [content]);
 
   if (!isOpen) return null;
 
@@ -138,9 +147,6 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
   const activeFolders = folders.filter((f) => !f.is_deleted);
-
-  const detectedTickers = useMemo(() => extractTickers(`${title} ${content}`), [title, content]);
-  const detectedLinks = useMemo(() => extractLinks(content), [content]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md select-none">

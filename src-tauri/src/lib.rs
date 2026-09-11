@@ -17,11 +17,17 @@ pub struct AppState {
     pub device_id: String,
     pub server_port: u16,
     pub base_dir: std::path::PathBuf,
+    pub peer_registry: sync::discovery::PeerRegistry,
 }
 
 #[tauri::command]
 fn get_system_status() -> String {
     "OmniVault Core Ready".into()
+}
+
+#[tauri::command]
+async fn get_discovered_peers_cmd(state: State<'_, AppState>) -> Result<Vec<sync::discovery::PeerInfo>, String> {
+    Ok(state.peer_registry.get_active_peers().await)
 }
 
 // ---------------------------------------------------------------------------
@@ -300,17 +306,66 @@ pub fn run() {
         }
     };
 
+    // Start P2P Mesh Discovery on background thread with Tokio runtime
+    let peer_registry = sync::discovery::PeerRegistry::new();
+    let peer_reg_clone = peer_registry.clone();
+    let dev_id_broadcaster = device_id.clone();
+    let dev_id_listener = device_id.clone();
+    let dev_name = format!("OmniVault Desktop ({})", &device_id[..6.min(device_id.len())]);
+
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Warning: Failed to create Tokio runtime for discovery: {e}");
+                return;
+            }
+        };
+
+        rt.block_on(async move {
+            let (_stop_tx, stop_rx1) = tokio::sync::watch::channel(false);
+            let stop_rx2 = stop_rx1.clone();
+
+            let b_dev_name = dev_name.clone();
+            tokio::spawn(async move {
+                let _ = sync::discovery::DiscoveryService::run_broadcaster(
+                    dev_id_broadcaster,
+                    b_dev_name,
+                    server_port,
+                    5,
+                    stop_rx1,
+                ).await;
+            });
+
+            tokio::spawn(async move {
+                let _ = sync::discovery::DiscoveryService::run_listener(
+                    dev_id_listener,
+                    peer_reg_clone,
+                    stop_rx2,
+                ).await;
+            });
+
+            // Keep discovery runtime alive indefinitely
+            std::future::pending::<()>().await;
+        });
+    });
+
     let state = AppState {
         db: db.clone(),
         device_id,
         server_port,
         base_dir,
+        peer_registry,
     };
 
     tauri::Builder::default()
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             get_system_status,
+            get_discovered_peers_cmd,
             list_folders_cmd,
             create_folder_cmd,
             rename_folder_cmd,

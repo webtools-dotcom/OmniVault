@@ -339,14 +339,17 @@ export function App() {
     targetFolderId: string | null,
     itemType: ItemType,
     metadata?: string | null
-  ) => {
+  ): Promise<VaultItem | void> => {
+    let resultItem: VaultItem | null = null;
     if (itemId) {
       const updated = await StorageService.updateItem(itemId, title, content, metadata);
       if (updated.folder_id !== targetFolderId) {
-        await StorageService.moveItem(itemId, targetFolderId);
+        resultItem = await StorageService.moveItem(itemId, targetFolderId);
+      } else {
+        resultItem = updated;
       }
     } else {
-      await StorageService.createItem(
+      resultItem = await StorageService.createItem(
         targetFolderId,
         itemType,
         title,
@@ -359,6 +362,7 @@ export function App() {
     if (activeView.type === "folder") {
       await refreshFolderItems(activeView.folderId);
     }
+    return resultItem || undefined;
   };
 
   const filteredInboxItems = useMemo(() => {

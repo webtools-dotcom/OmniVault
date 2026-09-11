@@ -165,12 +165,64 @@ pub fn delete_folder(
     let now = Utc::now().timestamp_millis();
     let tx = conn.transaction()?;
 
-    tx.execute(
-        "UPDATE folders SET is_deleted = 1, updated_at = ?1 WHERE id = ?2",
-        params![now, folder_id],
-    )?;
+    // 1. Recursively find all descendant subfolder IDs
+    let mut descendant_folder_ids: Vec<String> = Vec::new();
+    {
+        let mut stmt = tx.prepare(
+            "WITH RECURSIVE subfolders(id) AS (
+                SELECT id FROM folders WHERE parent_id = ?1 AND is_deleted = 0
+                UNION ALL
+                SELECT f.id FROM folders f
+                JOIN subfolders s ON f.parent_id = s.id
+                WHERE f.is_deleted = 0
+             )
+             SELECT id FROM subfolders",
+        )?;
+        let rows = stmt.query_map(params![folder_id], |row| row.get(0))?;
+        for r in rows {
+            descendant_folder_ids.push(r?);
+        }
+    }
 
-    record_revision_tx(&tx, "folder", folder_id, device_id, "deleted", "{}", now)?;
+    // 2. Mark target folder and all descendant folders as deleted
+    let mut all_folder_ids = descendant_folder_ids;
+    all_folder_ids.push(folder_id.to_string());
+
+    for fid in &all_folder_ids {
+        tx.execute(
+            "UPDATE folders SET is_deleted = 1, updated_at = ?1 WHERE id = ?2",
+            params![now, fid],
+        )?;
+        record_revision_tx(&tx, "folder", fid, device_id, "deleted", "{}", now)?;
+    }
+
+    // 3. Re-parent child items across all deleted folders to Quick Inbox (folder_id = NULL)
+    // so user notes and captures are never orphaned or permanently lost
+    for fid in &all_folder_ids {
+        let mut item_stmt = tx.prepare(
+            "SELECT id FROM vault_items WHERE folder_id = ?1 AND is_deleted = 0",
+        )?;
+        let item_ids: Vec<String> = item_stmt
+            .query_map(params![fid], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for item_id in item_ids {
+            tx.execute(
+                "UPDATE vault_items SET folder_id = NULL, updated_at = ?1 WHERE id = ?2",
+                params![now, &item_id],
+            )?;
+            record_revision_tx(
+                &tx,
+                "vault_item",
+                &item_id,
+                device_id,
+                "moved",
+                "{\"folder_id\":null}",
+                now,
+            )?;
+        }
+    }
 
     tx.commit()?;
     Ok(())
@@ -661,5 +713,40 @@ mod tests {
             |row| row.get(0),
         ).unwrap();
         assert_eq!(rev_count, 5);
+    }
+
+    #[test]
+    fn test_recursive_folder_deletion_and_child_reparenting() {
+        let mut conn = setup_memory_db();
+        let dev_id = "test-device-1";
+
+        // 1. Create nested hierarchy: Parent -> Sub -> Deep
+        let parent = create_folder(&mut conn, "Parent", None, None, dev_id).unwrap();
+        let sub = create_folder(&mut conn, "Sub", Some(&parent.id), None, dev_id).unwrap();
+        let deep = create_folder(&mut conn, "Deep", Some(&sub.id), None, dev_id).unwrap();
+
+        // 2. Add notes to each level of the hierarchy
+        let item_parent = create_item(&mut conn, Some(&parent.id), "note", "Note in Parent", "p content", None, dev_id).unwrap();
+        let item_sub = create_item(&mut conn, Some(&sub.id), "note", "Note in Sub", "s content", None, dev_id).unwrap();
+        let item_deep = create_item(&mut conn, Some(&deep.id), "note", "Note in Deep", "d content", None, dev_id).unwrap();
+
+        // Quick inbox should currently be empty (all items are filed)
+        assert_eq!(list_inbox_items(&conn).unwrap().len(), 0);
+
+        // 3. Delete root "Parent" folder
+        delete_folder(&mut conn, &parent.id, dev_id).unwrap();
+
+        // 4. Assert that ALL 3 folders are soft-deleted (0 active folders remain)
+        let active_folders = list_folders(&conn, false).unwrap();
+        assert_eq!(active_folders.len(), 0, "All descendant folders must be soft-deleted");
+
+        // 5. Assert that ALL 3 items are safely re-parented to Quick Inbox (folder_id = NULL)
+        let inbox_items = list_inbox_items(&conn).unwrap();
+        assert_eq!(inbox_items.len(), 3, "All child items must be preserved in Quick Inbox");
+
+        let inbox_ids: Vec<String> = inbox_items.into_iter().map(|i| i.id).collect();
+        assert!(inbox_ids.contains(&item_parent.id));
+        assert!(inbox_ids.contains(&item_sub.id));
+        assert!(inbox_ids.contains(&item_deep.id));
     }
 }

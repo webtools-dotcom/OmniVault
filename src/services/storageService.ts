@@ -236,6 +236,19 @@ export const StorageService = {
     }
   },
 
+  async getPairingSession(): Promise<{ pin: string; expires_in: number } | null> {
+    try {
+      const endpoint = isTauriEnvironment()
+        ? `http://127.0.0.1:${cachedServerPort}/api/pair/session`
+        : "/api/pair/session";
+      const res = await fetch(endpoint);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
   // -------------------------------------------------------------------------
   // Folders
   // -------------------------------------------------------------------------
@@ -407,8 +420,21 @@ export const StorageService = {
         f.updated_at = now;
       }
     }
-
     saveLocalFolders(folders);
+
+    // Re-parent items inside deleted folders to Quick Inbox (folder_id = null)
+    const items = getLocalItems();
+    let itemsChanged = false;
+    for (const item of items) {
+      if (item.folder_id && toDeleteIds.has(item.folder_id)) {
+        item.folder_id = null;
+        item.updated_at = now;
+        itemsChanged = true;
+      }
+    }
+    if (itemsChanged) {
+      saveLocalItems(items);
+    }
   },
 
   // -------------------------------------------------------------------------

@@ -16,17 +16,18 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({ isOpen, onClose 
     url: "http://localhost:42420",
   });
   const [copied, setCopied] = useState(false);
-  const [pairingPin] = useState<string>(() => {
-    // Generate deterministic session 6-digit PIN (e.g. 749 201)
-    const num = Math.floor(100000 + Math.random() * 900000);
-    return `${num.toString().slice(0, 3)} ${num.toString().slice(3)}`;
-  });
+  const [pairingPin, setPairingPin] = useState<string>("749 201");
 
-  // Fetch LAN IP & Port on modal open
+  // Fetch LAN IP, Port, and active backend pairing PIN on modal open
   useEffect(() => {
     if (isOpen) {
       StorageService.getLanConnectionInfo().then((info) => {
         setLanInfo(info);
+      });
+      StorageService.getPairingSession().then((session) => {
+        if (session && session.pin) {
+          setPairingPin(session.pin);
+        }
       });
       setCopied(false);
     }

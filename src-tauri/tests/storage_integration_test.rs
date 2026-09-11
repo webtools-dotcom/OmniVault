@@ -87,10 +87,15 @@ fn test_storage_integration_e2e_workflow() {
     let read_back = read_media_bytes(&temp_storage, &media.relative_path).unwrap();
     assert!(!read_back.is_empty());
 
-    // 6. Delete a folder (L4)
+    // 6. Delete a folder (L4, which cascades to child L5 and re-parents item to Quick Inbox)
     delete_folder(&mut conn, &l4.id, &device_id).unwrap();
     let remaining_folders = list_folders(&conn, false).unwrap();
-    assert_eq!(remaining_folders.len(), 4);
+    assert_eq!(remaining_folders.len(), 3, "L4 and child L5 must be recursively soft-deleted");
+
+    // Verify child item was preserved in Quick Inbox
+    let rescued_inbox = list_inbox_items(&conn).unwrap();
+    assert_eq!(rescued_inbox.len(), 1, "Child item must be safely rescued to Quick Inbox");
+    assert_eq!(rescued_inbox[0].id, moved_item.id);
 
     // 7. Audit Complete Revision Stream for Store-and-Forward Sync
     let mut rev_stmt = conn.prepare(
@@ -119,9 +124,10 @@ fn test_storage_integration_e2e_workflow() {
     // 1 item creation (Inbox)
     // 1 item move (Inbox -> L5)
     // 1 media file creation
-    // 1 folder deletion (L4)
-    // Total = 9 revisions
-    assert_eq!(revisions.len(), 9, "Expected exactly 9 revisions in delta audit");
+    // 2 folder deletions (L4, L5)
+    // 1 item re-parent move (L5 -> Inbox)
+    // Total = 11 revisions
+    assert_eq!(revisions.len(), 11, "Expected exactly 11 revisions in delta audit");
 
     // Assert revision timestamps are valid and monotonic
     for i in 1..revisions.len() {
