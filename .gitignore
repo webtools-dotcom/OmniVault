@@ -13,6 +13,9 @@ release/
 *.db-shm
 *.db-wal
 media_storage/
+/media/
+/src-tauri/media/
+/release/media/
 
 # System & IDE files
 .agent/

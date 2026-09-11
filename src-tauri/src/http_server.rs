@@ -10,6 +10,7 @@ use std::thread;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::db::media;
 use crate::db::models::VaultItem;
 use crate::db::storage;
 
@@ -105,6 +106,115 @@ pub struct UpdateItemRequest {
 pub struct PairRequest {
     pub pin: String,
     pub device_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MediaUploadRequest {
+    pub item_id: Option<String>,
+    pub folder_id: Option<String>,
+    pub title: Option<String>,
+    pub data: Option<String>,
+    pub base64: Option<String>,
+}
+
+/// Robust base64 decoder supporting data-URL prefixes and padding.
+pub fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
+    let clean = input.trim();
+    let clean = if let Some(idx) = clean.find(',') {
+        &clean[idx + 1..]
+    } else {
+        clean
+    };
+    let clean = clean.replace(['\r', '\n', ' ', '\t'], "");
+
+    fn char_val(c: u8) -> Result<u8, String> {
+        match c {
+            b'A'..=b'Z' => Ok(c - b'A'),
+            b'a'..=b'z' => Ok(c - b'a' + 26),
+            b'0'..=b'9' => Ok(c - b'0' + 52),
+            b'+' | b'-' => Ok(62),
+            b'/' | b'_' => Ok(63),
+            b'=' => Ok(0),
+            _ => Err(format!("Invalid base64 character: {}", c as char)),
+        }
+    }
+
+    let bytes = clean.as_bytes();
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    if bytes.len() % 4 != 0 {
+        return Err("Base64 string length must be a multiple of 4".to_string());
+    }
+
+    let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
+    for chunk in bytes.chunks_exact(4) {
+        let b0 = char_val(chunk[0])?;
+        let b1 = char_val(chunk[1])?;
+        let b2 = char_val(chunk[2])?;
+        let b3 = char_val(chunk[3])?;
+
+        let triple = ((b0 as u32) << 18) | ((b1 as u32) << 12) | ((b2 as u32) << 6) | (b3 as u32);
+        out.push(((triple >> 16) & 0xFF) as u8);
+        if chunk[2] != b'=' {
+            out.push(((triple >> 8) & 0xFF) as u8);
+        }
+        if chunk[3] != b'=' {
+            out.push((triple & 0xFF) as u8);
+        }
+    }
+    Ok(out)
+}
+
+pub fn get_storage_base_dir() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            if parent.join("omnivault.db").exists() || parent.join("media").exists() {
+                return parent.to_path_buf();
+            }
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        let release_dir = cwd.join("release");
+        if release_dir.join("omnivault.db").exists() || release_dir.join("media").exists() {
+            return release_dir;
+        }
+        return cwd;
+    }
+    PathBuf::from(".")
+}
+
+pub fn find_media_file(clean_hash: &str, dist_dir: Option<&Path>) -> Option<PathBuf> {
+    let filename = format!("{}.webp", clean_hash);
+    let mut candidates = Vec::new();
+
+    let base_dir = get_storage_base_dir();
+    candidates.push(base_dir.join("media").join(&filename));
+    candidates.push(PathBuf::from("media").join(&filename));
+    candidates.push(PathBuf::from("release").join("media").join(&filename));
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidates.push(parent.join("media").join(&filename));
+            if let Some(p2) = parent.parent() {
+                candidates.push(p2.join("media").join(&filename));
+                candidates.push(p2.join("release").join("media").join(&filename));
+            }
+        }
+    }
+
+    if let Some(dist) = dist_dir {
+        if let Some(parent) = dist.parent() {
+            candidates.push(parent.join("media").join(&filename));
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.is_file() && candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// Discovers the compiled frontend static directory (`dist/`).
@@ -255,6 +365,13 @@ fn handle_connection(
     device_id: &str,
     dist_dir: Option<&Path>,
 ) -> std::io::Result<()> {
+    // Windows inherits non-blocking mode from the listener to accepted streams.
+    // Explicitly restore blocking mode with timeouts so multi-packet LAN requests
+    // and large static asset streaming do not abort with WouldBlock.
+    let _ = stream.set_nonblocking(false);
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(15)));
+    let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(15)));
+
     let dist_fallback;
     let dist_dir = match dist_dir {
         Some(d) => Some(d),
@@ -596,33 +713,217 @@ fn handle_connection(
         }
     }
 
-    // Media Serving: /media/<hash> or /api/media/<hash>
-    let media_prefix = if path.starts_with("/api/media/") {
-        Some(&path["/api/media/".len()..])
-    } else if path.starts_with("/media/") {
-        Some(&path["/media/".len()..])
-    } else {
-        None
-    };
+    // Media Upload Route: POST /api/media/upload or POST /api/media
+    if method == "POST" && (path == "/api/media/upload" || path == "/api/media") {
+        let upload_item_id: Option<String>;
+        let upload_folder_id: Option<String>;
+        let upload_title: Option<String>;
+        let raw_bytes: Vec<u8>;
 
-    if let Some(media_hash) = media_prefix {
-        let clean_hash = media_hash.trim_end_matches(".webp");
-        let media_path = PathBuf::from("media").join(format!("{}.webp", clean_hash));
-        if media_path.exists() {
-            if let Ok(bytes) = fs::read(&media_path) {
-                send_response(&mut stream, 200, "OK", "image/webp", &bytes, &[])?;
+        let is_json = headers
+            .get("content-type")
+            .map(|ct| ct.contains("application/json"))
+            .unwrap_or(false)
+            || (body.starts_with(b"{") && body.ends_with(b"}"));
+
+        if is_json {
+            if let Ok(req) = serde_json::from_slice::<MediaUploadRequest>(&body) {
+                upload_item_id = req.item_id;
+                upload_folder_id = req.folder_id;
+                upload_title = req.title;
+                let b64_str = req.data.or(req.base64).unwrap_or_default();
+                match decode_base64(&b64_str) {
+                    Ok(b) => raw_bytes = b,
+                    Err(e) => {
+                        let err_json = serde_json::json!({ "error": format!("Base64 decode error: {}", e) });
+                        send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                        return Ok(());
+                    }
+                }
+            } else {
+                let err_json = serde_json::json!({ "error": "Invalid JSON payload for media upload" });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
+            }
+        } else {
+            upload_item_id = None;
+            upload_folder_id = None;
+            upload_title = None;
+            raw_bytes = body;
+        }
+
+        if raw_bytes.is_empty() {
+            let err_json = serde_json::json!({ "error": "No media bytes received" });
+            send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
+            return Ok(());
+        }
+
+        let base_dir = get_storage_base_dir();
+        let _ = fs::create_dir_all(base_dir.join("media"));
+        let _ = fs::create_dir_all("media");
+
+        let mut conn = db.lock().unwrap();
+
+        // Ensure item exists in vault_items for foreign key constraint
+        let existing_item: Option<VaultItem> = if let Some(ref iid) = upload_item_id {
+            conn.query_row(
+                "SELECT id, folder_id, item_type, title, content, metadata, is_pinned, is_archived, is_deleted, created_at, updated_at
+                 FROM vault_items WHERE id = ?1",
+                [iid],
+                |row| {
+                    Ok(VaultItem {
+                        id: row.get(0)?,
+                        folder_id: row.get(1)?,
+                        item_type: row.get(2)?,
+                        title: row.get(3)?,
+                        content: row.get(4)?,
+                        metadata: row.get(5)?,
+                        is_pinned: row.get::<_, i64>(6)? != 0,
+                        is_archived: row.get::<_, i64>(7)? != 0,
+                        is_deleted: row.get::<_, i64>(8)? != 0,
+                        created_at: row.get(9)?,
+                        updated_at: row.get(10)?,
+                    })
+                },
+            ).ok()
+        } else {
+            None
+        };
+
+        let target_item_id = if let Some(item) = existing_item {
+            item.id
+        } else {
+            let item_title = upload_title.unwrap_or_else(|| {
+                let now = chrono::Local::now();
+                format!("Screenshot ({})", now.format("%H:%M"))
+            });
+            match storage::create_item(
+                &mut conn,
+                upload_folder_id.as_deref(),
+                "image",
+                &item_title,
+                "",
+                None,
+                device_id,
+            ) {
+                Ok(item) => item.id,
+                Err(e) => {
+                    let err_json = serde_json::json!({ "error": format!("Failed to create item for media: {}", e) });
+                    send_response(&mut stream, 500, "Internal Server Error", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                    return Ok(());
+                }
+            }
+        };
+
+        match media::save_image_media(&mut conn, &base_dir, &target_item_id, &raw_bytes, device_id) {
+            Ok(media_file) => {
+                let media_url = format!("/api/media/{}.webp", media_file.file_hash);
+                let meta = serde_json::json!({
+                    "isImage": true,
+                    "mimeType": "image/webp",
+                    "fileHash": media_file.file_hash,
+                    "byteSize": media_file.byte_size,
+                    "width": media_file.width,
+                    "height": media_file.height,
+                });
+
+                let current_title: String = conn
+                    .query_row("SELECT title FROM vault_items WHERE id = ?1", [&target_item_id], |row| row.get(0))
+                    .unwrap_or_else(|_| "Screenshot".to_string());
+
+                let _ = storage::update_item(
+                    &mut conn,
+                    &target_item_id,
+                    &current_title,
+                    &media_url,
+                    Some(&meta.to_string()),
+                    device_id,
+                );
+
+                let item = conn.query_row(
+                    "SELECT id, folder_id, item_type, title, content, metadata, is_pinned, is_archived, is_deleted, created_at, updated_at
+                     FROM vault_items WHERE id = ?1",
+                    [&target_item_id],
+                    |row| {
+                        Ok(VaultItem {
+                            id: row.get(0)?,
+                            folder_id: row.get(1)?,
+                            item_type: row.get(2)?,
+                            title: row.get(3)?,
+                            content: row.get(4)?,
+                            metadata: row.get(5)?,
+                            is_pinned: row.get::<_, i64>(6)? != 0,
+                            is_archived: row.get::<_, i64>(7)? != 0,
+                            is_deleted: row.get::<_, i64>(8)? != 0,
+                            created_at: row.get(9)?,
+                            updated_at: row.get(10)?,
+                        })
+                    },
+                ).ok();
+
+                let resp = serde_json::json!({
+                    "status": "ok",
+                    "url": media_url,
+                    "file_hash": media_file.file_hash,
+                    "byte_size": media_file.byte_size,
+                    "width": media_file.width,
+                    "height": media_file.height,
+                    "item": item,
+                });
+                let json = serde_json::to_vec(&resp).unwrap_or_default();
+                send_response(&mut stream, 201, "Created", "application/json", &json, &[])?;
+                return Ok(());
+            }
+            Err(e) => {
+                let err_json = serde_json::json!({ "error": format!("Failed to save image media: {}", e) });
+                send_response(&mut stream, 500, "Internal Server Error", "application/json", &err_json.to_string().into_bytes(), &[])?;
                 return Ok(());
             }
         }
-        send_response(
-            &mut stream,
-            404,
-            "Not Found",
-            "text/plain",
-            b"Media not found",
-            &[],
-        )?;
-        return Ok(());
+    }
+
+    // Media Serving: GET /media/<hash> or GET /api/media/<hash>
+    if method == "GET" && (path.starts_with("/api/media/") || path.starts_with("/media/")) {
+        let media_hash = if path.starts_with("/api/media/") {
+            &path["/api/media/".len()..]
+        } else {
+            &path["/media/".len()..]
+        };
+
+        if media_hash != "upload" && !media_hash.is_empty() {
+            let clean_hash = media_hash.trim_end_matches(".webp");
+            if let Some(media_file_path) = find_media_file(clean_hash, dist_dir) {
+                if let Ok(bytes) = fs::read(&media_file_path) {
+                    let mime = if bytes.starts_with(b"RIFF") {
+                        "image/webp"
+                    } else if bytes.starts_with(b"\x89PNG") {
+                        "image/png"
+                    } else if bytes.starts_with(b"\xFF\xD8\xFF") {
+                        "image/jpeg"
+                    } else {
+                        "image/webp"
+                    };
+                    send_response(
+                        &mut stream,
+                        200,
+                        "OK",
+                        mime,
+                        &bytes,
+                        &[("Cache-Control", "public, max-age=31536000, immutable")],
+                    )?;
+                    return Ok(());
+                }
+            }
+            send_response(
+                &mut stream,
+                404,
+                "Not Found",
+                "text/plain",
+                b"Media not found",
+                &[],
+            )?;
+            return Ok(());
+        }
     }
 
     // Static Assets & SPA Fallback Serving
@@ -718,6 +1019,7 @@ fn send_response(
     stream.write_all(header_str.as_bytes())?;
     stream.write_all(body)?;
     stream.flush()?;
+    let _ = stream.shutdown(std::net::Shutdown::Both);
     Ok(())
 }
 
@@ -818,6 +1120,30 @@ mod tests {
         stream.read_to_string(&mut resp).unwrap();
         assert!(resp.contains("200 OK"));
         assert!(resp.contains("text/html"));
+
+        // 7. Test decode_base64
+        let test_b64 = "SGVsbG8gV29ybGQ=";
+        let decoded = decode_base64(test_b64).unwrap();
+        assert_eq!(decoded, b"Hello World");
+
+        // 8. Test POST /api/media/upload with a small 1x1 PNG
+        let red_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+        let upload_payload = format!(
+            r#"{{"title":"Test Upload","data":"{}"}}"#,
+            red_png_b64
+        );
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        let req = format!(
+            "POST /api/media/upload HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            upload_payload.len(),
+            upload_payload
+        );
+        stream.write_all(req.as_bytes()).unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("201 Created"));
+        assert!(resp.contains(r#""status":"ok""#));
+        assert!(resp.contains("/api/media/"));
 
         // Clean shutdown
         let _ = handle.stop_sender.send(());

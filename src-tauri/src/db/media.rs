@@ -68,14 +68,21 @@ pub fn save_image_media<P: AsRef<Path>>(
     // Attempt to parse and compress as WebP
     let (final_bytes, mime_type, width, height) = match image::load_from_memory(raw_bytes) {
         Ok(img) => {
-            let w = img.width();
-            let h = img.height();
+            let rgba = img.to_rgba8();
+            let w = rgba.width();
+            let h = rgba.height();
             let mut webp_buf = Vec::new();
-            match img.write_to(&mut Cursor::new(&mut webp_buf), ImageFormat::WebP) {
+            let dynamic = image::DynamicImage::ImageRgba8(rgba);
+            match dynamic.write_to(&mut Cursor::new(&mut webp_buf), ImageFormat::WebP) {
                 Ok(_) => (webp_buf, "image/webp".to_string(), Some(w), Some(h)),
                 Err(_) => {
-                    // Fallback to original bytes if WebP encode fails
-                    (raw_bytes.to_vec(), "application/octet-stream".to_string(), Some(w), Some(h))
+                    // Fallback to PNG encode
+                    let mut png_buf = Vec::new();
+                    if dynamic.write_to(&mut Cursor::new(&mut png_buf), ImageFormat::Png).is_ok() {
+                        (png_buf, "image/png".to_string(), Some(w), Some(h))
+                    } else {
+                        (raw_bytes.to_vec(), "application/octet-stream".to_string(), Some(w), Some(h))
+                    }
                 }
             }
         }

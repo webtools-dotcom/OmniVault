@@ -98,12 +98,51 @@ const STORAGE_KEY_PAIRED = "omnivault_paired";
 const STORAGE_KEY_AUTH_TOKEN = "omnivault_auth_token";
 const STORAGE_KEY_PEER_ID = "omnivault_peer_id";
 
+let cachedServerPort: number = 42420;
+
 // Helper to check if Tauri runtime is present
 export function isTauriEnvironment(): boolean {
   return (
     typeof window !== "undefined" &&
     ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
   );
+}
+
+// Query LAN port if in Tauri
+if (typeof window !== "undefined" && isTauriEnvironment()) {
+  try {
+    invoke<{ ip: string; port: number; url: string }>("get_lan_connection_info_cmd")
+      .then((info) => {
+        if (info && info.port) {
+          cachedServerPort = info.port;
+        }
+      })
+      .catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Resolves a media URL to an absolute or relative URL accessible by the current runtime.
+ * Handles desktop Tauri (translates /api/media/... to http://127.0.0.1:42420/api/media/...),
+ * tablet/mobile web (relative to current origin), and raw data URLs.
+ */
+export function resolveMediaUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
+  }
+  const clean = url.startsWith("/") ? url : `/${url}`;
+  if (isTauriEnvironment()) {
+    return `http://127.0.0.1:${cachedServerPort}${clean}`;
+  }
+  return clean;
 }
 
 // Check if running in browser capable of HTTP API fetch
@@ -397,9 +436,98 @@ export const StorageService = {
   },
 
   // -------------------------------------------------------------------------
+  // Media Upload & Attachment Handling
+  // -------------------------------------------------------------------------
+  /**
+   * Uploads an image (File, Blob, or base64/dataURL string) to the local backend.
+   * Compresses the image to WebP on disk and returns its relative media URL.
+   */
+  async uploadMedia(
+    data: File | Blob | string,
+    options?: {
+      itemId?: string;
+      folderId?: string | null;
+      title?: string;
+    }
+  ): Promise<{ url: string; file_hash: string; item?: VaultItem } | null> {
+    try {
+      let b64Data: string;
+
+      if (typeof data === "string") {
+        b64Data = data;
+      } else {
+        b64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(data);
+        });
+      }
+
+      const payload = {
+        item_id: options?.itemId,
+        folder_id: options?.folderId,
+        title: options?.title || (data instanceof File ? data.name.replace(/\.[^/.]+$/, "") : undefined),
+        data: b64Data,
+      };
+
+      const endpoint = isTauriEnvironment()
+        ? `http://127.0.0.1:${cachedServerPort}/api/media/upload`
+        : "/api/media/upload";
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.warn(`Failed to upload media, status: ${res.status}`);
+        return null;
+      }
+
+      const result = await res.json();
+      if (result && result.item) {
+        const items = getLocalItems().filter((i) => i.id !== result.item.id);
+        items.unshift(result.item);
+        saveLocalItems(items);
+      }
+      return result;
+    } catch (err) {
+      console.warn("Upload media error:", err);
+      return null;
+    }
+  },
+
+  // -------------------------------------------------------------------------
   // Vault Items (Quick Inbox & Folder Items)
   // -------------------------------------------------------------------------
   async getInboxItems(): Promise<VaultItem[]> {
+    // Background migration of any legacy stuck base64 data-URL items
+    if (typeof window !== "undefined") {
+      setTimeout(() => {
+        try {
+          const items = getLocalItems();
+          for (const item of items) {
+            if (item.item_type === "image" && item.content.startsWith("data:")) {
+              StorageService.uploadMedia(item.content, {
+                itemId: item.id,
+                folderId: item.folder_id,
+                title: item.title,
+              }).then((res) => {
+                if (res && res.url) {
+                  item.content = res.url;
+                  saveLocalItems(items);
+                }
+              }).catch(() => {});
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }, 500);
+    }
+
     if (isTauriEnvironment()) {
       try {
         return await invoke<VaultItem[]>("list_inbox_items_cmd");
@@ -451,6 +579,25 @@ export const StorageService = {
     content: string,
     metadata: string | null = null
   ): Promise<VaultItem> {
+    // If it's an image and contains a raw base64 data URL, upload to disk storage first
+    if (itemType === "image" && content.startsWith("data:")) {
+      try {
+        const uploadRes = await StorageService.uploadMedia(content, {
+          folderId,
+          title,
+        });
+        if (uploadRes) {
+          if (uploadRes.item) {
+            return uploadRes.item;
+          }
+          if (uploadRes.url) {
+            content = uploadRes.url;
+          }
+        }
+      } catch (err) {
+        console.warn("Auto-upload of data URL during createItem failed:", err);
+      }
+    }
     if (isTauriEnvironment()) {
       try {
         return await invoke<VaultItem>("create_item_cmd", {

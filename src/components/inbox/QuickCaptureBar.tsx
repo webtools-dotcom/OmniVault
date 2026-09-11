@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { ItemType } from "../../types";
+import { StorageService } from "../../services/storageService";
 
 export interface QuickCaptureBarProps {
   onCapture: (itemType: ItemType, title: string, content: string, metadata?: string) => Promise<void> | void;
@@ -37,12 +38,31 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         metadata = JSON.stringify({ url: cleanTitle });
       } else if (itemType === "image") {
         finalTitle = cleanTitle || "Screenshot / Image Capture";
-        finalContent = imagePreview || "";
-        metadata = JSON.stringify({
-          isImage: true,
-          mimeType: "image/webp",
-          capturedAt: Date.now(),
-        });
+        if (imagePreview) {
+          const uploadRes = await StorageService.uploadMedia(imagePreview, {
+            title: finalTitle,
+            folderId: _folderId,
+          });
+          if (uploadRes && uploadRes.url) {
+            finalContent = uploadRes.url;
+            metadata = JSON.stringify({
+              isImage: true,
+              mimeType: "image/webp",
+              fileHash: uploadRes.file_hash,
+              byteSize: (uploadRes as any).byte_size,
+              width: (uploadRes as any).width,
+              height: (uploadRes as any).height,
+              capturedAt: Date.now(),
+            });
+          } else {
+            finalContent = imagePreview;
+            metadata = JSON.stringify({
+              isImage: true,
+              mimeType: "image/webp",
+              capturedAt: Date.now(),
+            });
+          }
+        }
       }
 
       await onCapture(itemType, finalTitle, finalContent, metadata || undefined);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, Minus, Plus, RotateCcw, X } from "lucide-react";
+import { resolveMediaUrl } from "../../services/storageService";
 
 export interface ImageLightboxProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
   title = "Screenshot / Image Preview",
   metadata,
 }) => {
+  const resolvedUrl = resolveMediaUrl(imageUrl);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -146,7 +148,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           </div>
 
           <a
-            href={imageUrl}
+            href={resolvedUrl}
             download={title.endsWith(".webp") ? title : `${title}.webp`}
             className="w-8 h-8 rounded-xl bg-vault-elevated hover:bg-vault-card border border-vault-border flex items-center justify-center text-vault-secondary hover:text-vault-primary transition-all active:scale-90 cursor-pointer shadow-xs"
             title="Download Image"
@@ -173,7 +175,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         onMouseLeave={handleMouseUp}
       >
         <img
-          src={imageUrl}
+          src={resolvedUrl}
           alt={title}
           draggable={false}
           className="max-w-full max-h-full object-contain transition-transform duration-75 shadow-2xl rounded"

@@ -40,16 +40,8 @@ self.addEventListener("fetch", (event) => {
   // Ignore non-HTTP(S) and chrome-extension requests
   if (!url.protocol.startsWith("http")) return;
 
-  // Network-first for API requests
-  if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return new Response(JSON.stringify({ error: "offline", message: "Device is currently offline" }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" }
-        });
-      })
-    );
+  // Bypass service worker entirely for API and media requests to allow native streaming & large binary transfers
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/media/")) {
     return;
   }
 

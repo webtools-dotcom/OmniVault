@@ -11,6 +11,7 @@ import { cn } from "../../utils/cn";
 import { extractTickers } from "../../utils/tickerDetector";
 import { extractLinks } from "../../utils/linkDetector";
 import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
+import { resolveMediaUrl } from "../../services/storageService";
 
 export interface QuickInboxItemCardProps {
   item: VaultItem;
@@ -161,11 +162,11 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             className="relative mb-2.5 rounded-lg overflow-hidden border border-white/[0.08] bg-[#0E0E11] group/img max-h-40 flex items-center justify-center"
             onClick={(e) => {
               e.stopPropagation();
-              onViewImage?.(item.content, item.title);
+              onViewImage?.(resolveMediaUrl(item.content), item.title);
             }}
           >
             <img
-              src={item.content}
+              src={resolveMediaUrl(item.content)}
               alt={item.title}
               className="w-full h-auto max-h-40 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
             />
