@@ -188,7 +188,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User / Node Profile & Mesh Status (BridgeMind bottom profile dock) */}
       <div className="h-12 px-3 border-t border-white/[0.06] bg-[#121215] shrink-0 flex items-center justify-between text-xs select-none">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div
+          onClick={onOpenPairing}
+          className={cn("flex items-center gap-2.5 min-w-0", onOpenPairing && "cursor-pointer hover:opacity-90")}
+          title={onOpenPairing ? "View Discovered Mesh Peers" : undefined}
+        >
           <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 border border-white/10 flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs">
             O
           </div>

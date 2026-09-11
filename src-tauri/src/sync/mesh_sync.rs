@@ -20,6 +20,8 @@ pub struct MeshSyncStatus {
     pub last_sync_at: Option<i64>,
     pub peer_count: usize,
     pub peers: Vec<PeerInfo>,
+    #[serde(default)]
+    pub paired_device_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

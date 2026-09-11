@@ -890,7 +890,7 @@ fn handle_connection(
         let _ = conn.execute(
             "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![peer_id, dev_name, auth_token, now, now],
+            rusqlite::params![peer_id, dev_name, auth_token, now, None::<i64>],
         );
         let resp = serde_json::json!({
             "status": "authorized",
@@ -1011,11 +1011,13 @@ fn handle_connection(
     if path == "/api/sync/status" && method == "GET" {
         let conn = db.lock().unwrap();
         let paired = crate::sync::pairing::list_paired_devices(&conn).unwrap_or_default();
+        let paired_ids: Vec<String> = paired.iter().map(|p| p.device_id.clone()).collect();
         let resp = serde_json::json!({
             "status": "ready",
             "device_id": device_id,
             "paired_devices_count": paired.len(),
             "paired_devices": paired,
+            "paired_device_ids": paired_ids,
         });
         let json = serde_json::to_vec(&resp).unwrap_or_default();
         send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;

@@ -73,5 +73,6 @@ export interface MeshSyncState {
   lastSyncTimestamp?: number;
   errorMessage?: string;
   peers?: PeerInfo[];
+  pairedDeviceIds?: string[];
 }
 

@@ -51,19 +51,26 @@ async fn trigger_mesh_sync_cmd(state: State<'_, AppState>) -> Result<usize, Stri
 #[tauri::command]
 async fn get_mesh_sync_status_cmd(state: State<'_, AppState>) -> Result<sync::mesh_sync::MeshSyncStatus, String> {
     let peers = state.peer_registry.get_active_peers().await;
-    let last_sync_at = {
+    let (last_sync_at, paired_device_ids) = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
-        conn.query_row(
+        let last = conn.query_row(
             "SELECT MAX(last_sync_at) FROM paired_devices",
             [],
             |r| r.get(0),
-        ).unwrap_or(None)
+        ).unwrap_or(None);
+        let paired = sync::pairing::list_paired_devices(&conn)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.device_id)
+            .collect();
+        (last, paired)
     };
     Ok(sync::mesh_sync::MeshSyncStatus {
         is_syncing: false,
         last_sync_at,
         peer_count: peers.len(),
         peers,
+        paired_device_ids,
     })
 }
 

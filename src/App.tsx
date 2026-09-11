@@ -596,6 +596,10 @@ export function App() {
           <QrConnectModal
             isOpen={isQrModalOpen}
             onClose={() => setIsQrModalOpen(false)}
+            onSyncTriggered={() => {
+              refreshFolders();
+              refreshInboxItems();
+            }}
           />
 
           {/* Tablet & Mobile Web Peer PIN Authorization Modal */}

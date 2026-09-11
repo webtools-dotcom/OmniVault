@@ -271,12 +271,14 @@ export const StorageService = {
           last_sync_at: number | null;
           peer_count: number;
           peers: PeerInfo[];
+          paired_device_ids?: string[];
         }>("get_mesh_sync_status_cmd");
         return {
           status: raw.is_syncing ? "syncing" : raw.peer_count > 0 ? "synced" : "standby",
           peerCount: raw.peer_count,
           lastSyncTimestamp: raw.last_sync_at || undefined,
           peers: raw.peers,
+          pairedDeviceIds: raw.paired_device_ids || [],
         };
       } catch {
         return { status: "standby", peerCount: 0 };
@@ -285,6 +287,7 @@ export const StorageService = {
       const res = await apiFetch<{
         status: string;
         paired_devices_count: number;
+        paired_device_ids?: string[];
       }>("/api/sync/status");
       const peersRes = await apiFetch<{ peers: PeerInfo[]; count: number }>("/api/sync/peers");
       const peers = peersRes?.peers || [];
@@ -292,6 +295,7 @@ export const StorageService = {
         status: peers.length > 0 ? "synced" : "standby",
         peerCount: peers.length || (res?.paired_devices_count ?? 0),
         peers,
+        pairedDeviceIds: res?.paired_device_ids || [],
       };
     }
   },
