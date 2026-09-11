@@ -146,12 +146,20 @@ OmniVault follows a strict **Pure Local Core** architecture:
 2. Extract and double-click `omnivault.exe`.
 3. **No installer, no background services, and no cloud accounts required.**
 
-### Connecting Mobile / Tablet (Local Wi-Fi)
+### Native Android Application (Standalone Sideloading)
+
+1. Download `omnivault-v0.1.0-android.apk` (~9.2 MB) from [GitHub Releases](https://github.com/omnivault/omnivault/releases).
+2. On your Android phone or tablet, tap the downloaded APK to install. (If prompted, allow *"Install unknown apps"* for your browser or file manager).
+3. **100% Offline Outdoor Capture:** Capture notes, links, ideas, and photos anywhere in the world with zero internet.
+4. **Native Android Share Sheet (`ACTION_SEND`):** Highlight text or tap "Share" on any photo/link in Twitter, Reddit, Camera, Chrome, or Gallery, and select **OmniVault** to dump directly into your Quick Inbox.
+5. **Automatic Store-and-Forward Mesh Sync:** When you return home and connect to your local Wi-Fi (or turn on a mobile hotspot), your phone and desktop discover each other automatically and silently sync all deltas in milliseconds!
+
+### Connecting Mobile / Tablet via Local Browser (Zero-Install PWA)
 
 1. Launch OmniVault on your Windows PC.
 2. Click **"Connect Mobile"** in the top navigation bar or sidebar.
 3. Scan the displayed **QR Code** using your phone or tablet camera (or open `http://<your-lan-ip>:42420` in your mobile browser).
-4. Tap **"Add to Home Screen"** to install as a standalone PWA!
+4. Tap **"Add to Home Screen"** to install as a standalone PWA without installing any APK!
 
 ---
 
@@ -162,6 +170,7 @@ OmniVault follows a strict **Pure Local Core** architecture:
 - [Node.js](https://nodejs.org/) (v18+) & `npm`
 - [Rust](https://www.rust-lang.org/) (1.80+ with Cargo)
 - Windows 10/11 with WebView2 (standard on modern Windows)
+- For Android: Android SDK `cmdline-tools`, NDK 26+, and JDK 17+
 
 ### 1. Install Dependencies
 
@@ -181,7 +190,7 @@ npm run tauri dev
 
 ### 3. Run Automated Unified Verification
 
-OmniVault includes a 4-stage unified test harness that verifies the entire stack in ~22 seconds:
+OmniVault includes a 5-stage unified test harness that verifies the entire stack:
 
 ```bash
 npm test
@@ -192,9 +201,11 @@ This automatically runs:
 2. Rust core compilation, unit tests, and headless multi-device sync simulations (`cargo test`).
 3. Structural, WCAG AA contrast, and design token integrity assertions.
 4. Production bundle HTTP smoke test.
+5. Multi-platform release packaging and SHA-256 asset integrity check (Windows `.exe` + Android `.apk`).
 
-### 4. Build Windows Standalone Release
+### 4. Build Production Releases
 
+#### Windows Standalone Release
 ```bash
 # Compile optimized release binary with LTO and stripped symbols
 npm run build:release
@@ -202,8 +213,17 @@ npm run build:release
 # Package portable release bundle, verify < 15MB budget, and generate SHA-256 checksums
 npm run package:windows
 ```
-
 The optimized standalone distribution is produced in `release/omnivault-v0.1.0-windows-x64/` (~6.13 MB).
+
+#### Android Standalone Release APK
+```bash
+# Compile optimized release APK with ProGuard/R8 shrinking and release keystore signing
+npm run build:android
+
+# Package standalone APK to release/ and generate SHA-256 checksums
+npm run package:android
+```
+The optimized standalone APK is staged in `release/omnivault-v0.1.0-android.apk` (~9.29 MB).
 
 ---
 

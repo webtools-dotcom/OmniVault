@@ -25,8 +25,8 @@ const steps = [
     command: "node test/preview_check.mjs",
   },
   {
-    name: "Windows Release Packaging & Asset Integrity Check",
-    command: "node scripts/package_windows.mjs",
+    name: "Windows Release Packaging & Multi-Platform Asset Integrity Check (Windows + Android)",
+    command: "node scripts/package_windows.mjs && node scripts/package_android.mjs",
   },
 ];
 

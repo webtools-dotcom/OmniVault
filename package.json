@@ -10,6 +10,9 @@
     "test": "node scripts/verify.mjs",
     "build:release": "tauri build --no-bundle",
     "package:windows": "node scripts/package_windows.mjs",
+    "build:android": "cargo tauri android build --target aarch64 --apk",
+    "build:android:debug": "cargo tauri android build --target aarch64 --apk --debug",
+    "package:android": "node scripts/package_android.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
