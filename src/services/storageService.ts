@@ -807,4 +807,51 @@ export const StorageService = {
       url: typeof window !== "undefined" && window.location.origin ? window.location.origin : `http://${ip}:${port}`,
     };
   },
+
+  async saveMediaToDownloads(
+    mediaUrlOrHash: string,
+    suggestedFilename?: string
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    if (isTauriEnvironment()) {
+      try {
+        const filePath = await invoke<string>("save_media_to_downloads_cmd", {
+          mediaUrlOrHash,
+          suggestedFilename: suggestedFilename || null,
+        });
+        return { success: true, filePath };
+      } catch (err) {
+        console.warn("Tauri save_media_to_downloads_cmd failed, falling back to browser download:", err);
+      }
+    }
+
+    // Web / Tablet fallback via Blob URL
+    try {
+      const targetUrl = resolveMediaUrl(mediaUrlOrHash);
+      const res = await fetch(targetUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      const base = (suggestedFilename || "omnivault_image").replace(/[/\\?%*:|"<>]/g, "_").trim();
+      a.download = base.toLowerCase().endsWith(".webp") ? base : `${base}.webp`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : "Download failed" };
+    }
+  },
+
+  async openFileInFolder(filePath: string): Promise<void> {
+    if (isTauriEnvironment()) {
+      try {
+        await invoke("open_file_in_folder_cmd", { filePath });
+      } catch (err) {
+        console.warn("Failed to open file in folder:", err);
+      }
+    }
+  },
 };

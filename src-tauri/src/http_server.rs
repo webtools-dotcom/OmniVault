@@ -903,13 +903,22 @@ fn handle_connection(
                     } else {
                         "image/webp"
                     };
+                    let is_download = query.map(|q| q.contains("download")).unwrap_or(false);
+                    let disposition_val;
+                    let mut extra_headers: Vec<(&str, &str)> = vec![
+                        ("Cache-Control", "public, max-age=31536000, immutable"),
+                    ];
+                    if is_download {
+                        disposition_val = format!("attachment; filename=\"{}.webp\"", clean_hash);
+                        extra_headers.push(("Content-Disposition", &disposition_val));
+                    }
                     send_response(
                         &mut stream,
                         200,
                         "OK",
                         mime,
                         &bytes,
-                        &[("Cache-Control", "public, max-age=31536000, immutable")],
+                        &extra_headers,
                     )?;
                     return Ok(());
                 }

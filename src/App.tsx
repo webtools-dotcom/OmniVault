@@ -48,11 +48,19 @@ export function App() {
     peerCount: 0,
   });
 
-  // Load folders and items
+  // Load folders and items with shallow diffing to prevent unnecessary UI renders
   const refreshFolders = useCallback(async () => {
     try {
       const data = await StorageService.getFolders();
-      setFolders(data);
+      setFolders((prev) => {
+        if (
+          prev.length === data.length &&
+          prev.every((p, idx) => p.id === data[idx]?.id && p.updated_at === data[idx]?.updated_at)
+        ) {
+          return prev;
+        }
+        return data;
+      });
     } catch (err) {
       console.error("Failed to load folders:", err);
     }
@@ -61,7 +69,15 @@ export function App() {
   const refreshInboxItems = useCallback(async () => {
     try {
       const items = await StorageService.getInboxItems();
-      setInboxItems(items);
+      setInboxItems((prev) => {
+        if (
+          prev.length === items.length &&
+          prev.every((p, idx) => p.id === items[idx]?.id && p.updated_at === items[idx]?.updated_at)
+        ) {
+          return prev;
+        }
+        return items;
+      });
     } catch (err) {
       console.error("Failed to load inbox items:", err);
     }
@@ -70,7 +86,15 @@ export function App() {
   const refreshFolderItems = useCallback(async (folderId: string) => {
     try {
       const items = await StorageService.getFolderItems(folderId);
-      setFolderItems(items);
+      setFolderItems((prev) => {
+        if (
+          prev.length === items.length &&
+          prev.every((p, idx) => p.id === items[idx]?.id && p.updated_at === items[idx]?.updated_at)
+        ) {
+          return prev;
+        }
+        return items;
+      });
     } catch (err) {
       console.error("Failed to load folder items:", err);
     }
@@ -86,6 +110,35 @@ export function App() {
       refreshFolderItems(activeView.folderId);
     }
   }, [activeView, refreshFolderItems]);
+
+  // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation
+  useEffect(() => {
+    const handleRevalidate = () => {
+      // Avoid interrupting active note drafting
+      if (isEditorOpen) return;
+      refreshInboxItems();
+      if (activeView.type === "folder") {
+        refreshFolderItems(activeView.folderId);
+      }
+      refreshFolders();
+    };
+
+    window.addEventListener("focus", handleRevalidate);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleRevalidate();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const interval = setInterval(handleRevalidate, 2500);
+
+    return () => {
+      window.removeEventListener("focus", handleRevalidate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [isEditorOpen, activeView, refreshInboxItems, refreshFolderItems, refreshFolders]);
 
   // Find active folder details if folder view
   const activeFolder = useMemo(() => {

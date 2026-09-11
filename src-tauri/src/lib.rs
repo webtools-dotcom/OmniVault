@@ -187,6 +187,91 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
     http_server::get_lan_connection_info(state.server_port)
 }
 
+#[tauri::command]
+fn save_media_to_downloads_cmd(
+    _state: State<AppState>,
+    media_url_or_hash: String,
+    suggested_filename: Option<String>,
+) -> Result<String, String> {
+    let clean_hash = media_url_or_hash
+        .split('?')
+        .next()
+        .unwrap_or(&media_url_or_hash)
+        .rsplit('/')
+        .next()
+        .unwrap_or(&media_url_or_hash)
+        .trim_end_matches(".webp")
+        .trim();
+
+    if clean_hash.is_empty() {
+        return Err("Invalid media hash or URL".into());
+    }
+
+    let src_path = http_server::find_media_file(clean_hash, None)
+        .ok_or_else(|| format!("Media file for hash '{}' not found on disk", clean_hash))?;
+
+    let downloads_dir = std::env::var("USERPROFILE")
+        .map(|p| std::path::PathBuf::from(p).join("Downloads"))
+        .or_else(|_| std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads")))
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    if !downloads_dir.exists() {
+        let _ = std::fs::create_dir_all(&downloads_dir);
+    }
+
+    let base_name = suggested_filename
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.chars()
+                .map(|c| if "<>:\"/\\|?*".contains(c) { '_' } else { c })
+                .collect::<String>()
+        })
+        .unwrap_or_else(|| {
+            let short = if clean_hash.len() > 12 { &clean_hash[..12] } else { clean_hash };
+            format!("omnivault_{}", short)
+        });
+
+    let clean_name = if base_name.to_lowercase().ends_with(".webp") {
+        base_name
+    } else {
+        format!("{}.webp", base_name)
+    };
+
+    let mut dest_path = downloads_dir.join(&clean_name);
+    let mut counter = 1;
+    let stem = clean_name.trim_end_matches(".webp");
+    while dest_path.exists() {
+        dest_path = downloads_dir.join(format!("{} ({}).webp", stem, counter));
+        counter += 1;
+    }
+
+    std::fs::copy(&src_path, &dest_path)
+        .map_err(|e| format!("Failed to copy media file to Downloads: {}", e))?;
+
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", file_path))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(parent) = std::path::Path::new(&file_path).parent() {
+            let _ = std::process::Command::new("xdg-open").arg(parent).spawn();
+        }
+        Ok(())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base_dir = std::env::current_exe()
@@ -241,6 +326,8 @@ pub fn run() {
             save_image_media_cmd,
             get_item_media_cmd,
             get_lan_connection_info_cmd,
+            save_media_to_downloads_cmd,
+            open_file_in_folder_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");
