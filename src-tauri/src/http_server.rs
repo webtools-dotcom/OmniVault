@@ -286,6 +286,9 @@ fn get_mime_type(path: &Path) -> &'static str {
 pub struct HttpServerHandle {
     pub port: u16,
     pub stop_sender: Sender<()>,
+    /// Shared with the server thread so the desktop app can issue a pairing PIN
+    /// locally over IPC. The PIN is never served over HTTP — see D-051.
+    pub pairing_session: Arc<Mutex<Option<ActivePairingSession>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -315,14 +318,16 @@ pub fn start_http_server_with_peers(
     let (stop_sender, stop_receiver) = channel::<()>();
     let dist_dir = find_dist_dir();
     let pairing_session = Arc::new(Mutex::new(None));
+    let pairing_session_for_thread = pairing_session.clone();
 
     thread::spawn(move || {
-        run_server_loop(listener, stop_receiver, db, device_id, dist_dir, pairing_session, peer_registry);
+        run_server_loop(listener, stop_receiver, db, device_id, dist_dir, pairing_session_for_thread, peer_registry);
     });
 
     Ok(HttpServerHandle {
         port: actual_port,
         stop_sender,
+        pairing_session,
     })
 }
 
@@ -803,45 +808,6 @@ fn handle_connection(
                 send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
             }
         }
-        return Ok(());
-    }
-
-    // Active Pairing Session: GET /api/pair/session
-    if path == "/api/pair/session" && method == "GET" {
-        let now = chrono::Utc::now().timestamp_millis();
-        let mut session_lock = pairing_session.lock().unwrap();
-
-        let valid_session = if let Some(ref current) = *session_lock {
-            if current.expires_at > now + 15_000 {
-                Some(current.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let session = if let Some(s) = valid_session {
-            s
-        } else {
-            let entropy = (chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0).abs() as u128) ^ 0x5DEECE66D;
-            let num = (entropy % 900_000) + 100_000;
-            let pin_raw = format!("{:06}", num);
-            let formatted_pin = format!("{} {}", &pin_raw[0..3], &pin_raw[3..6]);
-            let new_session = ActivePairingSession {
-                pin: formatted_pin,
-                expires_at: now + 120_000,
-            };
-            *session_lock = Some(new_session.clone());
-            new_session
-        };
-
-        let remaining_sec = ((session.expires_at - now) / 1000).max(1);
-        let resp = serde_json::json!({
-            "pin": session.pin,
-            "expires_in": remaining_sec,
-        });
-        send_response(&mut stream, 200, "OK", "application/json", &resp.to_string().into_bytes(), &[])?;
         return Ok(());
     }
 

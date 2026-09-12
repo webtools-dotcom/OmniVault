@@ -18,7 +18,7 @@ use omnivault_lib::db::storage::{
 use omnivault_lib::http_server;
 use omnivault_lib::sync::blob_stream::{download_blob_over_tcp, handle_blob_request};
 use omnivault_lib::sync::discovery::{PeerInfo, PeerRegistry};
-use omnivault_lib::sync::mesh_sync::{pair_with_remote_peer, send_http_request, sync_with_peer};
+use omnivault_lib::sync::mesh_sync::{pair_with_remote_peer, sync_with_peer};
 use omnivault_lib::sync::pairing::{is_device_paired, store_paired_device, PairingManager};
 use omnivault_lib::sync::protocol::{apply_remote_revisions, query_revisions_since};
 
@@ -342,20 +342,26 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let _phone_server = http_server::start_http_server(phone_db.clone(), phone_dev_id.to_string(), 0).unwrap();
     let laptop_server = http_server::start_http_server(laptop_db.clone(), laptop_dev_id.to_string(), 0).unwrap();
 
-    // 3. One-time pairing handshake: Phone pairs with Laptop
-    let session_resp = send_http_request(
-        format!("127.0.0.1:{}", laptop_server.port).parse().unwrap(),
-        "GET",
-        "/api/pair/session",
-        &[],
-        None,
-        Duration::from_secs(5),
-    ).unwrap();
-    assert_eq!(session_resp.status, 200);
-
-    #[derive(serde::Deserialize)]
-    struct Sess { pin: String }
-    let sess: Sess = serde_json::from_slice(&session_resp.body).unwrap();
+    // 3. One-time pairing handshake: Phone pairs with Laptop.
+    //
+    // The PIN is issued locally on the laptop and read off its screen by the
+    // user — it is deliberately NOT obtainable over HTTP (D-051), because a PIN
+    // served over the network it protects is not an out-of-band secret. This
+    // test therefore seeds the session through the same shared handle the
+    // desktop UI writes to via `get_pairing_session_cmd`, which models the real
+    // flow: issued on the laptop, typed on the phone.
+    let laptop_pin = "424 242".to_string();
+    {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        let mut session = laptop_server.pairing_session.lock().unwrap();
+        *session = Some(http_server::ActivePairingSession {
+            pin: laptop_pin.clone(),
+            expires_at: now_ms + 120_000,
+        });
+    }
 
     // Phone initiates pairing with Laptop using the PIN
     let paired_device = pair_with_remote_peer(
@@ -364,7 +370,7 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
         "OmniVault Mobile",
         "127.0.0.1",
         laptop_server.port,
-        &sess.pin,
+        &laptop_pin,
     ).unwrap();
 
     assert_eq!(paired_device.device_id, laptop_dev_id);

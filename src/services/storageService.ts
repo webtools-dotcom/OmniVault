@@ -237,14 +237,16 @@ export const StorageService = {
   },
 
   async getPairingSession(): Promise<{ pin: string; expires_in: number } | null> {
+    // The PIN is only ever issued locally, over IPC. A browser client never
+    // displays a PIN — it types one the user read off the desktop screen — so
+    // there is deliberately no network path here. See D-051.
+    if (!isTauriEnvironment()) return null;
     try {
-      const endpoint = isTauriEnvironment()
-        ? `http://127.0.0.1:${cachedServerPort}/api/pair/session`
-        : "/api/pair/session";
-      const res = await fetch(endpoint);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
+      const session = await invoke<{ pin: string; expires_at: number }>("get_pairing_session_cmd");
+      const expiresIn = Math.max(1, Math.round((session.expires_at - Date.now()) / 1000));
+      return { pin: session.pin, expires_in: expiresIn };
+    } catch (err) {
+      console.warn("Failed to get pairing session:", err);
       return null;
     }
   },

@@ -18,6 +18,7 @@ pub struct AppState {
     pub server_port: u16,
     pub base_dir: std::path::PathBuf,
     pub peer_registry: sync::discovery::PeerRegistry,
+    pub pairing_session: Arc<Mutex<Option<http_server::ActivePairingSession>>>,
 }
 
 #[tauri::command]
@@ -447,6 +448,32 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
     })
 }
 
+/// Issues the local pairing PIN to the desktop app's own window over IPC.
+/// This is deliberately NOT an HTTP endpoint: the PIN is the out-of-band
+/// secret that proves physical presence at this machine, so serving it over
+/// the same network it protects would defeat pairing entirely. See D-051.
+#[tauri::command]
+fn get_pairing_session_cmd(state: State<AppState>) -> Result<http_server::ActivePairingSession, String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut session_lock = state.pairing_session.lock().map_err(|e| e.to_string())?;
+
+    if let Some(ref current) = *session_lock {
+        if current.expires_at > now + 15_000 {
+            return Ok(current.clone());
+        }
+    }
+
+    let entropy = (chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0).abs() as u128) ^ 0x5DEECE66D;
+    let num = (entropy % 900_000) + 100_000;
+    let pin_raw = format!("{:06}", num);
+    let session = http_server::ActivePairingSession {
+        pin: format!("{} {}", &pin_raw[0..3], &pin_raw[3..6]),
+        expires_at: now + 120_000,
+    };
+    *session_lock = Some(session.clone());
+    Ok(session)
+}
+
 pub fn resolve_app_base_dir() -> std::path::PathBuf {
     #[cfg(target_os = "android")]
     {
@@ -506,13 +533,17 @@ pub fn run() {
     let peer_reg_sync = peer_registry.clone();
 
     // Start embedded HTTP server on background thread (default port 42420)
+    let mut pairing_session_handle = Arc::new(Mutex::new(None));
     let server_port = match http_server::start_http_server_with_peers(
         db.clone(),
         device_id.clone(),
         42420,
         Some(peer_registry.clone()),
     ) {
-        Ok(handle) => handle.port,
+        Ok(handle) => {
+            pairing_session_handle = handle.pairing_session.clone();
+            handle.port
+        }
         Err(err) => {
             eprintln!("Warning: Failed to start embedded http server: {err}");
             42420
@@ -587,6 +618,7 @@ pub fn run() {
         server_port,
         base_dir,
         peer_registry,
+        pairing_session: pairing_session_handle,
     };
 
     tauri::Builder::default()
@@ -615,6 +647,7 @@ pub fn run() {
             save_media_to_downloads_cmd,
             open_file_in_folder_cmd,
             check_and_process_pending_shares_cmd,
+            get_pairing_session_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");
