@@ -172,3 +172,60 @@ console.log("✅ All baseline structure, triage, HTTP server, QR modal, PWA, pac
 
 
 
+
+// 10. Regression guard: Tailwind utilities that compile to nothing.
+// The UI was authored with Tailwind v4 class names (h-9.5, shadow-xs, ...) while
+// the project pins v3.4, so those utilities silently produced no CSS and every
+// toolbar height, icon box and shadow they controlled was dropped on the floor.
+// Any class used in src/ must exist in the compiled bundle.
+const distDir = path.resolve(process.cwd(), "dist/assets");
+const cssFiles = fs.existsSync(distDir)
+  ? fs.readdirSync(distDir).filter((f) => f.endsWith(".css"))
+  : [];
+assert.ok(cssFiles.length > 0, "No compiled CSS found in dist/assets — run the build first");
+const compiledCss = cssFiles
+  .map((f) => fs.readFileSync(path.join(distDir, f), "utf-8"))
+  .join("\n");
+
+const sourceFiles = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (/\.(tsx?|html)$/.test(entry.name)) sourceFiles.push(full);
+  }
+})(path.resolve(process.cwd(), "src"));
+const sourceText = sourceFiles.map((f) => fs.readFileSync(f, "utf-8")).join("\n");
+
+const fragileUtilities = new Set();
+const spacingPattern =
+  /\b(?:w|h|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y|min-w|max-w|min-h|max-h|top|left|right|bottom|inset|size)-\d+\.\d+\b/g;
+for (const match of sourceText.matchAll(spacingPattern)) fragileUtilities.add(match[0]);
+for (const name of ["shadow-xs", "backdrop-blur-xs", "scrollbar-none"]) {
+  if (sourceText.includes(name)) fragileUtilities.add(name);
+}
+
+// Tailwind escapes the dot in class selectors (".h-9\.5"), so build the needle
+// with an explicit backslash char code rather than a source-level escape.
+const BACKSLASH = String.fromCharCode(92);
+const missingUtilities = [...fragileUtilities].filter(
+  (cls) => !compiledCss.includes("." + cls.split(".").join(BACKSLASH + "."))
+);
+assert.deepStrictEqual(
+  missingUtilities,
+  [],
+  `Tailwind utilities used in src/ but absent from the compiled CSS (they render as nothing): ${missingUtilities.join(", ")}`
+);
+
+// CSS `zoom` does not compensate viewport units, so h-screen/w-screen under a
+// zoomed root leaves dead strips at the right and bottom edges. Density must
+// scale the root rem instead.
+const appSource = fs.readFileSync(path.resolve(process.cwd(), "src/App.tsx"), "utf-8");
+assert.ok(
+  !/style\s*(?:as any)?\)?\.zoom\s*=\s*String\(/.test(appSource),
+  "App.tsx must not drive UI density with CSS zoom — scale --ui-scale (root rem) instead"
+);
+const indexCss = fs.readFileSync(path.resolve(process.cwd(), "src/index.css"), "utf-8");
+assert.ok(indexCss.includes("--ui-scale"), "index.css must scale the root font-size via --ui-scale");
+
+console.log("✅ Tailwind utility compilation and UI-density scaling regression guards passed!");

@@ -56,7 +56,8 @@ export function App() {
   });
 
   useEffect(() => {
-    (document.documentElement.style as any).zoom = String(zoomScale);
+    (document.documentElement.style as any).zoom = "";
+    document.documentElement.style.setProperty("--ui-scale", String(zoomScale));
     localStorage.setItem("omnivault_ui_scale", String(zoomScale));
   }, [zoomScale]);
 
@@ -538,7 +539,7 @@ export function App() {
               searchQuery={searchQuery}
             />
           ) : (
-            <div className="w-full space-y-3">
+            <div className="w-full h-full flex flex-col gap-3">
               {/* Direct Folder Capture Bar */}
               <QuickCaptureBar
                 onCapture={handleCaptureItem}
@@ -547,28 +548,30 @@ export function App() {
 
               {/* Folder Items Grid */}
               {displayedFolderItems.length === 0 ? (
-                <div className="border border-white/[0.08] rounded-xl bg-[#141418] overflow-hidden shadow-xs">
-                  <div className="h-8 px-3.5 border-b border-white/[0.06] bg-[#18181D] flex items-center justify-between text-xs select-none">
+                <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="w-full max-w-2xl border border-white/[0.08] rounded-xl bg-vault-panel overflow-hidden shadow-xs">
+                  <div className="h-8 px-3.5 border-b border-white/[0.06] bg-vault-card flex items-center justify-between text-xs select-none">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
                       <span className="font-mono text-xs text-zinc-300">
                         vault://folder/{activeFolder?.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed"}
                       </span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">
+                      <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">
                         directory
                       </span>
                     </div>
-                    <span className="font-mono text-[10px] text-zinc-500">0 items</span>
+                    <span className="font-mono text-[0.741rem] text-zinc-500">0 items</span>
                   </div>
                   <div className="p-4 sm:p-5 font-mono text-xs space-y-2">
                     <div className="text-zinc-300 font-semibold flex items-center gap-2">
                       <span className="text-amber-400">❯</span>
                       <span>directory empty</span>
                     </div>
-                    <p className="text-zinc-500 text-[11px] leading-relaxed">
+                    <p className="text-zinc-500 text-[0.815rem] leading-relaxed">
                       Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
                     </p>
                   </div>
+                </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">

@@ -235,12 +235,12 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Auto-save Status Badge */}
           <div className="shrink-0 flex items-center">
             {saveStatus === "saving" ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span>Saving</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Check className="w-3 h-3" />
                 <span>Saved</span>
               </span>
@@ -306,7 +306,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         {/* Live Detected Market Symbols Bar */}
         {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
           <div className="px-4 sm:px-6 py-2.5 border-t border-vault-border/60 bg-vault-bg/60 flex items-center gap-3">
-            <span className="text-[11px] font-semibold text-vault-muted uppercase tracking-wider shrink-0">
+            <span className="text-[0.815rem] font-semibold text-vault-muted uppercase tracking-wider shrink-0">
               Detected Symbols:
             </span>
             <div className="flex-1 overflow-x-auto">
@@ -318,9 +318,9 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         {/* Editor Footer */}
         <div className="px-4 sm:px-6 py-3 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-[11px]">{wordCount} words</span>
+            <span className="font-mono text-[0.815rem]">{wordCount} words</span>
             <span className="text-vault-muted">•</span>
-            <span className="font-mono text-[11px]">{charCount} characters</span>
+            <span className="font-mono text-[0.815rem]">{charCount} characters</span>
             {item && onTogglePin && (
               <>
                 <span className="text-vault-muted">•</span>

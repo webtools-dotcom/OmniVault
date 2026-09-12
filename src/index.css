@@ -6,8 +6,10 @@
   color-scheme: dark;
 }
 
+/* UI density scales the root rem, never CSS zoom: `zoom` does not compensate
+   viewport units, so h-screen/w-screen would leave dead strips at the edges. */
 html {
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ui-scale, 0.88));
   -webkit-text-size-adjust: 100%;
 }
 
@@ -56,6 +58,16 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 }
 

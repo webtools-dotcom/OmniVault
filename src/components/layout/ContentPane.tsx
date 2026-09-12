@@ -67,7 +67,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
           <Breadcrumbs items={breadcrumbs} onNavigateHome={onNavigateHome} />
 
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0 hidden md:inline-block">
+          <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0 hidden md:inline-block">
             {itemCount}
           </span>
         </div>
@@ -135,7 +135,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
                 <X className="w-3 h-3" />
               </button>
             ) : (
-              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-600 bg-white/[0.03] px-1 py-0.2 rounded border border-white/[0.05] pointer-events-none">
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[0.667rem] font-mono text-zinc-600 bg-white/[0.03] px-1 py-0.2 rounded border border-white/[0.05] pointer-events-none">
                 ⌘K
               </kbd>
             )}

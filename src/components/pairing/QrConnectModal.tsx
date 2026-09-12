@@ -259,7 +259,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               <h2 id="qr-modal-title" className="text-sm font-bold text-vault-primary tracking-tight">
                 Connect & Sync Devices
               </h2>
-              <p className="text-[11px] text-vault-muted font-medium">
+              <p className="text-[0.815rem] text-vault-muted font-medium">
                 Local Wi-Fi mesh network • Zero cloud dependence
               </p>
             </div>
@@ -288,7 +288,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
             <Radio className="w-3.5 h-3.5" />
             <span>Mesh Network</span>
             {activePeers.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-blue-500/20 text-blue-300 text-[10px] font-bold rounded-full">
+              <span className="ml-1 px-1.5 py-0.2 bg-blue-500/20 text-blue-300 text-[0.741rem] font-bold rounded-full">
                 {activePeers.length}
               </span>
             )}
@@ -322,7 +322,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     <span className="text-xs font-semibold text-vault-primary block">
                       Wi-Fi Discovery Active
                     </span>
-                    <span className="text-[10px] text-vault-muted">
+                    <span className="text-[0.741rem] text-vault-muted">
                       {activePeers.length > 0
                         ? `${activePeers.length} device${activePeers.length > 1 ? "s" : ""} online on local network`
                         : "Listening for local OmniVault devices via UDP"}
@@ -366,9 +366,9 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
               {/* Discovered LAN Peers List */}
               <div className="space-y-2.5">
-                <div className="text-[11px] font-semibold text-vault-secondary uppercase tracking-wider flex items-center justify-between">
+                <div className="text-[0.815rem] font-semibold text-vault-secondary uppercase tracking-wider flex items-center justify-between">
                   <span>Discovered Wi-Fi Peers</span>
-                  <span className="text-[10px] text-vault-muted font-normal">
+                  <span className="text-[0.741rem] text-vault-muted font-normal">
                     {activePeers.length} discovered
                   </span>
                 </div>
@@ -381,7 +381,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     <h3 className="text-xs font-semibold text-vault-primary">
                       Searching local Wi-Fi mesh...
                     </h3>
-                    <p className="text-[11px] text-vault-muted max-w-xs mx-auto leading-relaxed">
+                    <p className="text-[0.815rem] text-vault-muted max-w-xs mx-auto leading-relaxed">
                       Connect your laptop, tablet, and phone to the same Wi-Fi or mobile hotspot. Devices discover each other automatically.
                     </p>
                   </div>
@@ -410,12 +410,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                                 <div className="text-xs font-semibold text-vault-primary flex items-center gap-1.5">
                                   <span>{peer.device_name}</span>
                                   {isPaired && (
-                                    <span className="px-1.5 py-0.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold rounded-md">
+                                    <span className="px-1.5 py-0.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[0.741rem] font-semibold rounded-md">
                                       Paired
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] font-mono text-vault-muted">
+                                <div className="text-[0.815rem] font-mono text-vault-muted">
                                   {peer.addr}:{peer.sync_port}
                                 </div>
                               </div>
@@ -423,7 +423,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
                             <div>
                               {isPaired ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[11px] font-medium rounded-xl border border-emerald-500/20">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[0.815rem] font-medium rounded-xl border border-emerald-500/20">
                                   <Check className="w-3 h-3" />
                                   <span>Auto-Syncing</span>
                                 </span>
@@ -447,7 +447,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                           {/* Inline PIN Entry for Unpaired Device */}
                           {isPairingThis && !isPaired && (
                             <div className="pt-2 border-t border-white/[0.06] space-y-2 animate-in fade-in">
-                              <label className="text-[10px] font-mono text-vault-muted block">
+                              <label className="text-[0.741rem] font-mono text-vault-muted block">
                                 ENTER PIN SHOWN ON {peer.device_name.toUpperCase()}
                               </label>
                               <div className="flex items-center gap-2">
@@ -499,17 +499,17 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       Direct Desktop Connection
                     </span>
                   </div>
-                  <span className="text-[10px] text-vault-muted font-medium">
+                  <span className="text-[0.741rem] text-vault-muted font-medium">
                     Manual IP Fallback
                   </span>
                 </div>
-                <p className="text-[11px] text-vault-secondary leading-relaxed">
+                <p className="text-[0.815rem] text-vault-secondary leading-relaxed">
                   If your router isolates devices or auto-discovery is delayed, connect directly by entering your Desktop's IP and 6-digit PIN.
                 </p>
                 <div className="space-y-2.5 pt-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] font-medium text-vault-muted block mb-1">
+                      <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
                         Desktop IP & Port
                       </label>
                       <input
@@ -521,7 +521,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-medium text-vault-muted block mb-1">
+                      <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
                         6-Digit Desktop PIN
                       </label>
                       <input
@@ -571,7 +571,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyPin}
-                    className="text-[11px] font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                    className="text-[0.815rem] font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
                   >
                     {copiedPin ? (
                       <>
@@ -590,11 +590,11 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   <span className="text-base font-mono font-bold text-vault-primary tracking-widest pl-1">
                     {pairingPin}
                   </span>
-                  <span className="text-[10px] text-vault-muted">
+                  <span className="text-[0.741rem] text-vault-muted">
                     Valid for Wi-Fi peers
                   </span>
                 </div>
-                <p className="text-[11px] text-vault-muted leading-relaxed">
+                <p className="text-[0.815rem] text-vault-muted leading-relaxed">
                   When pairing from another phone or tablet, enter this 6-digit PIN on that device to authorize peer sync.
                 </p>
               </div>
@@ -617,7 +617,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
                 {/* Connection URL Pill with 1-Click Copy */}
                 <div className="w-full space-y-2">
-                  <div className="text-[11px] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider">
+                  <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider">
                     <Wifi className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Local Network URL</span>
                   </div>
@@ -649,19 +649,19 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 {/* Step-by-Step Instructions */}
                 <div className="w-full bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 text-left space-y-2.5 text-xs">
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       1
                     </span>
                     <span className="leading-snug">Connect phone/tablet to the same Wi-Fi or mobile hotspot.</span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       2
                     </span>
                     <span className="leading-snug">Open camera and scan the QR code above.</span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       3
                     </span>
                     <span className="leading-snug">
@@ -678,7 +678,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         <div className="px-6 py-3.5 border-t border-white/[0.08] bg-vault-bg/40 flex items-center justify-between text-xs shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
-            <span className="text-[11px] text-vault-muted font-medium">
+            <span className="text-[0.815rem] text-vault-muted font-medium">
               LAN Port {lanInfo.port} • Local Mesh Only
             </span>
           </div>

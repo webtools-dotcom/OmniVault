@@ -102,13 +102,13 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-150">
       <div
-        className="w-full max-w-sm bg-[#141418] border border-white/[0.1] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-sm bg-vault-panel border border-white/[0.1] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="peer-pin-title"
       >
         {/* Terminal Header */}
-        <div className="h-9 px-3.5 border-b border-white/[0.08] bg-[#18181D] flex items-center justify-between text-xs">
+        <div className="h-9 px-3.5 border-b border-white/[0.08] bg-vault-card flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.5)]" />
             <span className="font-mono text-xs text-zinc-300">vault://pair/authenticate</span>
@@ -132,14 +132,14 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
               <h2 id="peer-pin-title" className="text-sm font-semibold text-zinc-100">
                 Link to Desktop Vault
               </h2>
-              <p className="text-[11px] text-zinc-400 font-mono">
+              <p className="text-[0.815rem] text-zinc-400 font-mono">
                 Enter authorization PIN from desktop
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-mono text-zinc-400 block">
+            <label className="text-[0.815rem] font-mono text-zinc-400 block">
               6-DIGIT AUTHORIZATION PIN
             </label>
             <div className="flex items-center justify-between gap-1.5 sm:gap-2">
@@ -154,7 +154,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   disabled={isSubmitting || success}
-                  className="w-10 h-12 text-center text-lg font-mono font-bold bg-[#1B1B22] border border-white/[0.1] rounded-xl text-zinc-100 focus:outline-hidden focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all disabled:opacity-50"
+                  className="w-10 h-12 text-center text-lg font-mono font-bold bg-vault-card border border-white/[0.1] rounded-xl text-zinc-100 focus:outline-hidden focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all disabled:opacity-50"
                   aria-label={`Digit ${idx + 1}`}
                 />
               ))}
@@ -162,10 +162,10 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-mono text-zinc-500 uppercase block">
+            <label className="text-[0.741rem] font-mono text-zinc-500 uppercase block">
               Device Name
             </label>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#18181D] border border-white/[0.08] rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-vault-card border border-white/[0.08] rounded-lg">
               <Laptop className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <input
                 type="text"

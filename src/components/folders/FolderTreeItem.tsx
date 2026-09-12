@@ -168,7 +168,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
 
         {/* Child count indicator when collapsed */}
         {hasChildren && !isExpanded && (
-          <span className="text-[10px] text-vault-muted px-1 mr-1">
+          <span className="text-[0.741rem] text-vault-muted px-1 mr-1">
             {children.length}
           </span>
         )}

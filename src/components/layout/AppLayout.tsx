@@ -123,8 +123,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
       <div
         className={cn(
           "h-full transition-all duration-200 ease-in-out",
+          // On mobile the sidebar itself is `fixed`, so this wrapper has zero
+          // width and translating it would be a no-op. The drawer slide is
+          // owned by Sidebar via its `isOpen` prop instead.
           isMobile
-            ? (sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none")
+            ? "w-0"
             : (sidebarOpen ? "w-56" : "w-0 overflow-hidden")
         )}
       >

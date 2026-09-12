@@ -35,7 +35,7 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  isOpen: _isOpen,
+  isOpen,
   onClose,
   onToggleCollapse,
   isMobile,
@@ -62,9 +62,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        "flex flex-col bg-vault-sidebar border-r border-white/[0.08] h-full transition-all duration-200 select-none",
+        "flex flex-col bg-vault-sidebar border-r border-white/[0.08] h-full transition-transform duration-200 select-none",
         isMobile
-          ? "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl"
+          ? cn(
+              "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl",
+              isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+            )
           : "w-56 shrink-0"
       )}
     >
@@ -77,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="font-semibold text-xs tracking-tight text-zinc-100">
             OmniVault
           </span>
-          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+          <span className="text-[0.667rem] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
             v0.1
           </span>
         </div>
@@ -107,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2.5 scrollbar-none">
         {/* Workspaces Header & Quick Inbox */}
         <div>
-          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+          <div className="px-2 py-1 text-[0.741rem] font-bold uppercase tracking-wider text-zinc-500">
             Workspaces
           </div>
           <button
@@ -142,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isInboxDragOver
                 ? "bg-blue-500/20 text-white font-medium ring-1 ring-blue-500/50"
                 : isInboxActive
-                ? "bg-[#222227] text-white font-medium shadow-xs"
+                ? "bg-vault-card-hover text-white font-medium shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
             )}
           >
@@ -155,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="flex-1 truncate">
               {isInboxDragOver ? "Drop to unfile" : "Quick Inbox"}
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] text-zinc-400">
+            <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] text-zinc-400">
               {inboxCount}
             </span>
           </button>
@@ -164,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Folders Section with Hierarchical Tree */}
         <div>
           <div className="flex items-center justify-between px-2 py-1 mb-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            <span className="text-[0.741rem] font-bold uppercase tracking-wider text-zinc-500">
               Folders
             </span>
             <button
@@ -215,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : "bg-zinc-500"
                 )}
               />
-              <span className="text-[10px] text-zinc-400 truncate">
+              <span className="text-[0.741rem] text-zinc-400 truncate">
                 {meshState.peerCount > 0 ? `${meshState.peerCount} connected` : "Standalone"}
               </span>
             </div>
@@ -228,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               onClick={onCycleZoom}
               title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle)`}
-              className="px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[9px] font-mono text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
+              className="px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[0.667rem] font-mono text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
             >
               {Math.round(zoomScale * 100)}%
             </button>

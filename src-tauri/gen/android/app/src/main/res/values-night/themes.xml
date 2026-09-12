@@ -1,8 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.omnivault" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="android:statusBarColor">#0E0E11</item>
-        <item name="android:navigationBarColor">#0E0E11</item>
+        <item name="android:statusBarColor">#0A0B0E</item>
+        <item name="android:navigationBarColor">#0A0B0E</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

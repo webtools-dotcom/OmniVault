@@ -47,40 +47,42 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
   }, [items, searchQuery]);
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full h-full flex flex-col gap-3">
       {/* 1-Tap Quick Capture Bar */}
       <QuickCaptureBar onCapture={onCapture} />
 
       {/* Inbox Items Grid */}
       {filteredItems.length === 0 ? (
-        <div className="border border-white/[0.08] rounded-xl bg-[#141418] overflow-hidden shadow-xs">
-          <div className="h-8 px-3.5 border-b border-white/[0.06] bg-[#18181D] flex items-center justify-between text-xs select-none">
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+        <div className="w-full max-w-2xl border border-white/[0.08] rounded-xl bg-vault-panel overflow-hidden shadow-xs">
+          <div className="h-8 px-3.5 border-b border-white/[0.06] bg-vault-card flex items-center justify-between text-xs select-none">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
               <span className="font-mono text-xs text-zinc-300">vault://stream</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">ready</span>
+              <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">ready</span>
             </div>
-            <span className="font-mono text-[10px] text-zinc-500">local mesh • 42420</span>
+            <span className="font-mono text-[0.741rem] text-zinc-500">local mesh • 42420</span>
           </div>
           <div className="p-4 sm:p-5 font-mono text-xs space-y-3">
             <div className="text-zinc-300 font-semibold flex items-center gap-2">
               <span className="text-emerald-400">❯</span>
               <span>omnivault stream initialized</span>
             </div>
-            <p className="text-zinc-500 text-[11px] leading-relaxed">
+            <p className="text-zinc-500 text-[0.815rem] leading-relaxed">
               {searchQuery
                 ? `No captures matching "${searchQuery}". Clear query or try another keyword.`
                 : "Your local knowledge stream is clear. All data is persisted locally in SQLite with zero cloud dependencies."}
             </p>
             {!searchQuery && (
-              <div className="pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500 font-mono">
-                <span className="flex items-center gap-1.5">
+              <div className="pt-3 border-t border-white/[0.06] flex flex-col gap-1 text-[0.815rem] leading-relaxed text-zinc-500 font-mono">
+                <span>
                   <span className="text-zinc-400">💡 Tip:</span> Type above to save notes, paste screenshots with Ctrl+V, or drop images directly.
                 </span>
                 <span className="text-zinc-600">Press Enter to capture</span>
               </div>
             )}
           </div>
+        </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">

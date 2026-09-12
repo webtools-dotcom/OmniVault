@@ -115,7 +115,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
           <div className="truncate text-vault-secondary pr-2">
             Filing: <span className="font-semibold text-vault-primary">{item.title || "Untitled Capture"}</span>
           </div>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-vault-elevated text-vault-secondary border border-vault-border shrink-0">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[0.815rem] font-medium bg-vault-elevated text-vault-secondary border border-vault-border shrink-0">
             {item.folder_id ? "Filed" : "Inbox"}
           </span>
         </div>
@@ -153,7 +153,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
               <span className="truncate font-medium">📥 Quick Inbox (Unfiled)</span>
             </div>
             {item.folder_id === null && (
-              <span className="text-[10px] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
+              <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
             )}
           </button>
 
@@ -185,7 +185,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
                   </span>
                 </div>
                 {isCurrent && (
-                  <span className="text-[10px] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
+                  <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
                 )}
               </button>
             );
@@ -206,7 +206,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
 
         {/* Modal Footer */}
         <form onSubmit={handleSubmit} className="px-5 py-3.5 border-t border-vault-border flex items-center justify-between bg-vault-bg/40">
-          <span className="text-[11px] text-vault-muted">
+          <span className="text-[0.815rem] text-vault-muted">
             Click any folder to file instantly
           </span>
           <Button

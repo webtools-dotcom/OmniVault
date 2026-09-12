@@ -87,7 +87,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           {/* Status Badge */}
           <span
             className={cn(
-              "text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
+              "text-[0.741rem] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
               item.is_pinned
                 ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
                 : isTicker
@@ -191,7 +191,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       </div>
 
       {/* Footer Status Bar */}
-      <div className="h-6.5 px-3 border-t border-white/[0.04] bg-vault-panel/40 flex items-center justify-between text-[11px] text-zinc-500 select-none shrink-0 font-sans">
+      <div className="h-6.5 px-3 border-t border-white/[0.04] bg-vault-panel/40 flex items-center justify-between text-[0.815rem] text-zinc-500 select-none shrink-0 font-sans">
         <span>{formatRelativeTime(item.updated_at)}</span>
         <span>{item.content?.length ? `${item.content.length} chars` : ""}</span>
       </div>

@@ -133,7 +133,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             {title}
           </h2>
           {metadata?.byteSize && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block font-mono">
+            <span className="text-[0.815rem] px-2.5 py-0.5 rounded-lg bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block font-mono">
               {formatSize(metadata.byteSize)} WebP
             </span>
           )}
@@ -153,7 +153,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     e.stopPropagation();
                     StorageService.openFileInFolder(downloadStatus.filePath!);
                   }}
-                  className="ml-1 px-1.5 py-0.5 rounded bg-emerald-500/25 hover:bg-emerald-500/40 text-[10px] text-white flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                  className="ml-1 px-1.5 py-0.5 rounded bg-emerald-500/25 hover:bg-emerald-500/40 text-[0.741rem] text-white flex items-center gap-1 cursor-pointer transition-colors shrink-0"
                   title="Open in File Explorer"
                 >
                   <span>Show</span>
@@ -174,7 +174,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               <Minus className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-[11px] font-mono text-vault-primary px-2.5 min-w-11 text-center select-none">
+            <span className="text-[0.815rem] font-mono text-vault-primary px-2.5 min-w-11 text-center select-none">
               {Math.round(zoom * 100)}%
             </span>
 
@@ -247,7 +247,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       </div>
 
       {/* Footer Info */}
-      <div className="h-9 px-6 border-t border-vault-border bg-vault-card/60 flex items-center justify-between text-[11px] text-vault-muted shrink-0">
+      <div className="h-9 px-6 border-t border-vault-border bg-vault-card/60 flex items-center justify-between text-[0.815rem] text-vault-muted shrink-0">
         <div className="flex items-center gap-2">
           {metadata?.fileHash && (
             <span className="font-mono truncate max-w-[180px] sm:max-w-xs">

@@ -29,7 +29,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
               href={t.tradingViewUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors flex items-center gap-0.5"
+              className="px-1.5 py-0.5 rounded-md text-[0.741rem] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors flex items-center gap-0.5"
               title={`Launch ${t.symbol} on TradingView`}
             >
               <span>TV</span>
@@ -40,7 +40,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
               href={t.yahooFinanceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors flex items-center gap-0.5"
+              className="px-1.5 py-0.5 rounded-md text-[0.741rem] font-mono font-bold text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors flex items-center gap-0.5"
               title={`Launch ${t.symbol} on Yahoo Finance`}
             >
               <span>YF</span>
@@ -61,7 +61,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
           title={l.url}
         >
           <LineChart className="w-3 h-3 text-amber-400" />
-          <span className="truncate max-w-[140px] font-mono text-[11px]">{l.domain}</span>
+          <span className="truncate max-w-[140px] font-mono text-[0.815rem]">{l.domain}</span>
           <ExternalLink className="w-2.5 h-2.5 shrink-0 text-vault-muted" />
         </a>
       ))}
