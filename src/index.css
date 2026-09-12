@@ -7,9 +7,11 @@
 }
 
 /* UI density scales the root rem, never CSS zoom: `zoom` does not compensate
-   viewport units, so h-screen/w-screen would leave dead strips at the edges. */
+   viewport units, so h-screen/w-screen would leave dead strips at the edges.
+   The 16px base is what the layout was authored against — `h-9.5` is the 38px
+   toolbar of D-046 only at a 16px root — so 1.0 renders the design at 1:1. */
 html {
-  font-size: calc(13.5px * var(--ui-scale, 0.88));
+  font-size: calc(16px * var(--ui-scale, 1));
   -webkit-text-size-adjust: 100%;
 }
 

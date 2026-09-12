@@ -14,6 +14,60 @@ use crate::sync::discovery::{PeerInfo, PeerRegistry};
 use crate::sync::pairing::{is_device_paired, store_paired_device, update_peer_last_sync, PairedDevice};
 use crate::sync::protocol::{apply_remote_revisions, query_revisions_since};
 
+/// Upper bound on blobs pulled in a single sync pass so a large backlog cannot
+/// stall one cycle; the remainder is picked up by the next pass.
+// ponytail: fixed cap, make it adaptive only if cold-start catchup feels slow.
+const MAX_MEDIA_FETCH_PER_SYNC: usize = 25;
+
+/// Pull the `<hash>` out of a `/api/media/<hash>.webp` reference.
+fn extract_media_hash(content: &str) -> Option<String> {
+    let start = content.rfind("/api/media/")? + "/api/media/".len();
+    let hash = content[start..].split(".webp").next()?;
+    if hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        Some(hash.to_string())
+    } else {
+        None
+    }
+}
+
+/// Every media hash this vault references but has no file on disk for.
+/// Reading from local state (rather than the current delta batch) makes media
+/// sync self-healing: a blob missed on an earlier pass is retried every cycle
+/// until it lands.
+fn collect_missing_media_hashes(
+    conn: &Connection,
+    media_dir: &Path,
+    limit: usize,
+) -> Vec<String> {
+    let mut hashes: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    if let Ok(mut stmt) = conn.prepare("SELECT file_hash FROM media_files") {
+        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+            for hash in rows.flatten() {
+                hashes.insert(hash);
+            }
+        }
+    }
+
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT content FROM vault_items WHERE is_deleted = 0 AND content LIKE '%/api/media/%'",
+    ) {
+        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+            for content in rows.flatten() {
+                if let Some(hash) = extract_media_hash(&content) {
+                    hashes.insert(hash);
+                }
+            }
+        }
+    }
+
+    hashes
+        .into_iter()
+        .filter(|hash| !media_dir.join(format!("{}.webp", hash)).exists())
+        .take(limit)
+        .collect()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeshSyncStatus {
     pub is_syncing: bool,
@@ -185,53 +239,58 @@ pub fn sync_with_peer(
         .map_err(|e| format!("Failed to parse peer deltas: {}", e))?;
 
     let mut applied_count = 0;
-    let mut missing_hashes = Vec::new();
-
     // Step 2: Apply remote revisions to local SQLite database
     if !deltas_resp.revisions.is_empty() {
         let mut conn = db.lock().map_err(|e| e.to_string())?;
         applied_count = apply_remote_revisions(&mut conn, &deltas_resp.revisions)
             .map_err(|e| format!("Failed to apply remote revisions: {}", e))?;
-
-        // Identify any media files that need to be fetched
-        for rev in &deltas_resp.revisions {
-            if rev.entity_type == "media_file" {
-                if let Some(ref payload) = rev.payload {
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(payload) {
-                        if let Some(hash) = v.get("file_hash").and_then(|h| h.as_str()) {
-                            missing_hashes.push(hash.to_string());
-                        }
-                    }
-                }
-            }
-        }
     }
 
-    // Step 3: Stream missing WebP media files from peer
+    // Step 3: Stream missing WebP media files from peer.
+    // The set is derived from local state, never from this batch's revisions:
+    // a blob whose fetch failed (peer asleep, timeout, truncated body) must be
+    // retried later, but `since_ts` has already moved past its `media_file`
+    // revision, so a batch-derived list would strand it as a permanent 404.
     let media_dir = base_dir.join("media");
     let _ = fs::create_dir_all(&media_dir);
 
+    let missing_hashes = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        collect_missing_media_hashes(&conn, &media_dir, MAX_MEDIA_FETCH_PER_SYNC)
+    };
+
     for hash in missing_hashes {
         let local_path = media_dir.join(format!("{}.webp", hash));
-        if !local_path.exists() {
-            let media_path = format!("/api/media/{}.webp", hash);
-            if let Ok(media_resp) = send_http_request(peer_addr, "GET", &media_path, &[], None, Duration::from_secs(10)) {
-                if media_resp.status == 200 && !media_resp.body.is_empty() {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&media_resp.body);
-                    let computed_hash = format!("{:x}", hasher.finalize());
-                    if computed_hash == hash {
-                        let temp_path = media_dir.join(format!("{}.tmp.{}", hash, uuid::Uuid::new_v4()));
-                        if let Ok(mut f) = File::create(&temp_path) {
-                            if f.write_all(&media_resp.body).is_ok() {
-                                let _ = fs::rename(&temp_path, &local_path);
-                            } else {
-                                let _ = fs::remove_file(&temp_path);
-                            }
+        let media_path = format!("/api/media/{}.webp", hash);
+        match send_http_request(peer_addr, "GET", &media_path, &[], None, Duration::from_secs(10)) {
+            Ok(media_resp) if media_resp.status == 200 && !media_resp.body.is_empty() => {
+                let mut hasher = Sha256::new();
+                hasher.update(&media_resp.body);
+                let computed_hash = format!("{:x}", hasher.finalize());
+                if computed_hash == hash {
+                    let temp_path = media_dir.join(format!("{}.tmp.{}", hash, uuid::Uuid::new_v4()));
+                    if let Ok(mut f) = File::create(&temp_path) {
+                        if f.write_all(&media_resp.body).is_ok() {
+                            let _ = fs::rename(&temp_path, &local_path);
+                        } else {
+                            let _ = fs::remove_file(&temp_path);
                         }
                     }
+                } else {
+                    eprintln!(
+                        "[mesh_sync] media {} failed integrity check, will retry next sync",
+                        hash
+                    );
                 }
             }
+            Ok(media_resp) => eprintln!(
+                "[mesh_sync] media {} unavailable from peer (HTTP {}), will retry next sync",
+                hash, media_resp.status
+            ),
+            Err(e) => eprintln!(
+                "[mesh_sync] media {} fetch failed ({}), will retry next sync",
+                hash, e
+            ),
         }
     }
 
@@ -368,5 +427,55 @@ pub async fn run_mesh_sync_loop(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::schema;
+
+    #[test]
+    fn extracts_hash_only_from_real_media_references() {
+        let hash = "a".repeat(64);
+        assert_eq!(
+            extract_media_hash(&format!("/api/media/{}.webp", hash)),
+            Some(hash.clone())
+        );
+        assert_eq!(extract_media_hash("just a plain note"), None);
+        assert_eq!(extract_media_hash("/api/media/not-a-hash.webp"), None);
+    }
+
+    #[test]
+    fn missing_media_is_rediscovered_after_the_delta_batch_is_gone() {
+        let dir = std::env::temp_dir().join(format!("ov_media_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = Connection::open_in_memory().unwrap();
+        schema::initialize_schema(&conn).unwrap();
+
+        let present = "b".repeat(64);
+        let absent = "c".repeat(64);
+        std::fs::write(dir.join(format!("{}.webp", present)), b"blob").unwrap();
+
+        // Two image items referencing blobs; only one is on disk. No revisions
+        // are involved, mirroring a sync long after the media_file revision
+        // scrolled past `since_ts`.
+        for (id, hash) in [("i1", &present), ("i2", &absent)] {
+            conn.execute(
+                "INSERT INTO vault_items (id, folder_id, item_type, title, content, created_at, updated_at)
+                 VALUES (?1, NULL, 'image', ?1, ?2, 0, 0)",
+                rusqlite::params![id, format!("/api/media/{}.webp", hash)],
+            )
+            .unwrap();
+        }
+
+        let missing = collect_missing_media_hashes(&conn, &dir, 25);
+        assert_eq!(missing, vec![absent.clone()], "only the blob absent from disk is refetched");
+
+        // Once it lands it must drop out of the repair set.
+        std::fs::write(dir.join(format!("{}.webp", absent)), b"blob").unwrap();
+        assert!(collect_missing_media_hashes(&conn, &dir, 25).is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -43,30 +43,32 @@ export function App() {
   // BridgeMind Stream Filter State (Stream | Notes | Markets)
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
 
-  // UI Density / Zoom Scaling (0.80, 0.88, 0.96, 1.04)
+  // UI Density (0.90, 1.00, 1.15, 1.30). 1.0 renders the layout at the 16px
+  // root it was authored against; the v2 key discards scales saved back when
+  // the same number meant "fraction of 13.5px" and read ~26% smaller.
   const [zoomScale, setZoomScale] = useState<number>(() => {
-    const saved = localStorage.getItem("omnivault_ui_scale");
+    const saved = localStorage.getItem("omnivault_ui_scale_v2");
     if (saved) {
       const parsed = parseFloat(saved);
       if (!isNaN(parsed) && parsed >= 0.7 && parsed <= 1.5) {
         return parsed;
       }
     }
-    return 0.88; // Default to crisp, high-density native scale
+    return 1; // Native 1:1 scale
   });
 
   useEffect(() => {
     (document.documentElement.style as any).zoom = "";
     document.documentElement.style.setProperty("--ui-scale", String(zoomScale));
-    localStorage.setItem("omnivault_ui_scale", String(zoomScale));
+    localStorage.setItem("omnivault_ui_scale_v2", String(zoomScale));
   }, [zoomScale]);
 
   const handleCycleZoom = useCallback(() => {
     setZoomScale((prev) => {
-      if (prev <= 0.82) return 0.88;
-      if (prev <= 0.90) return 0.96;
-      if (prev <= 1.00) return 1.08;
-      return 0.80;
+      if (prev < 0.95) return 1;
+      if (prev < 1.1) return 1.15;
+      if (prev < 1.25) return 1.3;
+      return 0.9;
     });
   }, []);
 
@@ -75,13 +77,13 @@ export function App() {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === "-" || e.key === "_") {
           e.preventDefault();
-          setZoomScale((prev) => Math.max(0.72, Math.round((prev - 0.08) * 100) / 100));
+          setZoomScale((prev) => Math.max(0.75, Math.round((prev - 0.05) * 100) / 100));
         } else if (e.key === "=" || e.key === "+") {
           e.preventDefault();
-          setZoomScale((prev) => Math.min(1.28, Math.round((prev + 0.08) * 100) / 100));
+          setZoomScale((prev) => Math.min(1.5, Math.round((prev + 0.05) * 100) / 100));
         } else if (e.key === "0") {
           e.preventDefault();
-          setZoomScale(0.88);
+          setZoomScale(1);
         }
       }
     };
@@ -574,7 +576,7 @@ export function App() {
                 </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2.5">
                   {displayedFolderItems.map((item) => (
                     <QuickInboxItemCard
                       key={item.id}

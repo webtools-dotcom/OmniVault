@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   inboxCount,
   meshState,
   onOpenPairing,
-  zoomScale = 0.88,
+  zoomScale = 1,
   onCycleZoom,
 }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
