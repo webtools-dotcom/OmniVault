@@ -82,12 +82,12 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       )}
     >
       {/* BridgeMind Terminal Card Header */}
-      <div className="h-8 px-3 border-b border-white/[0.06] bg-[#18181E] flex items-center justify-between select-none text-xs shrink-0">
-        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+      <div className="h-7 px-2.5 border-b border-white/[0.06] bg-[#18181E] flex items-center justify-between select-none text-xs shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1.5">
           {/* Status Dot */}
           <span
             className={cn(
-              "w-2 h-2 rounded-full shrink-0",
+              "w-1.5 h-1.5 rounded-full shrink-0",
               item.is_pinned
                 ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]"
                 : isTicker
@@ -155,11 +155,11 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       </div>
 
       {/* Card Content Body */}
-      <div className="p-3 text-xs flex-1 flex flex-col justify-between">
+      <div className="p-2.5 text-xs flex-1 flex flex-col justify-between">
         {/* Image Thumbnail */}
         {isImage && item.content && (
           <div
-            className="relative mb-2.5 rounded-lg overflow-hidden border border-white/[0.08] bg-[#0E0E11] group/img max-h-40 flex items-center justify-center"
+            className="relative mb-2 rounded-lg overflow-hidden border border-white/[0.08] bg-[#0E0E11] group/img max-h-36 flex items-center justify-center"
             onClick={(e) => {
               e.stopPropagation();
               onViewImage?.(resolveMediaUrl(item.content), item.title);
@@ -168,10 +168,10 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             <img
               src={resolveMediaUrl(item.content)}
               alt={item.title}
-              className="w-full h-auto max-h-40 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
+              className="w-full h-auto max-h-36 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-[11px] font-mono">
-              <Maximize2 className="w-3.5 h-3.5" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-[10px] font-mono">
+              <Maximize2 className="w-3 h-3" />
               <span>Zoom</span>
             </div>
           </div>
@@ -179,21 +179,21 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
 
         {/* Text Content */}
         {!isImage && item.content && (
-          <p className="text-xs text-zinc-300 line-clamp-3 leading-relaxed mb-2.5 font-sans font-normal">
+          <p className="text-xs text-zinc-300 line-clamp-3 leading-relaxed mb-2 font-sans font-normal">
             {item.content}
           </p>
         )}
 
         {/* Smart Ticker & Link Launchers */}
         {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
-          <div className="mb-2">
+          <div className="mb-1.5">
             <SmartMarketLauncher tickers={detectedTickers} links={detectedLinks} />
           </div>
         )}
       </div>
 
       {/* BridgeMind Terminal Footer Status Bar */}
-      <div className="h-6.5 px-3 border-t border-white/[0.04] bg-[#121216] flex items-center justify-between text-[10px] font-mono text-zinc-500 select-none shrink-0">
+      <div className="h-6 px-2.5 border-t border-white/[0.04] bg-[#121216] flex items-center justify-between text-[10px] font-mono text-zinc-500 select-none shrink-0">
         <span>{formatRelativeTime(item.updated_at)}</span>
         <span>{item.content?.length || 0} chars</span>
       </div>

@@ -14,7 +14,6 @@ class MainActivity : TauriActivity() {
   private var multicastLock: WifiManager.MulticastLock? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     acquireMulticastLock()
     handleIncomingIntent(intent)

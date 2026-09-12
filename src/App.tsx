@@ -43,6 +43,51 @@ export function App() {
   // BridgeMind Stream Filter State (Stream | Notes | Markets)
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
 
+  // UI Density / Zoom Scaling (0.80, 0.88, 0.96, 1.04)
+  const [zoomScale, setZoomScale] = useState<number>(() => {
+    const saved = localStorage.getItem("omnivault_ui_scale");
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0.7 && parsed <= 1.5) {
+        return parsed;
+      }
+    }
+    return 0.88; // Default to crisp, high-density native scale
+  });
+
+  useEffect(() => {
+    (document.documentElement.style as any).zoom = String(zoomScale);
+    localStorage.setItem("omnivault_ui_scale", String(zoomScale));
+  }, [zoomScale]);
+
+  const handleCycleZoom = useCallback(() => {
+    setZoomScale((prev) => {
+      if (prev <= 0.82) return 0.88;
+      if (prev <= 0.90) return 0.96;
+      if (prev <= 1.00) return 1.08;
+      return 0.80;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          setZoomScale((prev) => Math.max(0.72, Math.round((prev - 0.08) * 100) / 100));
+        } else if (e.key === "=" || e.key === "+") {
+          e.preventDefault();
+          setZoomScale((prev) => Math.min(1.28, Math.round((prev + 0.08) * 100) / 100));
+        } else if (e.key === "0") {
+          e.preventDefault();
+          setZoomScale(0.88);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const [meshState, setMeshState] = useState<MeshSyncState>({
     status: "standby",
     peerCount: 0,
@@ -415,6 +460,8 @@ export function App() {
           inboxCount={inboxItems.length}
           meshState={meshState}
           onOpenPairing={() => setIsQrModalOpen(true)}
+          zoomScale={zoomScale}
+          onCycleZoom={handleCycleZoom}
         />
       )}
     >
@@ -534,7 +581,7 @@ export function App() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
                   {displayedFolderItems.map((item) => (
                     <QuickInboxItemCard
                       key={item.id}

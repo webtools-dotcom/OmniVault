@@ -50,18 +50,18 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#0E0E11] overflow-hidden">
-      {/* Top Header / Navigation Bar (BridgeMind 44px unified shell) */}
-      <header className="h-11 px-3 sm:px-4 border-b border-white/[0.07] flex items-center justify-between gap-3 shrink-0 bg-[#121216] z-10 select-none">
+      {/* Top Header / Navigation Bar (BridgeMind 38px unified shell) */}
+      <header className="h-9.5 px-3 border-b border-white/[0.07] flex items-center justify-between gap-2.5 shrink-0 bg-[#121216] z-10 select-none">
         {/* Left: Sidebar Toggle & Location Breadcrumbs */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           {(!isSidebarOpen || isMobile) && (
             <button
               onClick={onToggleSidebar}
               title="Open Sidebar (Ctrl+B)"
               aria-label="Open sidebar"
-              className="w-7 h-7 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
+              className="w-6.5 h-6.5 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
             >
-              {isMobile ? <Menu className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+              {isMobile ? <Menu className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
             </button>
           )}
 
@@ -79,7 +79,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               type="button"
               onClick={() => onStreamFilterChange("stream")}
               className={cn(
-                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "stream"
                   ? "bg-[#27272F] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -91,7 +91,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               type="button"
               onClick={() => onStreamFilterChange("notes")}
               className={cn(
-                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "notes"
                   ? "bg-[#27272F] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -103,7 +103,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               type="button"
               onClick={() => onStreamFilterChange("markets")}
               className={cn(
-                "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "markets"
                   ? "bg-[#27272F] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -116,7 +116,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
         {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative hidden sm:block w-36 md:w-48 lg:w-56">
+          <div className="relative hidden sm:block w-36 md:w-44 lg:w-52">
             <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             <input
               ref={searchInputRef}
@@ -124,7 +124,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search..."
-              className="w-full h-7 pl-7.5 pr-8 bg-[#18181D] border border-white/[0.08] rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
+              className="w-full h-6.5 pl-7 pr-7.5 bg-[#18181D] border border-white/[0.08] rounded-md text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
             />
             {searchQuery ? (
               <button
@@ -146,7 +146,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
       </header>
 
       {/* Content Viewport */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+      <div className="flex-1 overflow-y-auto p-2.5 sm:p-3.5 lg:p-4">
         <div className="w-full h-full">
           {children}
         </div>

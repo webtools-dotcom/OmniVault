@@ -28,6 +28,8 @@ export interface SidebarProps {
   inboxCount: number;
   meshState: MeshSyncState;
   onOpenPairing?: () => void;
+  zoomScale?: number;
+  onCycleZoom?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -47,6 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   inboxCount,
   meshState,
   onOpenPairing,
+  zoomScale = 0.88,
+  onCycleZoom,
 }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isInboxDragOver, setIsInboxDragOver] = useState(false);
@@ -59,11 +63,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         "flex flex-col bg-[#111114] border-r border-white/[0.07] h-full transition-all duration-200 select-none",
         isMobile
           ? "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl"
-          : "w-60 shrink-0"
+          : "w-56 shrink-0"
       )}
     >
-      {/* Brand & App Header (BridgeMind 44px style) */}
-      <div className="h-11 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#131317]">
+      {/* Brand & App Header (BridgeMind 38px style) */}
+      <div className="h-9.5 px-2.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#131317]">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xs">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -98,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto px-2.5 py-2.5 space-y-3 scrollbar-none">
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2.5 scrollbar-none">
         {/* Workspaces Header & Quick Inbox */}
         <div>
           <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
@@ -187,20 +191,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* User / Node Profile & Mesh Status (BridgeMind bottom profile dock) */}
-      <div className="h-12 px-3 border-t border-white/[0.06] bg-[#121215] shrink-0 flex items-center justify-between text-xs select-none">
+      <div className="h-9.5 px-2.5 border-t border-white/[0.06] bg-[#121215] shrink-0 flex items-center justify-between text-xs select-none">
         <div
           onClick={onOpenPairing}
-          className={cn("flex items-center gap-2.5 min-w-0", onOpenPairing && "cursor-pointer hover:opacity-90")}
+          className={cn("flex items-center gap-2 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
           title={onOpenPairing ? "View Discovered Mesh Peers" : undefined}
         >
-          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 border border-white/10 flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs">
+          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 border border-white/10 flex items-center justify-center font-bold text-[10px] text-white shrink-0 shadow-xs">
             O
           </div>
           <div className="truncate min-w-0">
             <span className="text-zinc-200 text-xs font-semibold block truncate leading-tight">
               Local Vault
             </span>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center gap-1 mt-0.5">
               <span
                 className={cn(
                   "w-1.5 h-1.5 rounded-full shrink-0",
@@ -212,22 +216,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               />
               <span className="text-[10px] font-mono text-zinc-500 truncate">
-                {meshState.peerCount > 0 ? `${meshState.peerCount} peers` : "port: 42420"}
+                {meshState.peerCount > 0 ? `${meshState.peerCount} peers` : "local"}
               </span>
             </div>
           </div>
         </div>
 
-        {onOpenPairing && (
-          <button
-            type="button"
-            onClick={onOpenPairing}
-            title="Connect Mobile (QR Code)"
-            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-          >
-            <QrCode className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {onCycleZoom && (
+            <button
+              type="button"
+              onClick={onCycleZoom}
+              title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle, or Ctrl - / +)`}
+              className="px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[9px] font-mono text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+          )}
+
+          {onOpenPairing && (
+            <button
+              type="button"
+              onClick={onOpenPairing}
+              title="Connect Mobile (QR Code)"
+              className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   );

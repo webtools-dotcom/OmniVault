@@ -101,9 +101,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
 
   const handleCloseSidebar = () => setSidebarOpen(false);
   const handleToggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
 
   return (
-    <div className="flex h-screen w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans">
+    <div
+      className={cn(
+        "flex h-screen w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans",
+        isAndroid && "pt-6"
+      )}
+    >
       {/* Mobile Backdrop Overlay */}
       {isMobile && sidebarOpen && (
         <div
@@ -119,7 +125,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
           "h-full transition-all duration-200 ease-in-out",
           isMobile
             ? (sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none")
-            : (sidebarOpen ? "w-64" : "w-0 overflow-hidden")
+            : (sidebarOpen ? "w-56" : "w-0 overflow-hidden")
         )}
       >
         {sidebar({

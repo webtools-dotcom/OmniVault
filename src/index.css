@@ -6,6 +6,11 @@
   color-scheme: dark;
 }
 
+html {
+  font-size: 13.5px;
+  -webkit-text-size-adjust: 100%;
+}
+
 /* Browser Surface Theming (craft-floor requirement) */
 ::selection {
   background-color: rgba(59, 130, 246, 0.35);

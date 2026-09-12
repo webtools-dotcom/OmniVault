@@ -144,7 +144,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-[#141419] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 transition-all shadow-xs mb-3">
+    <div className="bg-[#141419] border border-white/[0.08] hover:border-white/[0.16] rounded-lg px-2.5 py-1.5 transition-all shadow-xs mb-2.5">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -154,8 +154,8 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         className="hidden"
       />
 
-      <form onSubmit={handleCapture} className="flex items-center gap-2.5">
-        <span className="text-emerald-400 font-mono text-sm font-bold select-none shrink-0">❯</span>
+      <form onSubmit={handleCapture} className="flex items-center gap-2">
+        <span className="text-emerald-400 font-mono text-xs font-bold select-none shrink-0">❯</span>
 
         {/* Format selector pill */}
         <select
@@ -167,7 +167,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               fileInputRef.current?.click();
             }
           }}
-          className="bg-[#1C1C23] text-zinc-300 text-xs font-mono px-2 py-1 rounded-md border border-white/[0.08] focus:outline-none cursor-pointer shrink-0"
+          className="bg-[#1C1C23] text-zinc-300 text-xs font-mono px-1.5 py-0.5 rounded-md border border-white/[0.08] focus:outline-none cursor-pointer shrink-0"
         >
           <option value="note">Note</option>
           <option value="ticker">$ Ticker</option>
@@ -190,7 +190,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               ? "Click to choose image or press Ctrl+V to paste..."
               : "Capture note, task, or fleeting thought (press Enter)..."
           }
-          className="flex-1 bg-transparent text-xs sm:text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none font-sans"
+          className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none font-sans"
           disabled={isSubmitting}
         />
 
@@ -199,13 +199,10 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-mono shrink-0">
             <img
               src={imagePreview}
-              alt="Selected"
-              className="w-4 h-4 rounded object-cover border border-purple-400/40"
+              alt="Preview"
+              className="w-4 h-4 rounded object-cover"
             />
-            <span className="truncate max-w-[80px] sm:max-w-[120px]">{imageInfo?.name || "Image"}</span>
-            {imageInfo?.sizeStr && (
-              <span className="text-[10px] text-purple-400/70 hidden sm:inline">({imageInfo.sizeStr})</span>
-            )}
+            <span className="max-w-[100px] truncate">{imageInfo?.name || "Image attached"}</span>
             <button
               type="button"
               onClick={() => {
@@ -224,7 +221,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="h-8 sm:h-7 px-3 sm:px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
+          className="h-6.5 px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-md text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
         >
           {isSubmitting ? (
             <>
