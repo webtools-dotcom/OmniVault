@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Sparkles, CornerDownLeft } from "lucide-react";
 import { ItemType, VaultItem } from "../../types";
 import { StorageService, cacheLocalMedia } from "../../services/storageService";
 
@@ -144,7 +144,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-[#141419] border border-white/[0.08] hover:border-white/[0.16] rounded-lg px-2.5 py-1.5 transition-all shadow-xs mb-2.5">
+    <div className="bg-vault-panel/80 border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 transition-all shadow-sm mb-3 backdrop-blur-sm">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -154,8 +154,8 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         className="hidden"
       />
 
-      <form onSubmit={handleCapture} className="flex items-center gap-2">
-        <span className="text-emerald-400 font-mono text-xs font-bold select-none shrink-0">❯</span>
+      <form onSubmit={handleCapture} className="flex items-center gap-2.5">
+        <Sparkles className="w-3.5 h-3.5 text-indigo-400 select-none shrink-0" />
 
         {/* Format selector pill */}
         <select
@@ -167,12 +167,12 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               fileInputRef.current?.click();
             }
           }}
-          className="bg-[#1C1C23] text-zinc-300 text-xs font-mono px-1.5 py-0.5 rounded-md border border-white/[0.08] focus:outline-none cursor-pointer shrink-0"
+          className="bg-vault-card text-zinc-300 text-xs px-2 py-1 rounded-lg border border-white/[0.08] focus:outline-none focus:border-indigo-500/50 cursor-pointer shrink-0 font-sans"
         >
           <option value="note">Note</option>
           <option value="ticker">$ Ticker</option>
           <option value="link">Link</option>
-          <option value="image">Screenshot</option>
+          <option value="image">Photo</option>
         </select>
 
         {/* Unified rapid capture input */}
@@ -187,30 +187,30 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               : itemType === "link"
               ? "Paste web link (e.g. https://...)..."
               : itemType === "image"
-              ? "Click to choose image or press Ctrl+V to paste..."
+              ? "Click to choose photo or press Ctrl+V to paste..."
               : "Capture note, task, or fleeting thought (press Enter)..."
           }
-          className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none font-sans"
+          className="flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none font-sans"
           disabled={isSubmitting}
         />
 
         {/* Image preview badge if loaded */}
         {imagePreview && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-mono shrink-0">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs shrink-0">
             <img
               src={imagePreview}
               alt="Preview"
               className="w-4 h-4 rounded object-cover"
             />
-            <span className="max-w-[100px] truncate">{imageInfo?.name || "Image attached"}</span>
+            <span className="max-w-[100px] truncate">{imageInfo?.name || "Photo attached"}</span>
             <button
               type="button"
               onClick={() => {
                 setImagePreview(null);
                 setImageInfo(null);
               }}
-              className="text-zinc-400 hover:text-white ml-1 cursor-pointer"
-              title="Remove image"
+              className="text-zinc-400 hover:text-white ml-1 cursor-pointer text-xs"
+              title="Remove photo"
             >
               ×
             </button>
@@ -221,22 +221,22 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="h-6.5 px-2.5 bg-[#202028] hover:bg-[#282834] disabled:opacity-30 text-zinc-200 hover:text-white rounded-md text-xs font-medium border border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
+          className="h-7 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white rounded-lg text-xs font-medium border border-indigo-400/20 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
-              <span className="hidden sm:inline">Syncing...</span>
+              <Loader2 className="w-3 h-3 animate-spin text-white" />
+              <span className="hidden sm:inline">Saving...</span>
             </>
           ) : justSynced ? (
             <>
-              <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400 font-mono">Synced</span>
+              <Check className="w-3.5 h-3.5 text-white" />
+              <span className="text-white font-medium">Saved</span>
             </>
           ) : (
             <>
               <span>Capture</span>
-              <kbd className="font-mono text-[10px] text-zinc-400">↵</kbd>
+              <CornerDownLeft className="w-3 h-3 text-indigo-200" />
             </>
           )}
         </button>
@@ -244,12 +244,12 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
 
       {/* Uploading progress status bar for large photos */}
       {isSubmitting && itemType === "image" && (
-        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[11px] font-mono text-purple-300 animate-pulse">
+        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-xs text-indigo-300 animate-pulse font-sans">
           <div className="flex items-center gap-1.5">
-            <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+            <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
             <span>Compressing and syncing photo to mesh vault...</span>
           </div>
-          {imageInfo?.sizeStr && <span className="text-purple-400/80">{imageInfo.sizeStr}</span>}
+          {imageInfo?.sizeStr && <span className="text-indigo-400/80">{imageInfo.sizeStr}</span>}
         </div>
       )}
     </div>

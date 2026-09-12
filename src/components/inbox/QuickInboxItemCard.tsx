@@ -73,40 +73,38 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       onDragEnd={handleDragEnd}
       onClick={() => onSelectItem?.(item)}
       className={cn(
-        "group relative bg-[#15151A] border rounded-xl overflow-hidden transition-all duration-150 shadow-xs hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] cursor-pointer flex flex-col",
+        "group relative bg-vault-card/90 hover:bg-vault-card border rounded-xl overflow-hidden transition-all duration-150 shadow-sm hover:shadow-xl cursor-pointer flex flex-col",
         isDragging
-          ? "opacity-30 ring-1 ring-blue-500 scale-[0.98]"
+          ? "opacity-30 ring-1 ring-indigo-500 scale-[0.98]"
           : item.is_pinned
-          ? "border-amber-500/30 bg-[#16161C] ring-1 ring-amber-500/20"
+          ? "border-amber-500/30 bg-vault-card ring-1 ring-amber-500/20"
           : "border-white/[0.08] hover:border-white/[0.18]"
       )}
     >
-      {/* BridgeMind Terminal Card Header */}
-      <div className="h-7 px-2.5 border-b border-white/[0.06] bg-[#18181E] flex items-center justify-between select-none text-xs shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1.5">
-          {/* Status Dot */}
+      {/* Modern Card Header */}
+      <div className="h-8 px-3 border-b border-white/[0.06] bg-vault-panel/60 flex items-center justify-between select-none text-xs shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          {/* Status Badge */}
           <span
             className={cn(
-              "w-1.5 h-1.5 rounded-full shrink-0",
+              "text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
               item.is_pinned
-                ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]"
+                ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
                 : isTicker
-                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                 : isLink
-                ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
                 : isImage
-                ? "bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.6)]"
-                : "bg-zinc-400"
+                ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                : "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
             )}
-          />
+          >
+            {isTicker ? "Market" : isImage ? "Photo" : isLink ? "Link" : "Note"}
+          </span>
 
-          <h3 className="font-mono text-xs font-semibold text-zinc-200 truncate">
+          <h3 className="font-sans text-xs font-semibold text-zinc-100 truncate">
             {item.title || "Untitled"}
           </h3>
-
-          <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0">
-            {item.item_type}
-          </span>
         </div>
 
         {/* Header Right Actions */}
@@ -119,7 +117,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-0.5 transition-colors"
             title="Drag to folder"
           >
-            <GripVertical className="w-3 h-3" />
+            <GripVertical className="w-3.5 h-3.5" />
           </div>
 
           <button
@@ -127,39 +125,39 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             onClick={() => onTogglePin(item.id)}
             title={item.is_pinned ? "Unpin" : "Pin to top"}
             className={cn(
-              "w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-white transition-colors cursor-pointer",
-              item.is_pinned && "text-amber-400"
+              "w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer",
+              item.is_pinned && "text-amber-400 hover:text-amber-300"
             )}
           >
-            <Pin className={cn("w-3 h-3", item.is_pinned && "fill-current")} />
+            <Pin className={cn("w-3.5 h-3.5", item.is_pinned && "fill-current")} />
           </button>
 
           <button
             type="button"
             onClick={() => onOpenMove(item)}
             title="Move to folder"
-            className="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
-            <FolderInput className="w-3 h-3" />
+            <FolderInput className="w-3.5 h-3.5" />
           </button>
 
           <button
             type="button"
             onClick={() => onDeleteItem(item.id)}
             title="Delete"
-            className="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Card Content Body */}
-      <div className="p-2.5 text-xs flex-1 flex flex-col justify-between">
+      <div className="p-3 text-xs flex-1 flex flex-col justify-between">
         {/* Image Thumbnail */}
         {isImage && item.content && (
           <div
-            className="relative mb-2 rounded-lg overflow-hidden border border-white/[0.08] bg-[#0E0E11] group/img max-h-36 flex items-center justify-center"
+            className="relative mb-2.5 rounded-lg overflow-hidden border border-white/[0.08] bg-vault-bg group/img max-h-40 flex items-center justify-center"
             onClick={(e) => {
               e.stopPropagation();
               onViewImage?.(resolveMediaUrl(item.content), item.title);
@@ -168,10 +166,10 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             <img
               src={resolveMediaUrl(item.content)}
               alt={item.title}
-              className="w-full h-auto max-h-36 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
+              className="w-full h-auto max-h-40 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-[10px] font-mono">
-              <Maximize2 className="w-3 h-3" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-medium">
+              <Maximize2 className="w-3.5 h-3.5" />
               <span>Zoom</span>
             </div>
           </div>
@@ -192,10 +190,10 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         )}
       </div>
 
-      {/* BridgeMind Terminal Footer Status Bar */}
-      <div className="h-6 px-2.5 border-t border-white/[0.04] bg-[#121216] flex items-center justify-between text-[10px] font-mono text-zinc-500 select-none shrink-0">
+      {/* Footer Status Bar */}
+      <div className="h-6.5 px-3 border-t border-white/[0.04] bg-vault-panel/40 flex items-center justify-between text-[11px] text-zinc-500 select-none shrink-0 font-sans">
         <span>{formatRelativeTime(item.updated_at)}</span>
-        <span>{item.content?.length || 0} chars</span>
+        <span>{item.content?.length ? `${item.content.length} chars` : ""}</span>
       </div>
     </div>
   );

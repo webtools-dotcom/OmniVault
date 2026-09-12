@@ -49,17 +49,17 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
   }, []);
 
   return (
-    <main className="flex-1 flex flex-col min-w-0 bg-[#0E0E11] overflow-hidden">
-      {/* Top Header / Navigation Bar (BridgeMind 38px unified shell) */}
-      <header className="h-9.5 px-3 border-b border-white/[0.07] flex items-center justify-between gap-2.5 shrink-0 bg-[#121216] z-10 select-none">
+    <main className="flex-1 flex flex-col min-w-0 bg-vault-bg overflow-hidden">
+      {/* Top Header / Navigation Bar */}
+      <header className="h-9.5 px-3.5 border-b border-white/[0.06] flex items-center justify-between gap-2.5 shrink-0 bg-vault-panel/70 backdrop-blur-sm z-10 select-none">
         {/* Left: Sidebar Toggle & Location Breadcrumbs */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {(!isSidebarOpen || isMobile) && (
             <button
               onClick={onToggleSidebar}
               title="Open Sidebar (Ctrl+B)"
               aria-label="Open sidebar"
-              className="w-6.5 h-6.5 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
+              className="w-6.5 h-6.5 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
             >
               {isMobile ? <Menu className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
             </button>
@@ -67,21 +67,21 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
           <Breadcrumbs items={breadcrumbs} onNavigateHome={onNavigateHome} />
 
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400 shrink-0 hidden md:inline-block">
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0 hidden md:inline-block">
             {itemCount}
           </span>
         </div>
 
-        {/* Center: BridgeMind Segmented Switcher [ Stream | Notes | Markets ] */}
+        {/* Center: Segmented Switcher [ Stream | Notes | Markets ] */}
         {onStreamFilterChange && (
-          <div className="hidden md:flex items-center bg-[#18181D] p-0.5 rounded-lg border border-white/[0.08] shadow-xs">
+          <div className="hidden md:flex items-center bg-vault-card p-0.5 rounded-lg border border-white/[0.08] shadow-xs">
             <button
               type="button"
               onClick={() => onStreamFilterChange("stream")}
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "stream"
-                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
               )}
             >
@@ -93,7 +93,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "notes"
-                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
               )}
             >
@@ -105,7 +105,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "markets"
-                  ? "bg-[#27272F] text-white shadow-xs font-semibold"
+                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
                   : "text-zinc-400 hover:text-zinc-200"
               )}
             >
@@ -117,14 +117,14 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
         {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative hidden sm:block w-36 md:w-44 lg:w-52">
-            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search..."
-              className="w-full h-6.5 pl-7 pr-7.5 bg-[#18181D] border border-white/[0.08] rounded-md text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
+              className="w-full h-7 pl-8 pr-7.5 bg-vault-card border border-white/[0.08] rounded-lg text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/50 transition-colors font-sans"
             />
             {searchQuery ? (
               <button

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Plus, QrCode } from "lucide-react";
+import { Plus, Radio } from "lucide-react";
 import { ActiveView, BreadcrumbItem, Folder, ItemType, MeshSyncState, VaultItem } from "./types";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -480,35 +480,25 @@ export function App() {
           onStreamFilterChange={setStreamFilter}
           headerActions={
             <div className="flex items-center gap-2">
-              {!isTauriEnvironment() ? (
+              {isPaired || (meshState.pairedDeviceIds && meshState.pairedDeviceIds.length > 0) ? (
                 <button
                   type="button"
-                  onClick={() => setIsPeerPinModalOpen(true)}
-                  title={isPaired ? "Device paired with desktop vault" : "Enter 6-digit desktop PIN to link"}
-                  className={`h-7 px-2.5 flex items-center gap-1.5 text-xs font-mono rounded-lg transition-colors cursor-pointer border ${
-                    isPaired
-                      ? "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25"
-                      : "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/25 animate-pulse"
-                  }`}
+                  onClick={() => setIsQrModalOpen(true)}
+                  title="Vault Synced • Tap to view mesh devices"
+                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 rounded-lg transition-all cursor-pointer shadow-xs"
                 >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isPaired
-                        ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
-                        : "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]"
-                    }`}
-                  />
-                  <span>{isPaired ? "Linked Peer" : "Enter PIN"}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                  <span>{meshState.peerCount > 0 ? `Synced (${meshState.peerCount})` : "Synced"}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsQrModalOpen(true)}
-                  title="Connect mobile / tablet via QR code"
-                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#18181D] hover:bg-[#22222A] border border-white/[0.08] rounded-lg transition-colors cursor-pointer"
+                  title="Tap to connect & pair with desktop or phone"
+                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-all cursor-pointer shadow-xs animate-pulse"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="hidden sm:inline">Connect</span>
+                  <Radio className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Connect Device</span>
                 </button>
               )}
               <button
@@ -517,9 +507,9 @@ export function App() {
                   setEditorItem(null);
                   setIsEditorOpen(true);
                 }}
-                className="h-7 px-2.5 flex items-center gap-1 text-xs font-medium text-white bg-[#272730] hover:bg-[#32323D] border border-white/[0.12] rounded-lg transition-colors cursor-pointer shadow-xs"
+                className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(99,102,241,0.4)]"
               >
-                <Plus className="w-3.5 h-3.5 text-zinc-300" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>New Note</span>
               </button>
             </div>

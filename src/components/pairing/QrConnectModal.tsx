@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  Link2,
 } from "lucide-react";
 import { Button } from "../common/Button";
 import { generateQrMatrix, generateQrPath } from "../../utils/qrCode";
@@ -179,6 +180,58 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
       setTimeout(() => setPairSuccess(null), 3500);
     } else {
       setPairError(res.error || "Pairing failed. Check the PIN and try again.");
+    }
+  };
+
+  // Manual direct IP pairing state
+  const [manualHostInput, setManualHostInput] = useState<string>(() => {
+    return localStorage.getItem("omnivault_manual_desktop_host") || "";
+  });
+  const [manualPinInput, setManualPinInput] = useState<string>("");
+  const [isManualPairing, setIsManualPairing] = useState(false);
+
+  const handleManualPair = async () => {
+    let clean = manualHostInput.trim();
+    const pin = manualPinInput.trim();
+    if (!clean) {
+      setPairError("Please enter your Desktop IP address (e.g. 192.168.1.5:42420)");
+      return;
+    }
+    if (!pin) {
+      setPairError("Please enter the 6-digit PIN shown on the desktop screen");
+      return;
+    }
+
+    // Strip http:// or https:// if user pasted a full URL
+    clean = clean.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+    let ip = clean;
+    let port = 42420;
+    if (clean.includes(":")) {
+      const parts = clean.split(":");
+      ip = parts[0];
+      const parsedPort = parseInt(parts[1], 10);
+      if (!isNaN(parsedPort) && parsedPort > 0) {
+        port = parsedPort;
+      }
+    }
+
+    setIsManualPairing(true);
+    setPairError(null);
+    setPairSuccess(null);
+
+    const res = await StorageService.pairWithPeer(ip, port, pin);
+    setIsManualPairing(false);
+
+    if (res.success) {
+      localStorage.setItem("omnivault_manual_desktop_host", clean);
+      setPairSuccess(`Connected & paired with desktop at ${ip}:${port}!`);
+      setManualPinInput("");
+      await StorageService.triggerMeshSync();
+      await fetchMeshStatus();
+      onSyncTriggered?.();
+      setTimeout(() => setPairSuccess(null), 3500);
+    } else {
+      setPairError(res.error || `Could not connect to ${ip}:${port}. Check IP/PIN and make sure Desktop app is running.`);
     }
   };
 
@@ -433,6 +486,77 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Direct IP & PIN Connection Card */}
+              <div className="p-4 bg-white/[0.03] hover:bg-white/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                      <Link2 className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-vault-primary">
+                      Direct Desktop Connection
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-vault-muted font-medium">
+                    Manual IP Fallback
+                  </span>
+                </div>
+                <p className="text-[11px] text-vault-secondary leading-relaxed">
+                  If your router isolates devices or auto-discovery is delayed, connect directly by entering your Desktop's IP and 6-digit PIN.
+                </p>
+                <div className="space-y-2.5 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-medium text-vault-muted block mb-1">
+                        Desktop IP & Port
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 192.168.1.10:42420"
+                        value={manualHostInput}
+                        onChange={(e) => setManualHostInput(e.target.value)}
+                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-indigo-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-medium text-vault-muted block mb-1">
+                        6-Digit Desktop PIN
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="e.g. 749 201"
+                        value={manualPinInput}
+                        onChange={(e) => setManualPinInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleManualPair();
+                        }}
+                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-indigo-500/50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleManualPair}
+                      disabled={isManualPairing || !manualHostInput.trim() || !manualPinInput.trim()}
+                      className="h-8 px-4 text-xs font-semibold rounded-lg gap-1.5"
+                    >
+                      {isManualPairing ? (
+                        "Linking to Desktop..."
+                      ) : (
+                        <>
+                          <span>Connect to Desktop</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {/* Local Device's Authorization PIN Card */}

@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import {
   Inbox,
+  Laptop,
   PanelLeftClose,
   Plus,
   QrCode,
   ShieldCheck,
+  Tablet,
   X,
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
@@ -60,22 +62,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        "flex flex-col bg-[#111114] border-r border-white/[0.07] h-full transition-all duration-200 select-none",
+        "flex flex-col bg-vault-sidebar border-r border-white/[0.08] h-full transition-all duration-200 select-none",
         isMobile
           ? "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl"
           : "w-56 shrink-0"
       )}
     >
-      {/* Brand & App Header (BridgeMind 38px style) */}
-      <div className="h-9.5 px-2.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#131317]">
+      {/* Brand & App Header */}
+      <div className="h-9.5 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-vault-sidebar/90">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-xs">
             <ShieldCheck className="w-3.5 h-3.5" />
           </div>
-          <span className="font-semibold text-xs tracking-tight text-zinc-200">
+          <span className="font-semibold text-xs tracking-tight text-zinc-100">
             OmniVault
           </span>
-          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-500 border border-white/[0.06]">
+          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
             v0.1
           </span>
         </div>
@@ -190,33 +192,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* User / Node Profile & Mesh Status (BridgeMind bottom profile dock) */}
-      <div className="h-9.5 px-2.5 border-t border-white/[0.06] bg-[#121215] shrink-0 flex items-center justify-between text-xs select-none">
+      {/* Node Profile & Mesh Status Dock */}
+      <div className="h-11 px-3 border-t border-white/[0.06] bg-vault-sidebar shrink-0 flex items-center justify-between text-xs select-none">
         <div
           onClick={onOpenPairing}
-          className={cn("flex items-center gap-2 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
-          title={onOpenPairing ? "View Discovered Mesh Peers" : undefined}
+          className={cn("flex items-center gap-2.5 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
+          title={onOpenPairing ? "Manage Device Pairing & Mesh Sync" : undefined}
         >
-          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 border border-white/10 flex items-center justify-center font-bold text-[10px] text-white shrink-0 shadow-xs">
-            O
+          <div className="w-6.5 h-6.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0 shadow-xs">
+            {isMobile ? <Tablet className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
           </div>
           <div className="truncate min-w-0">
-            <span className="text-zinc-200 text-xs font-semibold block truncate leading-tight">
-              Local Vault
+            <span className="text-zinc-200 text-xs font-medium block truncate leading-tight">
+              {isMobile ? "Tablet Node" : "Desktop Vault"}
             </span>
-            <div className="flex items-center gap-1 mt-0.5">
+            <div className="flex items-center gap-1.5 mt-0.5">
               <span
                 className={cn(
                   "w-1.5 h-1.5 rounded-full shrink-0",
-                  meshState.status === "standby" || meshState.status === "synced"
+                  meshState.peerCount > 0
                     ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"
-                    : meshState.status === "error"
-                    ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.7)]"
-                    : "bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.7)]"
+                    : "bg-zinc-500"
                 )}
               />
-              <span className="text-[10px] font-mono text-zinc-500 truncate">
-                {meshState.peerCount > 0 ? `${meshState.peerCount} peers` : "local"}
+              <span className="text-[10px] text-zinc-400 truncate">
+                {meshState.peerCount > 0 ? `${meshState.peerCount} connected` : "Standalone"}
               </span>
             </div>
           </div>
@@ -227,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onCycleZoom}
-              title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle, or Ctrl - / +)`}
+              title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle)`}
               className="px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[9px] font-mono text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
             >
               {Math.round(zoomScale * 100)}%
@@ -238,8 +238,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onOpenPairing}
-              title="Connect Mobile (QR Code)"
-              className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+              title="Pairing & Network Settings"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
             >
               <QrCode className="w-3.5 h-3.5" />
             </button>
