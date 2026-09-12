@@ -25,3 +25,8 @@ media_storage/
 Thumbs.db
 *.log
 
+# Android signing credentials — never commit these
+*.keystore
+*.jks
+keystore.properties
+

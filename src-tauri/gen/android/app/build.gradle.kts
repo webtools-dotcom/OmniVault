@@ -26,12 +26,37 @@ android {
     }
     signingConfigs {
         create("release") {
-            val ks = file("../omnivault-release.keystore")
-            if (ks.exists()) {
-                storeFile = ks
-                storePassword = "omnivault-release"
-                keyAlias = "omnivault"
-                keyPassword = "omnivault-release"
+            // Signing credentials are read from keystore.properties, which is
+            // gitignored. See keystore.properties.example for the required keys.
+            // When the file is absent (debug builds, fresh clones, CI without
+            // secrets) this block is left unconfigured and the release build is
+            // simply unsigned rather than failing.
+            val props = Properties().apply {
+                val propFile = rootProject.file("keystore.properties")
+                if (propFile.exists()) {
+                    propFile.inputStream().use { load(it) }
+                }
+            }
+            val storePath = props.getProperty("storeFile")
+            if (storePath != null) {
+                val ks = file(storePath)
+                if (ks.exists()) {
+                    storeFile = ks
+                    storePassword = props.getProperty("storePassword")
+                    keyAlias = props.getProperty("keyAlias")
+                    keyPassword = props.getProperty("keyPassword")
+                } else {
+                    // Say so instead of silently emitting an unsigned APK. A
+                    // Unix-style path (/d/keys/...) instead of a Windows one
+                    // (D:/keys/...) resolves to nothing here, and the failure
+                    // would otherwise only surface as "app not installed" on
+                    // the device.
+                    logger.warn(
+                        "WARNING: keystore.properties sets storeFile=$storePath " +
+                        "but no file exists there. The release build will be UNSIGNED. " +
+                        "Use an absolute path, e.g. D:/keys/omnivault-release.keystore"
+                    )
+                }
             }
         }
     }
