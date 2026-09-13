@@ -27,6 +27,15 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// The desktop webview's own origins. Matched exactly: a suffix test would also
+/// accept `http://evil.tauri.localhost`, which a caller can obtain simply by
+/// sending a matching Host header.
+const TAURI_ORIGINS: [&str; 3] = [
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+    "tauri://localhost",
+];
+
 /// Decides which origin, if any, may read this response.
 ///
 /// Same-origin callers are matched against the request's own `Host` header so
@@ -39,11 +48,6 @@ fn allowed_cors_origin(origin: Option<&str>, host: Option<&str>) -> Option<Strin
         return None;
     }
 
-    const TAURI_ORIGINS: [&str; 3] = [
-        "http://tauri.localhost",
-        "https://tauri.localhost",
-        "tauri://localhost",
-    ];
     if TAURI_ORIGINS.contains(&origin) {
         return Some(origin.to_string());
     }
@@ -58,6 +62,41 @@ fn allowed_cors_origin(origin: Option<&str>, host: Option<&str>) -> Option<Strin
     }
 
     None
+}
+
+/// Routes reachable without a token. `/api/pair` is the handshake that issues
+/// tokens, so requiring one would make pairing impossible; the other two return
+/// nothing the caller does not already know.
+const PUBLIC_API_ROUTES: [&str; 3] = ["/api/health", "/api/lan-info", "/api/pair"];
+
+/// Pulls the caller's device id and token from either the `x-device-id` /
+/// `x-auth-token` headers or the `device_id` / `auth_token` query parameters.
+///
+/// The query-string form exists because media URLs are consumed by `<img src>`,
+/// which cannot set headers. It is accepted for every route rather than only
+/// media so that one rule covers all callers.
+fn extract_caller_credentials(
+    headers: &HashMap<String, String>,
+    query: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    let mut device_id = headers.get("x-device-id").cloned();
+    let mut token = headers.get("x-auth-token").cloned();
+
+    if let Some(q) = query {
+        for pair in q.split('&') {
+            match pair.split_once('=') {
+                Some(("device_id", v)) if device_id.is_none() && !v.is_empty() => {
+                    device_id = Some(v.to_string());
+                }
+                Some(("auth_token", v)) if token.is_none() && !v.is_empty() => {
+                    token = Some(v.to_string());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    (device_id, token)
 }
 
 /// Returns the preferred local non-loopback IPv4 address on the active LAN/Wi-Fi interface.
@@ -535,6 +574,48 @@ fn handle_connection(
         *slot.borrow_mut() = cors_origin.clone();
     });
 
+    // Authorize API access. Static assets stay public so a tablet can load the
+    // page in order to pair; only vault data is gated.
+    if path.starts_with("/api/") && !PUBLIC_API_ROUTES.contains(&path) {
+        // The desktop app's own webview talks to 127.0.0.1 and has no pairing
+        // token for itself. A browser cannot forge Origin, so a hostile page
+        // cannot use this path; a local native process could, but it can already
+        // read the SQLite file directly, so nothing is lost by allowing it.
+        let is_desktop_self = stream
+            .peer_addr()
+            .map(|a| a.ip().is_loopback())
+            .unwrap_or(false)
+            && cors_origin
+                .as_deref()
+                .map(|o| TAURI_ORIGINS.contains(&o))
+                .unwrap_or(false);
+
+        if !is_desktop_self {
+            let (caller_id, caller_token) = extract_caller_credentials(&headers, query);
+            // Absent credentials are a rejection, never a skipped check.
+            let authorized = match (caller_id.as_deref(), caller_token.as_deref()) {
+                (Some(id), Some(tok)) => {
+                    let conn = db.lock().unwrap();
+                    crate::sync::pairing::validate_peer_auth_token(&conn, id, tok).unwrap_or(false)
+                }
+                _ => false,
+            };
+
+            if !authorized {
+                let err = serde_json::json!({ "error": "Unauthorized: pair this device first" });
+                send_response(
+                    &mut stream,
+                    401,
+                    "Unauthorized",
+                    "application/json",
+                    &err.to_string().into_bytes(),
+                    &[],
+                )?;
+                return Ok(());
+            }
+        }
+    }
+
     // Enforce Content-Length bounds: max 50MB for media upload, max 2MB for standard endpoints
     let max_allowed_body = if path == "/api/media/upload" || path == "/api/media" {
         50 * 1024 * 1024 // 50 MB
@@ -953,28 +1034,8 @@ fn handle_connection(
             None
         }).or_else(|| headers.get("x-device-id").cloned());
 
-        let auth_token = query.and_then(|q| {
-            for pair in q.split('&') {
-                if let Some((k, v)) = pair.split_once('=') {
-                    if k == "auth_token" {
-                        return Some(v.to_string());
-                    }
-                }
-            }
-            None
-        }).or_else(|| headers.get("x-auth-token").cloned());
-
-        let conn = db.lock().unwrap();
-
-        // If credentials provided, validate authorization
-        if let (Some(ref dev_id), Some(ref token)) = (&caller_device_id, &auth_token) {
-            let is_valid = crate::sync::pairing::validate_peer_auth_token(&conn, dev_id, token).unwrap_or(false);
-            if !is_valid {
-                let err_json = serde_json::json!({ "error": "Unauthorized peer or invalid auth token" });
-                send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                return Ok(());
-            }
-        }
+        // Authorization already happened in the central gate above.
+let conn = db.lock().unwrap();
 
         let revisions = crate::sync::protocol::query_revisions_since(&conn, since, caller_device_id.as_deref()).unwrap_or_default();
         let latest_ts = revisions.last().map(|r| r.timestamp).unwrap_or(since);
@@ -995,6 +1056,7 @@ fn handle_connection(
         #[derive(Deserialize)]
         struct DeltaApplyRequest {
             device_id: String,
+            #[allow(dead_code)]
             auth_token: Option<String>,
             revisions: Vec<crate::db::models::Revision>,
         }
@@ -1009,15 +1071,6 @@ fn handle_connection(
         };
 
         let mut conn = db.lock().unwrap();
-
-        if let Some(ref token) = req.auth_token {
-            let is_valid = crate::sync::pairing::validate_peer_auth_token(&conn, &req.device_id, token).unwrap_or(false);
-            if !is_valid {
-                let err_json = serde_json::json!({ "error": "Unauthorized peer or invalid auth token" });
-                send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
-                return Ok(());
-            }
-        }
 
         let applied = crate::sync::protocol::apply_remote_revisions(&mut conn, &req.revisions).unwrap_or(0);
         let _ = crate::sync::pairing::update_peer_last_sync(&conn, &req.device_id);
@@ -1539,7 +1592,7 @@ mod tests {
         let folder_payload = br##"{"name":"Mobile Research","parent_id":null,"color":"#58A6FF"}"##;
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         let req = format!(
-            "POST /api/folders HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "POST /api/folders HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             folder_payload.len(),
             std::str::from_utf8(folder_payload).unwrap()
         );
@@ -1553,7 +1606,7 @@ mod tests {
         let item_payload = br#"{"title":"Quick phone idea","content":"NVDA setup at 140","item_type":"ticker","folder_id":null}"#;
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         let req = format!(
-            "POST /api/items HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "POST /api/items HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             item_payload.len(),
             std::str::from_utf8(item_payload).unwrap()
         );
@@ -1566,7 +1619,7 @@ mod tests {
         // 5. Test GET /api/items/inbox
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         stream
-            .write_all(b"GET /api/items/inbox HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .write_all(b"GET /api/items/inbox HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nConnection: close\r\n\r\n")
             .unwrap();
         let mut resp = String::new();
         stream.read_to_string(&mut resp).unwrap();
@@ -1596,7 +1649,7 @@ mod tests {
         );
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         let req = format!(
-            "POST /api/media/upload HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "POST /api/media/upload HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             upload_payload.len(),
             upload_payload
         );
@@ -1624,7 +1677,7 @@ mod tests {
         // 11. Test Invalid JSON POST returning 400 Bad Request
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         stream
-            .write_all(b"POST /api/folders HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 13\r\nConnection: close\r\n\r\n{invalid_json}")
+            .write_all(b"POST /api/folders HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nContent-Type: application/json\r\nContent-Length: 13\r\nConnection: close\r\n\r\n{invalid_json}")
             .unwrap();
         let mut resp = String::new();
         stream.read_to_string(&mut resp).unwrap();
@@ -1634,12 +1687,37 @@ mod tests {
         // 12. Test Unknown API Route returning 404 Not Found
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         stream
-            .write_all(b"GET /api/nonexistent-route HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .write_all(b"GET /api/nonexistent-route HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nConnection: close\r\n\r\n")
             .unwrap();
         let mut resp = String::new();
         stream.read_to_string(&mut resp).unwrap();
         assert!(resp.contains("404 Not Found"), "Unknown API route must return 404 Not Found");
         assert!(!resp.contains("<!DOCTYPE"), "Unknown API route must never fall through to HTML");
+
+        // 13. Test Unpaired Caller without Origin is Rejected with 401 Unauthorized
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /api/folders HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("401 Unauthorized"), "Unauthenticated call without origin must return 401 Unauthorized");
+
+        // 14. A lookalike origin must not reach the desktop-self exemption.
+        // That exemption trusts a Tauri Origin arriving on loopback. Matching it
+        // by suffix would admit any caller that sends Host: evil.tauri.localhost
+        // with an Origin to match, because same-origin requests are approved
+        // against the request's own Host.
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /api/folders HTTP/1.1\r\nHost: evil.tauri.localhost\r\nOrigin: http://evil.tauri.localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            resp.contains("401 Unauthorized"),
+            "A lookalike *.tauri.localhost origin must not be treated as the desktop app"
+        );
 
         // Clean shutdown
         let _ = handle.stop_sender.send(());

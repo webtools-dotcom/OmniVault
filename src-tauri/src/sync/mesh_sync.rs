@@ -262,7 +262,14 @@ pub fn sync_with_peer(
     for hash in missing_hashes {
         let local_path = media_dir.join(format!("{}.webp", hash));
         let media_path = format!("/api/media/{}.webp", hash);
-        match send_http_request(peer_addr, "GET", &media_path, &[], None, Duration::from_secs(10)) {
+        match send_http_request(
+            peer_addr,
+            "GET",
+            &media_path,
+            &[("x-auth-token", auth_token.as_str()), ("x-device-id", self_device_id)],
+            None,
+            Duration::from_secs(10),
+        ) {
             Ok(media_resp) if media_resp.status == 200 && !media_resp.body.is_empty() => {
                 let mut hasher = Sha256::new();
                 hasher.update(&media_resp.body);
@@ -311,7 +318,11 @@ pub fn sync_with_peer(
                 peer_addr,
                 "POST",
                 "/api/sync/deltas",
-                &[("Content-Type", "application/json")],
+                &[
+                    ("Content-Type", "application/json"),
+                    ("x-auth-token", auth_token.as_str()),
+                    ("x-device-id", self_device_id),
+                ],
                 Some(&body_bytes),
                 timeout,
             );

@@ -26,6 +26,19 @@ const STORAGE_KEY_PAIRED = "omnivault_paired";
 const STORAGE_KEY_AUTH_TOKEN = "omnivault_auth_token";
 const STORAGE_KEY_PEER_ID = "omnivault_peer_id";
 
+function authHeaders(): Record<string, string> {
+  try {
+    const token = localStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
+    const deviceId = localStorage.getItem(STORAGE_KEY_PEER_ID);
+    if (token && deviceId) {
+      return { "X-Auth-Token": token, "X-Device-Id": deviceId };
+    }
+  } catch {
+    // localStorage unavailable; fall through unauthenticated
+  }
+  return {};
+}
+
 let cachedServerPort: number = 42420;
 
 // Helper to check if Tauri runtime is present
@@ -95,6 +108,16 @@ export function resolveMediaUrl(url: string | null | undefined): string {
   if (isTauriEnvironment()) {
     return `http://127.0.0.1:${cachedServerPort}${clean}`;
   }
+  try {
+    const token = localStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
+    const deviceId = localStorage.getItem(STORAGE_KEY_PEER_ID);
+    if (token && deviceId) {
+      const sep = clean.includes("?") ? "&" : "?";
+      return `${clean}${sep}device_id=${encodeURIComponent(deviceId)}&auth_token=${encodeURIComponent(token)}`;
+    }
+  } catch {
+    // fall through to the bare URL
+  }
   return clean;
 }
 
@@ -106,7 +129,10 @@ function canUseHttpApi(): boolean {
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | null> {
   if (!canUseHttpApi()) return null;
   try {
-    const res = await fetch(path, options);
+    const res = await fetch(path, {
+      ...options,
+      headers: { ...authHeaders(), ...(options?.headers || {}) },
+    });
     if (!res.ok) {
       console.warn(`HTTP ${res.status} from ${path}`);
       return null;
@@ -557,7 +583,7 @@ export const StorageService = {
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(payload),
       });
 
