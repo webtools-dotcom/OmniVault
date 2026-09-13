@@ -14,6 +14,52 @@ use crate::db::media;
 use crate::db::models::VaultItem;
 use crate::db::storage;
 
+thread_local! {
+    /// CORS origin permitted for the request currently being handled on this
+    /// thread, or None when the caller's Origin is not recognised.
+    ///
+    /// This is a thread-local rather than a parameter because `send_response`
+    /// has 60 call sites; threading an argument through all of them would make
+    /// the security change impossible to review. It is sound here because
+    /// `run_server_loop` spawns exactly one thread per connection and
+    /// `handle_connection` sets this once, before any response is written.
+    static CORS_ALLOW_ORIGIN: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Decides which origin, if any, may read this response.
+///
+/// Same-origin callers are matched against the request's own `Host` header so
+/// the tablet browser works on any LAN address without hardcoding one. The
+/// Tauri origins are the desktop app's webview, which uploads media
+/// cross-origin to 127.0.0.1 and would otherwise fail its CORS preflight.
+fn allowed_cors_origin(origin: Option<&str>, host: Option<&str>) -> Option<String> {
+    let origin = origin?.trim();
+    if origin.is_empty() {
+        return None;
+    }
+
+    const TAURI_ORIGINS: [&str; 3] = [
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "tauri://localhost",
+    ];
+    if TAURI_ORIGINS.contains(&origin) {
+        return Some(origin.to_string());
+    }
+
+    if let Some(host) = host {
+        let host = host.trim();
+        if !host.is_empty()
+            && (origin == format!("http://{}", host) || origin == format!("https://{}", host))
+        {
+            return Some(origin.to_string());
+        }
+    }
+
+    None
+}
+
 /// Returns the preferred local non-loopback IPv4 address on the active LAN/Wi-Fi interface.
 pub fn get_local_lan_ip() -> String {
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
@@ -480,6 +526,15 @@ fn handle_connection(
         }
     }
 
+    // Decide CORS before any response can be written on this thread.
+    let cors_origin = allowed_cors_origin(
+        headers.get("origin").map(|s| s.as_str()),
+        headers.get("host").map(|s| s.as_str()),
+    );
+    CORS_ALLOW_ORIGIN.with(|slot| {
+        *slot.borrow_mut() = cors_origin.clone();
+    });
+
     // Enforce Content-Length bounds: max 50MB for media upload, max 2MB for standard endpoints
     let max_allowed_body = if path == "/api/media/upload" || path == "/api/media" {
         50 * 1024 * 1024 // 50 MB
@@ -508,6 +563,10 @@ fn handle_connection(
 
     // Preflight CORS OPTIONS
     if method == "OPTIONS" {
+        if cors_origin.is_none() {
+            send_response(&mut stream, 403, "Forbidden", "text/plain", b"", &[])?;
+            return Ok(());
+        }
         send_response(
             &mut stream,
             204,
@@ -1354,18 +1413,28 @@ fn send_response(
     body: &[u8],
     extra_headers: &[(&str, &str)],
 ) -> std::io::Result<()> {
+    let cors_headers = CORS_ALLOW_ORIGIN.with(|slot| match slot.borrow().as_deref() {
+        Some(origin) => format!(
+            "Access-Control-Allow-Origin: {}\r\n\
+             Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\
+             Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token\r\n\
+             Vary: Origin\r\n",
+            origin
+        ),
+        None => "Vary: Origin\r\n".to_string(),
+    });
+
     let mut header_str = format!(
         "HTTP/1.1 {} {}\r\n\
          Content-Type: {}\r\n\
          Content-Length: {}\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\
-         Access-Control-Allow-Headers: Content-Type, Authorization\r\n\
+         {}\
          Connection: close\r\n",
         status_code,
         status_text,
         content_type,
-        body.len()
+        body.len(),
+        cors_headers
     );
 
     for (k, v) in extra_headers {
@@ -1386,6 +1455,42 @@ mod tests {
     use crate::db::schema;
     use std::io::{Read, Write};
     use std::net::TcpStream;
+
+    /// A response is readable cross-origin only if the browser is told so.
+    /// Returning `*` here let any page the user visited read the vault through
+    /// 127.0.0.1, so these cases are a security boundary, not a formality.
+    #[test]
+    fn cors_grants_only_same_origin_and_the_tauri_webview() {
+        let host = Some("192.168.31.187:42420");
+
+        // The real browser attack shape: the browser sets Host to the target it
+        // is calling and Origin to the page making the call, so a hostile page
+        // always presents a foreign Origin against a legitimate Host.
+        assert_eq!(allowed_cors_origin(Some("http://evil.example"), host), None);
+        assert_eq!(allowed_cors_origin(Some("null"), host), None);
+        assert_eq!(allowed_cors_origin(Some(""), host), None);
+        assert_eq!(allowed_cors_origin(None, host), None);
+
+        // A prefix match must not be enough, or evil.com.attacker.net passes.
+        assert_eq!(
+            allowed_cors_origin(Some("http://192.168.31.187:42420.evil.example"), host),
+            None
+        );
+
+        // The tablet browser, served from this server on any LAN address.
+        assert_eq!(
+            allowed_cors_origin(Some("http://192.168.31.187:42420"), host),
+            Some("http://192.168.31.187:42420".to_string())
+        );
+
+        // The desktop webview, which uploads media cross-origin to 127.0.0.1.
+        for origin in ["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"] {
+            assert_eq!(
+                allowed_cors_origin(Some(origin), Some("127.0.0.1:42420")),
+                Some(origin.to_string())
+            );
+        }
+    }
 
     fn setup_test_db() -> (Arc<Mutex<Connection>>, String) {
         let conn = Connection::open_in_memory().unwrap();
