@@ -241,12 +241,27 @@ When OmniVault runs, its embedded Rust HTTP server exposes lightweight JSON endp
 
 ---
 
-## 🔒 Security & Privacy Guarantees
+## 🔒 Security & Privacy
 
-- **Zero Cloud Intermediaries:** Your data never touches any third-party server.
-- **LAN-Only Scope:** The embedded HTTP server and sync listener bind only to local network interfaces.
-- **PIN Authorization:** New mobile or desktop peers must authenticate with a one-time 6-digit PIN before syncing deltas.
-- **SHA-256 Integrity Verification:** Every media blob transfer is validated against content hashes to prevent corrupted or tampered payloads.
+### What OmniVault does
+
+- **Zero cloud intermediaries.** Your data never touches a third-party server. There are no accounts, no telemetry, and no analytics.
+- **Pairing is required.** Every `/api/*` route rejects callers that do not present a token issued by the 6-digit PIN handshake. The only exceptions are the health check, the LAN-info probe, and the pairing endpoint itself.
+- **The PIN never crosses the network.** It is displayed only in the desktop app's own window and must be read off that screen, so possession of it is evidence of physical presence at the machine.
+- **Same-origin browser access.** Responses carry no cross-origin grant unless the caller is the app itself, so a web page you happen to visit cannot read the vault through `localhost`.
+- **SHA-256 integrity on media.** Every blob is verified against its content hash before it is written to disk; a corrupted or tampered transfer is discarded.
+
+### Threat model — read this before using it on a network you do not trust
+
+OmniVault is built for a **trusted home network**. It is explicitly not hardened for public or shared Wi-Fi, and the following are known, deliberate limitations rather than oversights:
+
+- **Traffic is not encrypted in transit.** Sync runs as plain HTTP/1.1 over TCP on the local network. There is no TLS. Anyone able to observe traffic on your LAN — a compromised router, a hostile device on the same café or hotel Wi-Fi — can read your notes and images as they sync. Do not pair devices over a network you do not control.
+- **The server binds all interfaces.** It listens on `0.0.0.0:42420`, not only loopback. On a machine with a public IP and no firewall, that port is reachable from outside your LAN.
+- **Media URLs carry the token in the query string.** Images are loaded by `<img src>`, which cannot send headers, so the credential travels in the URL and will appear in any HTTP log or proxy along the path.
+- **The pairing PIN is weakly generated and unthrottled.** It derives from a timestamp rather than a cryptographic random source, and `POST /api/pair` applies no rate limit, so a determined attacker with LAN access during the 120-second window has a brute-force path.
+- **Anything running on your computer is trusted.** Requests from loopback that carry the desktop app's own origin skip authentication. A malicious local program could use this — though it could equally read the SQLite file directly, so nothing additional is exposed.
+
+If you want it reachable beyond your own LAN, put it behind a VPN or an SSH tunnel. Do not port-forward it.
 
 ---
 
