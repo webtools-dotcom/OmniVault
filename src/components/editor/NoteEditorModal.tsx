@@ -44,7 +44,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [folderId, setFolderId] = useState<string | null>(initialFolderId);
   const [itemType, setItemType] = useState<ItemType>("note");
   const [viewMode, setViewMode] = useState<EditorViewMode>("split");
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isPinned, setIsPinned] = useState(false);
 
   const [currentId, setCurrentId] = useState<string | null>(item?.id || null);
@@ -75,6 +75,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
   }, [isOpen, item, initialFolderId]);
 
+  // `onSave` is recreated on every App render, so depending on it directly made
+  // each completed save schedule the next one: the editor re-saved roughly
+  // every 600ms for as long as it stayed open, writing a revision each time and
+  // never letting the status badge settle. Hold the latest callback in a ref so
+  // the effect re-runs only when the note itself changes.
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
   // Debounced auto-save effect
   useEffect(() => {
     if (!isOpen) return;
@@ -93,7 +103,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
         const finalTitle = title.trim() || "Untitled Note";
-        const saved = await onSave(
+        const saved = await onSaveRef.current(
           currentId,
           finalTitle,
           content,
@@ -106,6 +116,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         setSaveStatus("saved");
       } catch (err) {
         console.error("Auto-save failed:", err);
+        setSaveStatus("error");
       }
     }, 600);
 
@@ -114,7 +125,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         window.clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, content, folderId, itemType, isOpen, currentId, onSave]);
+  }, [title, content, folderId, itemType, isOpen, currentId]);
 
   const detectedTickers = useMemo(() => extractTickers(`${title} ${content}`), [title, content]);
   const detectedLinks = useMemo(() => extractLinks(content), [content]);
@@ -147,6 +158,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
   const activeFolders = folders.filter((f) => !f.is_deleted);
+
+  const handleRequestClose = () => {
+    if (saveStatus === "error") {
+      const discard = window.confirm(
+        "This note has not been saved to the vault. Close anyway and lose the unsaved changes?"
+      );
+      if (!discard) return;
+    }
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md select-none">
@@ -239,6 +260,14 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span>Saving</span>
               </span>
+            ) : saveStatus === "error" ? (
+              <span
+                title="This note has not reached the vault. Keep this window open and check your connection — typing again retries."
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <span>Not saved</span>
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Check className="w-3 h-3" />
@@ -249,7 +278,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
           {/* Close button */}
           <button
-            onClick={onClose}
+            onClick={handleRequestClose}
             className="w-8 h-8 flex items-center justify-center text-vault-muted hover:text-vault-primary hover:bg-vault-elevated rounded-lg transition-colors shrink-0 cursor-pointer"
             aria-label="Close editor"
           >
@@ -363,7 +392,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             <Button
               variant="primary"
               size="sm"
-              onClick={onClose}
+              onClick={handleRequestClose}
               className="font-medium"
             >
               Done

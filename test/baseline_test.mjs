@@ -229,3 +229,27 @@ const indexCss = fs.readFileSync(path.resolve(process.cwd(), "src/index.css"), "
 assert.ok(indexCss.includes("--ui-scale"), "index.css must scale the root font-size via --ui-scale");
 
 console.log("✅ Tailwind utility compilation and UI-density scaling regression guards passed!");
+
+// 11. Regression guard: the editor's autosave effect must not depend on `onSave`.
+// `App.handleSaveEditorItem` is a plain const, so it gets a new identity on every
+// App render. With `onSave` in the dependency array, each completed save
+// re-triggered the effect, which re-armed the 600ms debounce — the editor
+// re-saved ~1.5x/second for as long as it stayed open, wrote a revision row every
+// time (D-012), and the status badge could never settle on "Saved". The callback
+// is held in a ref instead; see D-055.
+const editorSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/components/editor/NoteEditorModal.tsx"),
+  "utf-8"
+);
+const autosaveDeps = editorSource.match(/\},\s*\[title,\s*content[^\]]*\]\s*\);/);
+assert.ok(autosaveDeps, "Could not locate the autosave effect's dependency array in NoteEditorModal.tsx");
+assert.ok(
+  !/\bonSave\b/.test(autosaveDeps[0]),
+  `The autosave effect must not depend on onSave — it is recreated every App render, which makes each save schedule the next one. Found: ${autosaveDeps[0]}`
+);
+assert.ok(
+  editorSource.includes("onSaveRef.current("),
+  "The autosave effect must call onSave through a ref so it always uses the latest callback without re-running"
+);
+
+console.log("✅ Editor autosave-loop regression guard passed!");

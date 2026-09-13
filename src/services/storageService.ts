@@ -144,6 +144,31 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
   }
 }
 
+/**
+ * Thrown when the server rejected or could not receive a write and this client
+ * is paired, meaning the desktop vault — not this browser — is the source of
+ * truth. Falling back to localStorage here would look like success while the
+ * note silently failed to leave the device.
+ */
+export class VaultWriteError extends Error {
+  constructor(operation: string) {
+    super(`Could not save to the vault (${operation}). Your device may have lost the connection.`);
+    this.name = "VaultWriteError";
+  }
+}
+
+/** Fails a paired write rather than letting it degrade into a local-only copy. */
+function assertServerWrite<T>(result: T | null, operation: string): T {
+  if (result === null || result === undefined) {
+    if (StorageService.isPaired()) {
+      throw new VaultWriteError(operation);
+    }
+    // Unpaired "Browse Local" session: local-only is the intended mode (D-021).
+    return null as unknown as T;
+  }
+  return result;
+}
+
 // Local storage fallback helpers
 function getLocalFolders(): Folder[] {
   try {
@@ -724,17 +749,20 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItem = await apiFetch<VaultItem>("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          folder_id: folderId,
-          item_type: itemType,
-          title: title.trim(),
-          content: content.trim(),
-          metadata,
+      const serverItem = assertServerWrite(
+        await apiFetch<VaultItem>("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            folder_id: folderId,
+            item_type: itemType,
+            title: title.trim(),
+            content: content.trim(),
+            metadata,
+          }),
         }),
-      });
+        "create note"
+      );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().filter((i) => i.id !== serverItem.id);
         items.unshift(serverItem);
@@ -782,16 +810,19 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItem = await apiFetch<VaultItem>("/api/items/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: itemId,
-          title: title.trim(),
-          content: content.trim(),
-          metadata,
+      const serverItem = assertServerWrite(
+        await apiFetch<VaultItem>("/api/items/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: itemId,
+            title: title.trim(),
+            content: content.trim(),
+            metadata,
+          }),
         }),
-      });
+        "update note"
+      );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
         saveLocalItems(items);
@@ -822,14 +853,17 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItem = await apiFetch<VaultItem>("/api/items/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: itemId,
-          folder_id: newFolderId,
+      const serverItem = assertServerWrite(
+        await apiFetch<VaultItem>("/api/items/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: itemId,
+            folder_id: newFolderId,
+          }),
         }),
-      });
+        "move note"
+      );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
         saveLocalItems(items);
