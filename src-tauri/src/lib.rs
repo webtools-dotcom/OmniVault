@@ -479,6 +479,23 @@ fn get_pairing_session_cmd(state: State<AppState>) -> Result<http_server::Active
     Ok(session)
 }
 
+/// Whether this device currently serves the browser client.
+#[tauri::command]
+fn get_browser_access_cmd() -> bool {
+    http_server::browser_access_enabled()
+}
+
+/// Turns browser access on or off and remembers the choice for next launch.
+/// The sync API is unaffected either way — see D-059.
+#[tauri::command]
+fn set_browser_access_cmd(state: State<AppState>, enabled: bool) -> Result<bool, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    storage::set_meta(&conn, "browser_access", if enabled { "1" } else { "0" })
+        .map_err(|e| e.to_string())?;
+    http_server::set_browser_access(enabled);
+    Ok(enabled)
+}
+
 pub fn resolve_app_base_dir() -> std::path::PathBuf {
     #[cfg(target_os = "android")]
     {
@@ -579,6 +596,9 @@ pub fn run() {
             eprintln!("[db] WAL checkpoint after VACUUM failed: {e}");
         }
     }
+
+    // Restore the persisted browser-access choice before the server starts.
+    http_server::set_browser_access(storage::get_meta(&conn, "browser_access", "0") == "1");
 
     let db = Arc::new(Mutex::new(conn));
 
@@ -703,6 +723,8 @@ pub fn run() {
             open_file_in_folder_cmd,
             check_and_process_pending_shares_cmd,
             get_pairing_session_cmd,
+            get_browser_access_cmd,
+            set_browser_access_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

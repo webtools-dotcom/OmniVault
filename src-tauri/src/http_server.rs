@@ -27,6 +27,23 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// Whether this device serves the browser client (the SPA and its assets).
+///
+/// The sync API always listens, because mesh sync reaches a peer on this very
+/// port — turning the listener off entirely would disable the product's core
+/// feature rather than harden it. What is optional is serving a *browser* a UI,
+/// which is the surface that makes a hand-written HTTP parser face unknown
+/// clients. Off by default; see D-059.
+static BROWSER_ACCESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_browser_access(enabled: bool) {
+    BROWSER_ACCESS.store(enabled, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn browser_access_enabled() -> bool {
+    BROWSER_ACCESS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Failed pairing attempts per source address, as (count, window_start_ms).
 static PAIR_ATTEMPTS: std::sync::OnceLock<Mutex<HashMap<std::net::IpAddr, (u32, i64)>>> =
     std::sync::OnceLock::new();
@@ -1453,6 +1470,21 @@ let conn = lock_recover(&db);
 
     // Static Assets & SPA Fallback Serving
     if let Some(dist) = dist_dir {
+        if !browser_access_enabled() {
+            // Everything above this point — health, pairing and the sync API —
+            // stays reachable, so mesh sync is unaffected. Only the browser UI
+            // is withheld.
+            send_response(
+                &mut stream,
+                403,
+                "Forbidden",
+                "text/plain; charset=utf-8",
+                b"Browser access is turned off on this device. Enable it under Connect Device in the desktop app.",
+                &[],
+            )?;
+            return Ok(());
+        }
+
         let relative_path = path.trim_start_matches('/');
 
         // Path traversal defense: block any traversal attempts
@@ -1705,7 +1737,23 @@ mod tests {
         assert!(resp.contains("200 OK"));
         assert!(resp.contains("Quick phone idea"));
 
-        // 6. Test Static Fallback (SPA routing)
+        // 6. Test Static Fallback (SPA routing).
+        // Browser access is off by default (D-059), so the UI must be withheld
+        // until it is explicitly enabled — while the API tested above stays
+        // reachable throughout, because mesh sync depends on it.
+        set_browser_access(false);
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /some/custom/path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            resp.contains("403 Forbidden"),
+            "the browser UI must not be served while browser access is off: {resp}"
+        );
+
+        set_browser_access(true);
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
         stream
             .write_all(b"GET /some/custom/path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")

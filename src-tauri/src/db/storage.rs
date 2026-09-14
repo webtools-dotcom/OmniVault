@@ -25,6 +25,27 @@ pub fn get_or_create_device_id(conn: &Connection) -> Result<String> {
     }
 }
 
+/// Reads a `device_meta` value, or the supplied default when it is unset.
+pub fn get_meta(conn: &Connection, key: &str, default: &str) -> String {
+    conn.query_row("SELECT value FROM device_meta WHERE key = ?1", [key], |r| r.get(0))
+        .optional()
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| default.to_string())
+}
+
+/// Writes a `device_meta` value. Settings are device-local, so this writes no
+/// revision: a browser-access toggle on the laptop must not propagate to the
+/// tablet and quietly open a listener there.
+pub fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO device_meta (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )?;
+    Ok(())
+}
+
 fn record_revision_tx(
     tx: &Transaction,
     entity_type: &str,

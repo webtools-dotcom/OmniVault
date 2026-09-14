@@ -19,6 +19,7 @@ import { Button } from "../common/Button";
 import { generateQrMatrix, generateQrPath } from "../../utils/qrCode";
 import { StorageService } from "../../services/storageService";
 import { PeerInfo, MeshSyncState } from "../../types";
+import { cn } from "../../utils/cn";
 
 export interface QrConnectModalProps {
   isOpen: boolean;
@@ -32,6 +33,15 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
   onSyncTriggered,
 }) => {
   const [activeTab, setActiveTab] = useState<"mesh" | "browser">("mesh");
+  const [browserAccess, setBrowserAccess] = useState(false);
+
+  const handleToggleBrowserAccess = async () => {
+    const next = !browserAccess;
+    setBrowserAccess(next);
+    const applied = await StorageService.setBrowserAccess(next);
+    // Reflect what actually took effect rather than what was requested.
+    setBrowserAccess(applied);
+  };
   const [lanInfo, setLanInfo] = useState<{ ip: string; port: number; url: string }>({
     ip: "127.0.0.1",
     port: 42420,
@@ -73,6 +83,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
       StorageService.getLanConnectionInfo().then((info) => {
         setLanInfo(info);
       });
+      StorageService.getBrowserAccess().then(setBrowserAccess);
       StorageService.getPairingSession().then((session) => {
         if (session && session.pin) {
           setPairingPin(session.pin);
@@ -601,6 +612,46 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
             </>
           ) : (
             <>
+              {/* Browser access is off by default: serving a UI to browsers is
+                  the one surface that exposes the hand-written HTTP parser to
+                  unknown clients. Mesh sync is unaffected either way (D-059). */}
+              <div className="flex items-center justify-between p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl">
+                <div className="min-w-0 pr-3 text-left">
+                  <span className="text-xs font-semibold text-vault-primary block">
+                    Allow browser access
+                  </span>
+                  <span className="text-[0.741rem] text-vault-muted">
+                    {browserAccess
+                      ? "Phones and tablets on this Wi-Fi can open the vault in a browser."
+                      : "Off. Other devices still sync — only the browser page is blocked."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={browserAccess}
+                  aria-label="Allow browser access"
+                  onClick={handleToggleBrowserAccess}
+                  className={cn(
+                    "relative w-11 h-6 rounded-full shrink-0 transition-colors cursor-pointer",
+                    browserAccess ? "bg-emerald-500/80" : "bg-white/[0.12]"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                      browserAccess ? "translate-x-5.5" : "translate-x-0.5"
+                    )}
+                  />
+                </button>
+              </div>
+
+              {!browserAccess && (
+                <p className="text-[0.741rem] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+                  Turn this on before scanning the code below, or the page will not load.
+                </p>
+              )}
+
               {/* Browser Access Tab */}
               <div className="flex flex-col items-center text-center space-y-5">
                 {/* High-Contrast Crisp QR Code Card */}

@@ -287,6 +287,26 @@ export const StorageService = {
     }
   },
 
+  /** Whether this device serves the browser client. Desktop-only setting. */
+  async getBrowserAccess(): Promise<boolean> {
+    if (!isTauriEnvironment()) return true;
+    try {
+      return await invoke<boolean>("get_browser_access_cmd");
+    } catch {
+      return false;
+    }
+  },
+
+  async setBrowserAccess(enabled: boolean): Promise<boolean> {
+    if (!isTauriEnvironment()) return true;
+    try {
+      return await invoke<boolean>("set_browser_access_cmd", { enabled });
+    } catch (err) {
+      console.warn("Failed to change browser access:", err);
+      return !enabled;
+    }
+  },
+
   async getPairingSession(): Promise<{ pin: string; expires_in: number } | null> {
     // The PIN is only ever issued locally, over IPC. A browser client never
     // displays a PIN — it types one the user read off the desktop screen — so
