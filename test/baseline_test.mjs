@@ -277,3 +277,33 @@ assert.ok(
 );
 
 console.log("✅ Request-path panic guard passed!");
+
+// 13. Regression guard: no dynamic href may bypass the scheme whitelist.
+// Note content arrives from paired devices and the Android share sheet, and
+// React does not sanitise href — `[x](javascript:...)` in a synced note would
+// render a working anchor with reach into the Tauri IPC surface. See D-061.
+const dynamicHrefFiles = ["src/utils/markdown.tsx", "src/components/research/SmartMarketLauncher.tsx"];
+for (const rel of dynamicHrefFiles) {
+  const src = fs.readFileSync(path.resolve(process.cwd(), rel), "utf-8");
+  const dynamicHrefs = (src.match(/href=\{(?!`https|"https)/g) || []).length;
+  if (dynamicHrefs === 0) continue;
+  assert.ok(
+    src.includes("safeHref"),
+    `${rel} builds an href from data but never calls safeHref()`
+  );
+  const guardCalls = (src.match(/safeHref\(/g) || []).length;
+  assert.ok(
+    guardCalls >= dynamicHrefs,
+    `${rel} has ${dynamicHrefs} dynamic href(s) but only ${guardCalls} safeHref() call(s)`
+  );
+}
+const safeUrlSrc = fs.readFileSync(path.resolve(process.cwd(), "src/utils/safeUrl.ts"), "utf-8");
+for (const scheme of ["http", "https", "mailto"]) {
+  assert.ok(safeUrlSrc.includes(`"${scheme}"`), `safeUrl must allow ${scheme}`);
+}
+assert.ok(
+  !/"javascript"|'javascript'/.test(safeUrlSrc),
+  "safeUrl must never allow the javascript: scheme"
+);
+
+console.log("✅ Link scheme guard passed!");

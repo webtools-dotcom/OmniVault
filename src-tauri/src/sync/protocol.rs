@@ -71,6 +71,49 @@ pub fn query_revisions_since(
     Ok(revisions)
 }
 
+/// Deterministic Last-Write-Wins.
+///
+/// Wall-clock timestamps do tie: two devices editing the same row inside the
+/// same millisecond both accepted the other version under a plain `>=`, so each
+/// ended up holding the *other* device's row and the vault diverged with no
+/// further revision left to heal it. On a tie we compare the row contents
+/// themselves - both devices run the identical comparison, so both pick the
+/// same winner and converge.
+fn remote_wins(local: Option<(i64, String)>, remote_ts: i64, remote_key: &str) -> bool {
+    match local {
+        None => true,
+        Some((local_ts, local_key)) => match remote_ts.cmp(&local_ts) {
+            std::cmp::Ordering::Greater => true,
+            std::cmp::Ordering::Less => false,
+            std::cmp::Ordering::Equal => remote_key > local_key.as_str(),
+        },
+    }
+}
+
+fn folder_key(f: &Folder) -> String {
+    format!(
+        "{}|{}|{}|{}",
+        f.parent_id.as_deref().unwrap_or(""),
+        f.name,
+        f.color.as_deref().unwrap_or(""),
+        f.is_deleted as u8
+    )
+}
+
+fn item_key(i: &VaultItem) -> String {
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}|{}",
+        i.folder_id.as_deref().unwrap_or(""),
+        i.item_type,
+        i.title,
+        i.is_pinned as u8,
+        i.is_archived as u8,
+        i.is_deleted as u8,
+        i.metadata.as_deref().unwrap_or(""),
+        i.content
+    )
+}
+
 /// Applies a sequence of remote revisions from a peer into the local SQLite database.
 /// Uses Last-Write-Wins based on timestamps to guarantee convergence.
 pub fn apply_remote_revisions(
@@ -85,19 +128,27 @@ pub fn apply_remote_revisions(
             "folder" => {
                 if let Some(payload_str) = &rev.payload {
                     if let Ok(folder) = serde_json::from_str::<Folder>(payload_str) {
-                        // Check local updated_at timestamp
-                        let local_updated: Option<i64> = tx
+                        let local: Option<(i64, String)> = tx
                             .query_row(
-                                "SELECT updated_at FROM folders WHERE id = ?1",
+                                "SELECT updated_at, parent_id, name, color, is_deleted FROM folders WHERE id = ?1",
                                 [&folder.id],
-                                |r| r.get(0),
+                                |r| {
+                                    Ok((
+                                        r.get::<_, i64>(0)?,
+                                        format!(
+                                            "{}|{}|{}|{}",
+                                            r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                                            r.get::<_, String>(2)?,
+                                            r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                                            r.get::<_, i64>(4)?,
+                                        ),
+                                    ))
+                                },
                             )
                             .ok();
 
-                        let should_apply = match local_updated {
-                            Some(local_ts) => folder.updated_at >= local_ts,
-                            None => true,
-                        };
+                        let should_apply =
+                            remote_wins(local, folder.updated_at, &folder_key(&folder));
 
                         if should_apply {
                             tx.execute(
@@ -108,8 +159,7 @@ pub fn apply_remote_revisions(
                                     name = excluded.name,
                                     color = excluded.color,
                                     updated_at = excluded.updated_at,
-                                    is_deleted = excluded.is_deleted
-                                 WHERE excluded.updated_at >= folders.updated_at",
+                                    is_deleted = excluded.is_deleted",
                                 params![
                                     folder.id,
                                     folder.parent_id,
@@ -129,18 +179,30 @@ pub fn apply_remote_revisions(
             "vault_item" => {
                 if let Some(payload_str) = &rev.payload {
                     if let Ok(item) = serde_json::from_str::<VaultItem>(payload_str) {
-                        let local_updated: Option<i64> = tx
+                        let local: Option<(i64, String)> = tx
                             .query_row(
-                                "SELECT updated_at FROM vault_items WHERE id = ?1",
+                                "SELECT updated_at, folder_id, item_type, title, is_pinned, is_archived, is_deleted, metadata, content FROM vault_items WHERE id = ?1",
                                 [&item.id],
-                                |r| r.get(0),
+                                |r| {
+                                    Ok((
+                                        r.get::<_, i64>(0)?,
+                                        format!(
+                                            "{}|{}|{}|{}|{}|{}|{}|{}",
+                                            r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                                            r.get::<_, String>(2)?,
+                                            r.get::<_, String>(3)?,
+                                            r.get::<_, i64>(4)?,
+                                            r.get::<_, i64>(5)?,
+                                            r.get::<_, i64>(6)?,
+                                            r.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                                            r.get::<_, String>(8)?,
+                                        ),
+                                    ))
+                                },
                             )
                             .ok();
 
-                        let should_apply = match local_updated {
-                            Some(local_ts) => item.updated_at >= local_ts,
-                            None => true,
-                        };
+                        let should_apply = remote_wins(local, item.updated_at, &item_key(&item));
 
                         if should_apply {
                             tx.execute(
@@ -155,8 +217,7 @@ pub fn apply_remote_revisions(
                                     is_pinned = excluded.is_pinned,
                                     is_archived = excluded.is_archived,
                                     is_deleted = excluded.is_deleted,
-                                    updated_at = excluded.updated_at
-                                 WHERE excluded.updated_at >= vault_items.updated_at",
+                                    updated_at = excluded.updated_at",
                                 params![
                                     item.id,
                                     item.folder_id,
@@ -286,5 +347,57 @@ mod tests {
         let latest_ts = deltas_a.last().unwrap().timestamp;
         let new_deltas = query_revisions_since(&node_a, latest_ts, None).unwrap();
         assert_eq!(new_deltas.len(), 0);
+    }
+
+    /// Same item, same millisecond, different edits on two devices. Under the
+    /// old `>=` each device accepted the other and they diverged forever.
+    #[test]
+    fn same_millisecond_edits_converge_on_both_devices() {
+        let mut node_a = setup_node_db();
+        let mut node_b = setup_node_db();
+
+        let ts = 1_700_000_000_000i64;
+        let mk = |content: &str| VaultItem {
+            id: "item-1".to_string(),
+            folder_id: None,
+            item_type: "note".to_string(),
+            title: "Shared".to_string(),
+            content: content.to_string(),
+            metadata: None,
+            is_pinned: false,
+            is_archived: false,
+            is_deleted: false,
+            created_at: ts,
+            updated_at: ts,
+        };
+        let rev = |dev: &str, item: &VaultItem| Revision {
+            id: 0,
+            entity_type: "vault_item".to_string(),
+            entity_id: item.id.clone(),
+            device_id: dev.to_string(),
+            change_type: "updated".to_string(),
+            payload: Some(serde_json::to_string(item).unwrap()),
+            timestamp: ts,
+        };
+
+        let from_a = mk("edit made on the laptop");
+        let from_b = mk("edit made on the tablet");
+
+        // Each device starts holding only its own edit...
+        apply_remote_revisions(&mut node_a, &[rev("a", &from_a)]).unwrap();
+        apply_remote_revisions(&mut node_b, &[rev("b", &from_b)]).unwrap();
+        // ...then receives the other one.
+        apply_remote_revisions(&mut node_a, &[rev("b", &from_b)]).unwrap();
+        apply_remote_revisions(&mut node_b, &[rev("a", &from_a)]).unwrap();
+
+        let read = |c: &Connection| -> String {
+            c.query_row("SELECT content FROM vault_items WHERE id = ?1", ["item-1"], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        assert_eq!(read(&node_a), read(&node_b), "devices diverged on a timestamp tie");
+        // Deterministic winner: the lexicographically greater row.
+        assert_eq!(read(&node_a), "edit made on the tablet");
     }
 }

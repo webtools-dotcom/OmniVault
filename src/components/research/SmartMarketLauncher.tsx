@@ -1,3 +1,4 @@
+import { safeHref } from "../../utils/safeUrl";
 import React from "react";
 import { ExternalLink, LineChart, TrendingUp } from "lucide-react";
 import { DetectedTicker } from "../../utils/tickerDetector";
@@ -26,7 +27,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
 
           <div className="flex items-center border-l border-emerald-500/20 pl-0.5 gap-0.5">
             <a
-              href={t.tradingViewUrl}
+              href={safeHref(t.tradingViewUrl) ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="px-1.5 py-0.5 rounded-md text-[0.741rem] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors flex items-center gap-0.5"
@@ -37,7 +38,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
             </a>
 
             <a
-              href={t.yahooFinanceUrl}
+              href={safeHref(t.yahooFinanceUrl) ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="px-1.5 py-0.5 rounded-md text-[0.741rem] font-mono font-bold text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors flex items-center gap-0.5"
@@ -54,7 +55,7 @@ export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ ticker
       {links.map((l) => (
         <a
           key={l.url}
-          href={l.url}
+          href={safeHref(l.url) ?? "#"}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-vault-secondary hover:text-vault-primary hover:border-blue-500/40 hover:bg-blue-500/[0.04] transition-all duration-150"

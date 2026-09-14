@@ -1,3 +1,4 @@
+import { safeHref } from "./safeUrl";
 import React from "react";
 
 /**
@@ -180,11 +181,18 @@ function parseInline(text: string): React.ReactNode {
     // Link [title](url)
     else if (match[2]) {
       const linkTitle = match[3];
-      const linkUrl = match[4];
+      const safeLinkUrl = safeHref(match[4]);
       nodes.push(
+        safeLinkUrl === null ? (
+          // Not a scheme we will link. Show the text so nothing is lost, but
+          // give the reader nothing to click. See D-061.
+          <span key={`inline-link-${match.index}`} title={`Blocked link: ${match[4]}`}>
+            {linkTitle}
+          </span>
+        ) : (
         <a
           key={`inline-link-${match.index}`}
-          href={linkUrl}
+          href={safeLinkUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-vault-accent underline hover:text-vault-accent-hover transition-colors"
@@ -192,6 +200,7 @@ function parseInline(text: string): React.ReactNode {
         >
           {linkTitle}
         </a>
+        )
       );
     }
     // Bold **text**

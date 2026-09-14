@@ -569,6 +569,18 @@ pub fn run() {
         }
         Err(e) => eprintln!("[revisions] compaction failed: {e:?}"),
     }
+    // Blobs whose only item has been deleted are dead weight; a day of grace
+    // keeps an in-flight upload safe from its own vault.
+    match db::media::purge_orphan_media(
+        &conn,
+        &base_dir,
+        std::time::Duration::from_secs(24 * 60 * 60),
+    ) {
+        Ok(0) => {}
+        Ok(n) => println!("[media] removed {n} orphaned blob(s)"),
+        Err(e) => eprintln!("[media] orphan sweep failed: {e:?}"),
+    }
+
     if reclaimed > 0 {
         println!("[media] reclaimed {reclaimed} oversized or duplicate row(s)");
     }

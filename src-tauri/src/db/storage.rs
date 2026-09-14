@@ -4,6 +4,20 @@ use uuid::Uuid;
 
 use crate::db::models::{Folder, VaultItem};
 
+/// A local write must never be older than something this device has already
+/// seen. Wall clocks on phones and laptops drift apart by minutes; with plain
+/// `Utc::now()` a device whose clock runs slow can edit an item and have the
+/// edit silently lose Last-Write-Wins forever against a peer revision that is
+/// merely timestamped ahead. Taking one millisecond past the newest revision we
+/// hold keeps every local edit able to win, without inventing a clock.
+pub fn next_write_timestamp(conn: &Connection) -> i64 {
+    let wall = Utc::now().timestamp_millis();
+    let seen: i64 = conn
+        .query_row("SELECT COALESCE(MAX(timestamp), 0) FROM revisions", [], |r| r.get(0))
+        .unwrap_or(0);
+    wall.max(seen + 1)
+}
+
 pub fn get_or_create_device_id(conn: &Connection) -> Result<String> {
     let existing: Option<String> = conn
         .query_row(
@@ -130,7 +144,7 @@ pub fn create_folder(
     color: Option<&str>,
     device_id: &str,
 ) -> Result<Folder> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let folder_id = Uuid::new_v4().to_string();
 
     let tx = conn.transaction()?;
@@ -164,7 +178,7 @@ pub fn rename_folder(
     new_name: &str,
     device_id: &str,
 ) -> Result<Folder> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -202,7 +216,7 @@ pub fn move_folder(
     new_parent_id: Option<&str>,
     device_id: &str,
 ) -> Result<Folder> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     // A folder must never become its own ancestor. D-021 described this guard,
@@ -276,7 +290,7 @@ pub fn delete_folder(
     folder_id: &str,
     device_id: &str,
 ) -> Result<()> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     // 1. Recursively find all descendant subfolder IDs
@@ -385,7 +399,7 @@ pub fn create_item(
     metadata: Option<&str>,
     device_id: &str,
 ) -> Result<VaultItem> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let item_id = Uuid::new_v4().to_string();
 
     let tx = conn.transaction()?;
@@ -425,7 +439,7 @@ pub fn update_item(
     metadata: Option<&str>,
     device_id: &str,
 ) -> Result<VaultItem> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -468,7 +482,7 @@ pub fn move_item(
     new_folder_id: Option<&str>, // None = Move to Quick Inbox
     device_id: &str,
 ) -> Result<VaultItem> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -510,7 +524,7 @@ pub fn set_item_archive(
     is_archived: bool,
     device_id: &str,
 ) -> Result<()> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -532,7 +546,7 @@ pub fn set_item_pin(
     is_pinned: bool,
     device_id: &str,
 ) -> Result<()> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -552,7 +566,7 @@ pub fn toggle_pin_item(
     item_id: &str,
     device_id: &str,
 ) -> Result<VaultItem> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -593,7 +607,7 @@ pub fn delete_item(
     item_id: &str,
     device_id: &str,
 ) -> Result<()> {
-    let now = Utc::now().timestamp_millis();
+    let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -866,5 +880,29 @@ mod tests {
         assert!(inbox_ids.contains(&item_parent.id));
         assert!(inbox_ids.contains(&item_sub.id));
         assert!(inbox_ids.contains(&item_deep.id));
+    }
+
+    /// A device whose wall clock lags behind a peer must still be able to edit.
+    #[test]
+    fn a_local_edit_outranks_a_revision_from_a_device_with_a_fast_clock() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::schema::initialize_schema(&conn).unwrap();
+
+        // A peer with a clock an hour fast lands a revision in our log.
+        let future = chrono::Utc::now().timestamp_millis() + 3_600_000;
+        conn.execute(
+            "INSERT INTO revisions (entity_type, entity_id, device_id, change_type, payload, timestamp)
+             VALUES ('vault_item', 'x', 'fast-peer', 'updated', NULL, ?1)",
+            rusqlite::params![future],
+        )
+        .unwrap();
+
+        let item = create_item(&mut conn, None, "note", "Mine", "body", None, "me").unwrap();
+        assert!(
+            item.updated_at > future,
+            "local edit was stamped behind a peer we had already seen ({} <= {})",
+            item.updated_at,
+            future
+        );
     }
 }

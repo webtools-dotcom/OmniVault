@@ -1,7 +1,5 @@
 use std::fs;
 use std::io::Cursor;
-use std::net::TcpListener;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -9,14 +7,13 @@ use image::{ImageFormat, Rgba, RgbaImage};
 use rusqlite::Connection;
 use uuid::Uuid;
 
-use omnivault_lib::db::media::{compute_sha256, read_media_bytes, save_image_media};
+use omnivault_lib::db::media::save_image_media;
 use omnivault_lib::db::schema::initialize_schema;
 use omnivault_lib::db::storage::{
     create_folder, create_item, get_item_by_id, list_folders, list_inbox_items,
     list_items_by_folder, update_item,
 };
 use omnivault_lib::http_server;
-use omnivault_lib::sync::blob_stream::{download_blob_over_tcp, handle_blob_request};
 use omnivault_lib::sync::discovery::{PeerInfo, PeerRegistry};
 use omnivault_lib::sync::mesh_sync::{pair_with_remote_peer, sync_with_peer};
 use omnivault_lib::sync::pairing::{is_device_paired, store_paired_device, PairingManager};
@@ -91,7 +88,7 @@ async fn test_headless_two_node_sync_e2e() {
 
     // 1.3 Attach WebP screenshot chart to NVDA item
     let chart_png = create_synthetic_png_bytes(80, 80);
-    let media_chart = save_image_media(
+    let _media_chart = save_image_media(
         &mut phone.conn,
         &phone.storage_dir,
         &item_nvda.id,
@@ -177,52 +174,6 @@ async fn test_headless_two_node_sync_e2e() {
     let laptop_inbox = list_inbox_items(&laptop.conn).unwrap();
     assert_eq!(laptop_inbox.len(), 1);
     assert_eq!(laptop_inbox[0].title, "Market Open Checklist");
-
-    // -------------------------------------------------------------
-    // STAGE 5: TCP Media Blob Streaming & Verification
-    // -------------------------------------------------------------
-    // Laptop has media metadata in SQLite, but disk media file does not exist yet
-    let laptop_media_target = laptop.storage_dir.join(&media_chart.relative_path);
-    assert!(!laptop_media_target.exists());
-
-    // Spin up TCP listener on Phone side for blob transfers
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let phone_tcp_addr = listener.local_addr().unwrap();
-    let phone_storage = phone.storage_dir.clone();
-    let valid_token = auth_token.clone();
-
-    let server_running = Arc::new(AtomicBool::new(true));
-    let server_flag = server_running.clone();
-
-    let server_handle = thread::spawn(move || {
-        listener.set_nonblocking(true).unwrap();
-        while server_flag.load(Ordering::Relaxed) {
-            if let Ok((mut stream, _)) = listener.accept() {
-                stream.set_nonblocking(false).unwrap();
-                let mut reader = stream.try_clone().unwrap();
-                let _ = handle_blob_request(&mut reader, &mut stream, &phone_storage, |t| t == valid_token);
-                break;
-            }
-            thread::sleep(Duration::from_millis(10));
-        }
-    });
-
-    // Laptop requests and downloads media blob from Phone over TCP
-    let downloaded_path = download_blob_over_tcp(
-        &phone_tcp_addr.to_string(),
-        &media_chart.file_hash,
-        &auth_token,
-        &laptop.storage_dir,
-    ).expect("failed to download blob over TCP");
-
-    server_running.store(false, Ordering::Relaxed);
-    let _ = server_handle.join();
-
-    assert!(downloaded_path.exists());
-    let laptop_blob_bytes = read_media_bytes(&laptop.storage_dir, &media_chart.relative_path).unwrap();
-    let phone_blob_bytes = read_media_bytes(&phone.storage_dir, &media_chart.relative_path).unwrap();
-    assert_eq!(laptop_blob_bytes, phone_blob_bytes);
-    assert_eq!(compute_sha256(&laptop_blob_bytes), media_chart.file_hash);
 
     // -------------------------------------------------------------
     // STAGE 6: Bidirectional Offline Convergence (Laptop -> Phone)

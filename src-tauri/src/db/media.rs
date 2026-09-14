@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
-use chrono::Utc;
+
 use image::ImageFormat;
 use rusqlite::{params, Connection, Result};
 use sha2::{Digest, Sha256};
@@ -61,7 +61,7 @@ pub fn save_image_media<P: AsRef<Path>>(
     raw_bytes: &[u8],
     device_id: &str,
 ) -> Result<MediaFile, MediaError> {
-    let now = Utc::now().timestamp_millis();
+    let now = crate::db::storage::next_write_timestamp(conn);
     let media_dir = storage_dir.as_ref().join("media");
     fs::create_dir_all(&media_dir)?;
 
@@ -171,6 +171,83 @@ pub fn read_media_bytes<P: AsRef<Path>>(storage_dir: P, relative_path: &str) -> 
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)?;
     Ok(buf)
+}
+
+/// Deletes media blobs nothing points at any more.
+///
+/// Deleting an item only flips `is_deleted`; the `media/<hash>.webp` it pointed
+/// at stayed on disk forever, so a vault used as an image scratchpad grows
+/// without bound even when the user empties it. A blob is live while any
+/// undeleted item references it - through `content` or through `media_files` -
+/// and blobs younger than the grace window are spared so an upload that has not
+/// yet had its item row written is never swept out from under itself.
+pub fn purge_orphan_media<P: AsRef<Path>>(
+    conn: &Connection,
+    storage_dir: P,
+    grace: std::time::Duration,
+) -> Result<usize, MediaError> {
+    let media_dir = storage_dir.as_ref().join("media");
+    if !media_dir.is_dir() {
+        return Ok(0);
+    }
+
+    let mut live: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let mut stmt = conn.prepare(
+        "SELECT content FROM vault_items WHERE is_deleted = 0 AND content LIKE '%/api/media/%'",
+    )?;
+    for row in stmt.query_map([], |r| r.get::<_, String>(0))? {
+        let content = row?;
+        let mut rest = content.as_str();
+        while let Some(at) = rest.find("/api/media/") {
+            rest = &rest[at + "/api/media/".len()..];
+            let end = rest
+                .find(|c: char| !c.is_ascii_alphanumeric())
+                .unwrap_or(rest.len());
+            if end > 0 {
+                live.insert(rest[..end].to_string());
+            }
+            rest = &rest[end..];
+        }
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT m.file_hash FROM media_files m
+         JOIN vault_items i ON i.id = m.item_id
+         WHERE i.is_deleted = 0",
+    )?;
+    for row in stmt.query_map([], |r| r.get::<_, String>(0))? {
+        live.insert(row?);
+    }
+
+    let mut removed = 0usize;
+    for entry in fs::read_dir(&media_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let hash = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(h) => h.to_string(),
+            None => continue,
+        };
+        if live.contains(&hash) {
+            continue;
+        }
+        let young = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .map(|t| t.elapsed().map(|age| age < grace).unwrap_or(true))
+            .unwrap_or(true);
+        if young {
+            continue;
+        }
+        if fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+
+    Ok(removed)
 }
 
 #[cfg(test)]
@@ -594,5 +671,48 @@ mod revision_compaction_tests {
 
         // Idempotent.
         assert_eq!(compact_redundant_item_revisions(&mut conn).unwrap(), 0);
+    }
+}
+
+
+#[cfg(test)]
+mod orphan_sweep_tests {
+    use super::*;
+    use crate::db::schema::initialize_schema;
+    use crate::db::storage::{create_item, delete_item};
+
+    fn png(size: u32) -> Vec<u8> {
+        let mut buf = Vec::new();
+        let img = image::DynamicImage::ImageRgba8(image::RgbaImage::new(size, size));
+        img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png).unwrap();
+        buf
+    }
+
+    #[test]
+    fn deleting_an_item_frees_its_blob_but_spares_a_shared_one() {
+        let dir = std::env::temp_dir().join(format!("ov-sweep-{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+
+        let doomed = create_item(&mut conn, None, "image", "Doomed", "", None, "dev").unwrap();
+        let kept = create_item(&mut conn, None, "image", "Kept", "", None, "dev").unwrap();
+        let m1 = save_image_media(&mut conn, &dir, &doomed.id, &png(1), "dev").unwrap();
+        let m2 = save_image_media(&mut conn, &dir, &kept.id, &png(4), "dev").unwrap();
+        assert_ne!(m1.file_hash, m2.file_hash);
+
+        delete_item(&mut conn, &doomed.id, "dev").unwrap();
+
+        // Nothing is swept while the blobs are still inside the grace window.
+        let day = std::time::Duration::from_secs(24 * 60 * 60);
+        assert_eq!(purge_orphan_media(&conn, &dir, day).unwrap(), 0);
+
+        // With no grace, exactly the deleted item's blob goes.
+        let swept = purge_orphan_media(&conn, &dir, std::time::Duration::ZERO).unwrap();
+        assert_eq!(swept, 1, "expected only the orphan to be swept");
+        assert!(!dir.join(&m1.relative_path).exists(), "orphan blob survived");
+        assert!(dir.join(&m2.relative_path).exists(), "live blob was deleted");
+
+        fs::remove_dir_all(&dir).ok();
     }
 }
