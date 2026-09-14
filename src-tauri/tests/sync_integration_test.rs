@@ -16,7 +16,7 @@ use omnivault_lib::db::storage::{
 use omnivault_lib::http_server;
 use omnivault_lib::sync::discovery::{PeerInfo, PeerRegistry};
 use omnivault_lib::sync::mesh_sync::{pair_with_remote_peer, sync_with_peer};
-use omnivault_lib::sync::pairing::{is_device_paired, store_paired_device, PairingManager};
+use omnivault_lib::sync::pairing::{is_device_paired, store_paired_device};
 use omnivault_lib::sync::protocol::{apply_remote_revisions, query_revisions_since};
 
 fn create_synthetic_png_bytes(width: u32, height: u32) -> Vec<u8> {
@@ -134,19 +134,13 @@ async fn test_headless_two_node_sync_e2e() {
     assert_eq!(active_peers[0].device_id, phone.device_id);
 
     // -------------------------------------------------------------
-    // STAGE 3: 6-Digit PIN Pairing Handshake
+    // STAGE 3: Mutual Pairing Token
     // -------------------------------------------------------------
-    let phone_pairing_mgr = PairingManager::new();
-    let pin = phone_pairing_mgr.create_pairing_request(&laptop.device_id, &laptop.device_name).await;
-    assert_eq!(pin.len(), 6);
-
-    // Phone confirms submitted PIN and issues persistent auth token
-    let paired_device = phone_pairing_mgr
-        .verify_and_pair(&phone.conn, &laptop.device_id, &pin)
-        .await
-        .expect("PIN verification failed");
-    let auth_token = paired_device.auth_token;
-    assert_eq!(auth_token.len(), 64); // SHA-256 token
+    // The PIN handshake itself is exercised against the real HTTP surface in
+    // http_server's tests; here both sides simply end up holding one token.
+    let auth_token = "f".repeat(64);
+    store_paired_device(&phone.conn, &laptop.device_id, &laptop.device_name, &auth_token)
+        .unwrap();
 
     // Laptop stores the mutual pairing token
     store_paired_device(&laptop.conn, &phone.device_id, &phone.device_name, &auth_token).unwrap();

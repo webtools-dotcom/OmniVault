@@ -171,6 +171,21 @@ export function App() {
     return () => window.removeEventListener("omnivault:unauthorized", handleUnauthorized);
   }, []);
 
+  // Every write handler below hands its promise to a child component or to
+  // nothing at all, so a failed save used to disappear into the console. One
+  // listener catches all of them, including paths added later.
+  const [vaultError, setVaultError] = useState<string | null>(null);
+  useEffect(() => {
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason;
+      setVaultError(
+        reason instanceof Error ? reason.message : "Something went wrong while saving."
+      );
+    };
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => window.removeEventListener("unhandledrejection", handleRejection);
+  }, []);
+
   const isPollingRef = useRef(false);
 
   // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation + Android shares
@@ -666,6 +681,22 @@ export function App() {
               refreshInboxItems();
             }}
           />
+          {vaultError && (
+            <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
+              <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-950/90 px-4 py-2.5 text-xs text-rose-100 shadow-lg backdrop-blur-sm">
+                <span className="flex-1 leading-relaxed">{vaultError}</span>
+                <button
+                  type="button"
+                  onClick={() => setVaultError(null)}
+                  className="shrink-0 text-rose-300 hover:text-white cursor-pointer"
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
         </ContentPane>
       )}
     </AppLayout>

@@ -531,6 +531,19 @@ pub fn resolve_app_base_dir() -> std::path::PathBuf {
     std::path::PathBuf::from(".")
 }
 
+/// Leaves a readable reason behind when the app cannot start at all.
+fn report_fatal_startup_error(base_dir: &std::path::Path, message: &str) {
+    let stamp = chrono::Utc::now().to_rfc3339();
+    let body = format!("OmniVault could not start.{nl}{nl}{stamp}{nl}{message}{nl}", nl = "
+");
+    for dir in [base_dir.to_path_buf(), std::env::temp_dir()] {
+        if std::fs::write(dir.join("omnivault-startup-error.txt"), &body).is_ok() {
+            break;
+        }
+    }
+    eprintln!("[startup] {message}");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base_dir = resolve_app_base_dir();
@@ -539,12 +552,30 @@ pub fn run() {
 
     let db_path = base_dir.join("omnivault.db");
 
-    let mut conn = Connection::open(&db_path)
-        .or_else(|_| Connection::open("omnivault.db"))
-        .or_else(|_| Connection::open_in_memory())
-        .expect("failed to open database");
-    schema::initialize_schema(&conn).expect("failed to init schema");
-    let device_id = storage::get_or_create_device_id(&conn).expect("failed to get device_id");
+    // No in-memory fallback. It used to be the last resort here, which meant a
+    // vault that could not be opened - locked file, bad permissions, full disk -
+    // started as an empty one instead: the user saw a wiped vault, typed into
+    // it, and lost that too when the app closed. A release build is a GUI
+    // binary with no console, so the reason is written next to the vault where
+    // it can actually be found.
+    let mut conn = match Connection::open(&db_path).or_else(|_| Connection::open("omnivault.db")) {
+        Ok(c) => c,
+        Err(e) => {
+            report_fatal_startup_error(&base_dir, &format!("Could not open the vault database at {}: {e}", db_path.display()));
+            panic!("failed to open database: {e}");
+        }
+    };
+    if let Err(e) = schema::initialize_schema(&conn) {
+        report_fatal_startup_error(&base_dir, &format!("The vault database could not be prepared: {e}"));
+        panic!("failed to init schema: {e}");
+    }
+    let device_id = match storage::get_or_create_device_id(&conn) {
+        Ok(id) => id,
+        Err(e) => {
+            report_fatal_startup_error(&base_dir, &format!("The vault database could not be read: {e}"));
+            panic!("failed to get device_id: {e}");
+        }
+    };
     let _ = storage::seed_defaults_if_empty(&mut conn, &device_id);
 
     // Move any pre-D-035 inline base64 images onto disk. No-op on a clean vault.

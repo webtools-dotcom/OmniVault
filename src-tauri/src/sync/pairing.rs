@@ -1,13 +1,6 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tokio::sync::RwLock;
-use uuid::Uuid;
-
-pub const PAIRING_PIN_TTL_SECONDS: i64 = 120; // 2 minutes
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PairedDevice {
@@ -17,123 +10,6 @@ pub struct PairedDevice {
     pub paired_at: i64,
     pub last_sync_at: Option<i64>,
 }
-
-#[derive(Debug, Clone)]
-pub struct PendingPairing {
-    pub peer_device_id: String,
-    pub peer_name: String,
-    pub pin: String,
-    pub expires_at: i64,
-}
-
-#[derive(Debug)]
-pub enum PairingError {
-    Db(rusqlite::Error),
-    InvalidPin,
-    Expired,
-    NotFound,
-}
-
-impl std::fmt::Display for PairingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PairingError::Db(e) => write!(f, "Database error: {}", e),
-            PairingError::InvalidPin => write!(f, "Invalid PIN provided"),
-            PairingError::Expired => write!(f, "Pairing PIN expired"),
-            PairingError::NotFound => write!(f, "Pending pairing request not found"),
-        }
-    }
-}
-
-impl std::error::Error for PairingError {}
-
-impl From<rusqlite::Error> for PairingError {
-    fn from(e: rusqlite::Error) -> Self {
-        PairingError::Db(e)
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct PairingManager {
-    pending: Arc<RwLock<HashMap<String, PendingPairing>>>,
-}
-
-impl PairingManager {
-    pub fn new() -> Self {
-        Self {
-            pending: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    /// Generates a deterministic-length 6-digit PIN and stores pending session
-    pub async fn create_pairing_request(&self, peer_device_id: &str, peer_name: &str) -> String {
-        let now = Utc::now().timestamp();
-        // Generate pseudo-random 6-digit pin from UUID entropy
-        let entropy = Uuid::new_v4().as_u128();
-        let pin = format!("{:06}", (entropy % 900_000) + 100_000);
-
-        let mut lock = self.pending.write().await;
-        lock.insert(
-            peer_device_id.to_string(),
-            PendingPairing {
-                peer_device_id: peer_device_id.to_string(),
-                peer_name: peer_name.to_string(),
-                pin: pin.clone(),
-                expires_at: now + PAIRING_PIN_TTL_SECONDS,
-            },
-        );
-
-        pin
-    }
-
-    /// Verifies the 6-digit PIN and authorizes the peer
-    pub async fn verify_and_pair(
-        &self,
-        conn: &Connection,
-        peer_device_id: &str,
-        pin_attempt: &str,
-    ) -> std::result::Result<PairedDevice, PairingError> {
-        let now = Utc::now().timestamp();
-        let pending = {
-            let mut lock = self.pending.write().await;
-            lock.remove(peer_device_id).ok_or(PairingError::NotFound)?
-        };
-
-        if now > pending.expires_at {
-            return Err(PairingError::Expired);
-        }
-
-        if pending.pin != pin_attempt.trim() {
-            return Err(PairingError::InvalidPin);
-        }
-
-        // Generate persistent auth token (SHA-256 of high entropy UUID)
-        let token_seed = format!("{}:{}:{}", peer_device_id, Uuid::new_v4(), now);
-        let mut hasher = Sha256::new();
-        hasher.update(token_seed.as_bytes());
-        let auth_token = format!("{:x}", hasher.finalize());
-
-        let now_ms = Utc::now().timestamp_millis();
-        conn.execute(
-            "INSERT INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
-             VALUES (?1, ?2, ?3, ?4, NULL)
-             ON CONFLICT(device_id) DO UPDATE SET
-                device_name = excluded.device_name,
-                auth_token = excluded.auth_token,
-                paired_at = excluded.paired_at",
-            params![peer_device_id, pending.peer_name, auth_token, now_ms],
-        )?;
-
-        Ok(PairedDevice {
-            device_id: peer_device_id.to_string(),
-            device_name: pending.peer_name,
-            auth_token,
-            paired_at: now_ms,
-            last_sync_at: None,
-        })
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Database Queries for Paired Devices
 // ---------------------------------------------------------------------------
@@ -181,8 +57,18 @@ pub fn validate_peer_auth_token(conn: &Connection, device_id: &str, token: &str)
         )
         .optional()?;
 
+    // Compare in constant time: `==` returns on the first differing byte, and
+    // this token is the only thing standing between a LAN peer and the vault.
     Ok(match stored_token {
-        Some(t) => t == token,
+        Some(t) => {
+            let a = t.as_bytes();
+            let b = token.as_bytes();
+            let mut diff = (a.len() ^ b.len()) as u8;
+            for i in 0..a.len().max(b.len()) {
+                diff |= a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(1);
+            }
+            diff == 0
+        }
         None => false,
     })
 }
@@ -235,47 +121,31 @@ mod tests {
         conn
     }
 
-    #[tokio::test]
-    async fn test_pairing_handshake_flow() {
+    /// The lifecycle of a paired device, through the same functions the
+    /// running app uses. The PIN handshake itself lives in http_server.
+    #[test]
+    fn a_paired_device_can_be_stored_validated_and_removed() {
         let conn = setup_test_db();
-        let manager = PairingManager::new();
-
         let peer_id = "phone-dev-123";
-        let peer_name = "iPhone 15";
+        let token = "a".repeat(64);
 
-        // 1. Initiate pairing request -> returns 6-digit PIN
-        let pin = manager.create_pairing_request(peer_id, peer_name).await;
-        assert_eq!(pin.len(), 6);
-        assert!(pin.chars().all(|c| c.is_ascii_digit()));
-
-        // 2. Reject incorrect PIN
-        let bad_attempt = manager.verify_and_pair(&conn, peer_id, "000000").await;
-        assert!(matches!(bad_attempt, Err(PairingError::InvalidPin)));
-
-        // Re-create request for valid verify
-        let valid_pin = manager.create_pairing_request(peer_id, peer_name).await;
-
-        // 3. Confirm with valid PIN
-        let paired = manager.verify_and_pair(&conn, peer_id, &valid_pin).await.unwrap();
-        assert_eq!(paired.device_id, peer_id);
-        assert_eq!(paired.device_name, peer_name);
-        assert!(!paired.auth_token.is_empty());
-
-        // 4. Verify device is recorded as paired in DB
+        assert!(!is_device_paired(&conn, peer_id).unwrap());
+        store_paired_device(&conn, peer_id, "Pad Go", &token).unwrap();
         assert!(is_device_paired(&conn, peer_id).unwrap());
 
-        // 5. Verify cryptographic auth token validation
-        assert!(validate_peer_auth_token(&conn, peer_id, &paired.auth_token).unwrap());
+        assert!(validate_peer_auth_token(&conn, peer_id, &token).unwrap());
         assert!(!validate_peer_auth_token(&conn, peer_id, "invalid-token").unwrap());
+        // A prefix of the real token must not pass.
+        assert!(!validate_peer_auth_token(&conn, peer_id, &"a".repeat(63)).unwrap());
+        assert!(!validate_peer_auth_token(&conn, "someone-else", &token).unwrap());
 
-        // 6. Update last sync timestamp
         update_peer_last_sync(&conn, peer_id).unwrap();
         let list = list_paired_devices(&conn).unwrap();
         assert_eq!(list.len(), 1);
         assert!(list[0].last_sync_at.is_some());
 
-        // 7. Unpair device
         unpair_device(&conn, peer_id).unwrap();
         assert!(!is_device_paired(&conn, peer_id).unwrap());
+        assert!(!validate_peer_auth_token(&conn, peer_id, &token).unwrap());
     }
 }
