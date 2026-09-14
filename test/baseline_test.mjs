@@ -253,3 +253,27 @@ assert.ok(
 );
 
 console.log("✅ Editor autosave-loop regression guard passed!");
+
+// 12. Regression guard: no panic paths in the LAN-facing request handler.
+// The release profile sets panic = "abort" (D-030), so a panic on any connection
+// thread kills the whole app, and a panic while holding a lock poisons it so
+// every later request aborts too. Locks in the request path must recover from
+// poisoning; see D-056. Test-module unwraps are fine and are excluded.
+const serverSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src-tauri/src/http_server.rs"),
+  "utf-8"
+);
+const testModuleAt = serverSource.indexOf("#[cfg(test)]");
+const requestPath = testModuleAt === -1 ? serverSource : serverSource.slice(0, testModuleAt);
+const panicCalls = requestPath.split("\n").filter((l) => l.includes(".unwrap()"));
+assert.deepStrictEqual(
+  panicCalls.map((l) => l.trim()),
+  [],
+  "http_server.rs request path must contain no .unwrap() — under panic = \"abort\" one bad request would kill the app. Use lock_recover() for mutexes and return an HTTP error otherwise."
+);
+assert.ok(
+  requestPath.includes("fn lock_recover"),
+  "http_server.rs must define lock_recover() so a poisoned mutex cannot abort every later request"
+);
+
+console.log("✅ Request-path panic guard passed!");

@@ -27,6 +27,19 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// Locks a mutex, recovering from poisoning rather than aborting the process.
+///
+/// The release profile sets `panic = "abort"` (D-030), so a panic on any
+/// connection thread kills the whole application. A panic while a lock is held
+/// also poisons it, which would turn every later request into a second abort —
+/// one bad request could take the app down and keep it down. Recovering the
+/// inner value keeps the server answering; the data behind these locks is
+/// SQLite handles and a pairing session, neither of which is left in a
+/// half-written state by a panicking request handler.
+fn lock_recover<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// The desktop webview's own origins. Matched exactly: a suffix test would also
 /// accept `http://evil.tauri.localhost`, which a caller can obtain simply by
 /// sending a matching Host header.
@@ -595,7 +608,7 @@ fn handle_connection(
             // Absent credentials are a rejection, never a skipped check.
             let authorized = match (caller_id.as_deref(), caller_token.as_deref()) {
                 (Some(id), Some(tok)) => {
-                    let conn = db.lock().unwrap();
+                    let conn = lock_recover(&db);
                     crate::sync::pairing::validate_peer_auth_token(&conn, id, tok).unwrap_or(false)
                 }
                 _ => false,
@@ -681,7 +694,7 @@ fn handle_connection(
 
     if path == "/api/folders" {
         if method == "GET" {
-            let conn = db.lock().unwrap();
+            let conn = lock_recover(&db);
             let folders = storage::list_folders(&conn, false).unwrap_or_default();
             let json = serde_json::to_vec(&folders).unwrap_or_default();
             send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
@@ -695,7 +708,7 @@ fn handle_connection(
                     return Ok(());
                 }
             };
-            let mut conn = db.lock().unwrap();
+            let mut conn = lock_recover(&db);
             match storage::create_folder(
                 &mut conn,
                 &req.name,
@@ -725,7 +738,7 @@ fn handle_connection(
 
     if path == "/api/items/inbox" || path == "/api/items" {
         if method == "GET" {
-            let conn = db.lock().unwrap();
+            let conn = lock_recover(&db);
             let folder_id = query.and_then(|q| {
                 for pair in q.split('&') {
                     if let Some((k, v)) = pair.split_once('=') {
@@ -755,7 +768,7 @@ fn handle_connection(
                     return Ok(());
                 }
             };
-            let mut conn = db.lock().unwrap();
+            let mut conn = lock_recover(&db);
             match storage::create_item(
                 &mut conn,
                 req.folder_id.as_deref(),
@@ -794,7 +807,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::toggle_pin_item(&mut conn, &req.id, device_id) {
             Ok(item) => {
                 let json = serde_json::to_vec(&item).unwrap_or_default();
@@ -817,7 +830,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::delete_item(&mut conn, &req.id, device_id) {
             Ok(()) => {
                 send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
@@ -839,7 +852,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::move_item(&mut conn, &req.id, req.folder_id.as_deref(), device_id) {
             Ok(item) => {
                 let json = serde_json::to_vec(&item).unwrap_or_default();
@@ -862,7 +875,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::update_item(
             &mut conn,
             &req.id,
@@ -892,7 +905,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::rename_folder(&mut conn, &req.id, &req.name, device_id) {
             Ok(folder) => {
                 let json = serde_json::to_vec(&folder).unwrap_or_default();
@@ -915,7 +928,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::move_folder(&mut conn, &req.id, req.parent_id.as_deref(), device_id) {
             Ok(folder) => {
                 let json = serde_json::to_vec(&folder).unwrap_or_default();
@@ -938,7 +951,7 @@ fn handle_connection(
                 return Ok(());
             }
         };
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
         match storage::delete_folder(&mut conn, &req.id, device_id) {
             Ok(()) => {
                 send_response(&mut stream, 200, "OK", "application/json", b"{\"status\":\"deleted\"}", &[])?;
@@ -968,7 +981,7 @@ fn handle_connection(
         }
 
         let now = chrono::Utc::now().timestamp_millis();
-        let session_lock = pairing_session.lock().unwrap();
+        let session_lock = lock_recover(&pairing_session);
 
         // Verify against active session if one exists
         let is_valid = if let Some(ref active) = *session_lock {
@@ -992,7 +1005,7 @@ fn handle_connection(
         let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
         let peer_id = req.device_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let auth_token = uuid::Uuid::new_v4().to_string();
-        let conn = db.lock().unwrap();
+        let conn = lock_recover(&db);
         let _ = conn.execute(
             "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -1035,7 +1048,7 @@ fn handle_connection(
         }).or_else(|| headers.get("x-device-id").cloned());
 
         // Authorization already happened in the central gate above.
-let conn = db.lock().unwrap();
+let conn = lock_recover(&db);
 
         let revisions = crate::sync::protocol::query_revisions_since(&conn, since, caller_device_id.as_deref()).unwrap_or_default();
         let latest_ts = revisions.last().map(|r| r.timestamp).unwrap_or(since);
@@ -1070,7 +1083,7 @@ let conn = db.lock().unwrap();
             }
         };
 
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
 
         let applied = crate::sync::protocol::apply_remote_revisions(&mut conn, &req.revisions).unwrap_or(0);
         let _ = crate::sync::pairing::update_peer_last_sync(&conn, &req.device_id);
@@ -1087,7 +1100,7 @@ let conn = db.lock().unwrap();
 
     // Sync Status & Discovered Peers: GET /api/sync/status and GET /api/sync/peers
     if path == "/api/sync/status" && method == "GET" {
-        let conn = db.lock().unwrap();
+        let conn = lock_recover(&db);
         let paired = crate::sync::pairing::list_paired_devices(&conn).unwrap_or_default();
         let paired_ids: Vec<String> = paired.iter().map(|p| p.device_id.clone()).collect();
         let resp = serde_json::json!({
@@ -1166,7 +1179,7 @@ let conn = db.lock().unwrap();
         let _ = fs::create_dir_all(base_dir.join("media"));
         let _ = fs::create_dir_all("media");
 
-        let mut conn = db.lock().unwrap();
+        let mut conn = lock_recover(&db);
 
         // Ensure item exists in vault_items for foreign key constraint
         let existing_item: Option<VaultItem> = if let Some(ref iid) = upload_item_id {
