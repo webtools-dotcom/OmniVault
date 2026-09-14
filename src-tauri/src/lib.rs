@@ -530,6 +530,56 @@ pub fn run() {
     let device_id = storage::get_or_create_device_id(&conn).expect("failed to get device_id");
     let _ = storage::seed_defaults_if_empty(&mut conn, &device_id);
 
+    // Move any pre-D-035 inline base64 images onto disk. No-op on a clean vault.
+    let mut reclaimed = 0usize;
+    match db::media::migrate_inline_media_to_disk(&mut conn, &base_dir, &device_id) {
+        Ok(n) => reclaimed += n,
+        Err(e) => eprintln!("[media] inline media migration failed: {e:?}"),
+    }
+    // The live rows are usually already clean; the bulk of the bloat sits in the
+    // append-only revision log, which still carries the payloads those rows had
+    // before D-035.
+    match db::media::compact_inline_media_in_revisions(&mut conn, &base_dir) {
+        Ok(n) => reclaimed += n,
+        Err(e) => eprintln!("[media] revision compaction failed: {e:?}"),
+    }
+    // Collapse the duplicate snapshots left behind by the autosave loop (D-055).
+    match db::media::compact_redundant_item_revisions(&mut conn) {
+        Ok(0) => {}
+        Ok(n) => {
+            println!("[revisions] dropped {n} duplicate item revision(s)");
+            reclaimed += n;
+        }
+        Err(e) => eprintln!("[revisions] compaction failed: {e:?}"),
+    }
+    if reclaimed > 0 {
+        println!("[media] reclaimed {reclaimed} oversized or duplicate row(s)");
+    }
+
+    // Deleting rows only marks their pages free; the file keeps its size until
+    // a VACUUM rewrites it. Trigger on measured free space rather than on
+    // whether this particular run compacted anything, so a database left
+    // bloated by an earlier run still recovers — and so a healthy database
+    // never pays for a VACUUM it does not need.
+    let free_ratio = {
+        let free: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap_or(0);
+        let total: i64 = conn.query_row("PRAGMA page_count", [], |r| r.get(0)).unwrap_or(0);
+        if total > 0 { free as f64 / total as f64 } else { 0.0 }
+    };
+    if free_ratio > 0.25 {
+        println!("[db] {:.0}% of the database file is unused; compacting", free_ratio * 100.0);
+        if let Err(e) = conn.execute_batch("VACUUM;") {
+            eprintln!("[db] VACUUM failed: {e}");
+        }
+        // The database runs in WAL mode, so VACUUM's result lands in the -wal
+        // file and the space is not actually returned to the filesystem until a
+        // checkpoint folds it back. Without this the vault looks compacted in
+        // SQLite's own terms while still occupying the old size on disk.
+        if let Err(e) = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);") {
+            eprintln!("[db] WAL checkpoint after VACUUM failed: {e}");
+        }
+    }
+
     let db = Arc::new(Mutex::new(conn));
 
     // Start P2P Mesh Discovery on background thread with Tokio runtime

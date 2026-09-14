@@ -236,3 +236,363 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
+
+/// One-shot repair that moves inline `data:image/...;base64,...` payloads out of
+/// `vault_items.content` and onto disk as content-addressed WebP.
+///
+/// Architecture Rule 3 and D-003 put media on disk precisely so the database
+/// stays small and sync stays cheap, but the D-035 migration to disk-backed
+/// WebP only changed the write path — rows created before it kept their inline
+/// payloads. Those rows bloat every delta that touches them and had grown the
+/// active database past its 15 MB budget. See D-058.
+///
+/// Returns the number of items migrated. Safe to call on every startup: it
+/// selects only rows that still carry a data URL, so a clean vault does nothing.
+pub fn migrate_inline_media_to_disk<P: AsRef<Path>>(
+    conn: &mut Connection,
+    storage_dir: P,
+    device_id: &str,
+) -> Result<usize, MediaError> {
+    let pending: Vec<(String, String, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content FROM vault_items
+             WHERE is_deleted = 0 AND content LIKE 'data:image/%'",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        rows.flatten().collect()
+    };
+
+    let mut migrated = 0usize;
+    for (item_id, title, content) in pending {
+        let bytes = match crate::http_server::decode_base64(&content) {
+            Ok(b) if !b.is_empty() => b,
+            // A payload we cannot decode is left exactly as it is: dropping it
+            // would destroy the only copy of the user's image.
+            _ => {
+                eprintln!("[media] item {item_id} has an undecodable inline payload; left untouched");
+                continue;
+            }
+        };
+
+        let media = match save_image_media(conn, storage_dir.as_ref(), &item_id, &bytes, device_id) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("[media] item {item_id} could not be written to disk ({e:?}); left untouched");
+                continue;
+            }
+        };
+
+        // Only rewrite the row once the bytes are safely on disk, so an
+        // interrupted run can never leave an item pointing at a missing file.
+        let new_content = format!("/api/media/{}.webp", media.file_hash);
+        if let Err(e) = crate::db::storage::update_item(
+            conn,
+            &item_id,
+            &title,
+            &new_content,
+            None,
+            device_id,
+        ) {
+            eprintln!("[media] item {item_id} saved to disk but the row was not updated ({e:?})");
+            continue;
+        }
+        migrated += 1;
+    }
+
+    Ok(migrated)
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    use crate::db::schema::initialize_schema;
+    use crate::db::storage::{create_item, get_item_by_id};
+    use image::{Rgba, RgbaImage};
+
+    fn png_bytes() -> Vec<u8> {
+        let mut img = RgbaImage::new(8, 8);
+        for p in img.pixels_mut() {
+            *p = Rgba([10, 120, 220, 255]);
+        }
+        let mut buf = Vec::new();
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
+            .unwrap();
+        buf
+    }
+
+    fn b64(bytes: &[u8]) -> String {
+        const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::new();
+        for c in bytes.chunks(3) {
+            let b = [c[0], *c.get(1).unwrap_or(&0), *c.get(2).unwrap_or(&0)];
+            let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+            out.push(T[(n >> 18) as usize & 63] as char);
+            out.push(T[(n >> 12) as usize & 63] as char);
+            out.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
+            out.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' });
+        }
+        out
+    }
+
+    #[test]
+    fn inline_payloads_move_to_disk_and_plain_notes_are_left_alone() {
+        let dir = std::env::temp_dir().join(format!("ov_mig_{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+        let dev = "test-device";
+
+        let data_url = format!("data:image/png;base64,{}", b64(&png_bytes()));
+        let image_item = create_item(&mut conn, None, "image", "inline shot", &data_url, None, dev).unwrap();
+        let note_item = create_item(&mut conn, None, "note", "just text", "not a data url", None, dev).unwrap();
+
+        let moved = migrate_inline_media_to_disk(&mut conn, &dir, dev).unwrap();
+        assert_eq!(moved, 1, "exactly the one inline payload should migrate");
+
+        let migrated = get_item_by_id(&conn, &image_item.id).unwrap().unwrap();
+        assert!(
+            migrated.content.starts_with("/api/media/") && migrated.content.ends_with(".webp"),
+            "content should now reference a file on disk, got: {}",
+            migrated.content
+        );
+        let hash = migrated.content.trim_start_matches("/api/media/").trim_end_matches(".webp");
+        assert!(
+            dir.join("media").join(format!("{hash}.webp")).exists(),
+            "the referenced blob must actually exist on disk before the row is rewritten"
+        );
+
+        let untouched = get_item_by_id(&conn, &note_item.id).unwrap().unwrap();
+        assert_eq!(untouched.content, "not a data url", "non-image rows must not be touched");
+
+        // Idempotent: a second pass has nothing left to do.
+        assert_eq!(migrate_inline_media_to_disk(&mut conn, &dir, dev).unwrap(), 0);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+/// Replaces inline `data:image/...` payloads inside historical revision rows
+/// with a reference to the same bytes on disk.
+///
+/// The revision log is append-only and is the substrate mesh sync replays
+/// (D-012, D-017), so rows are never deleted here — only the oversized
+/// `content` field inside a payload is swapped for `/api/media/<hash>.webp`
+/// pointing at bytes that are written to disk first. A peer replaying such a
+/// revision now receives a reference and pulls the blob through the
+/// self-healing media path (D-055/P9-T02) instead of carrying megabytes of
+/// base64 through every delta. Causality, ordering and timestamps are
+/// untouched, so Last-Write-Wins convergence is unaffected. See D-058.
+pub fn compact_inline_media_in_revisions<P: AsRef<Path>>(
+    conn: &mut Connection,
+    storage_dir: P,
+) -> Result<usize, MediaError> {
+    let pending: Vec<(i64, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, payload FROM revisions WHERE payload LIKE '%data:image/%'",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.flatten().collect()
+    };
+
+    let media_dir = storage_dir.as_ref().join("media");
+    fs::create_dir_all(&media_dir)?;
+
+    let mut compacted = 0usize;
+    for (rev_id, payload) in pending {
+        let mut json: serde_json::Value = match serde_json::from_str(&payload) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let Some(content) = json.get("content").and_then(|c| c.as_str()) else {
+            continue;
+        };
+        if !content.starts_with("data:image/") {
+            continue;
+        }
+
+        let Ok(bytes) = crate::http_server::decode_base64(content) else {
+            continue;
+        };
+        if bytes.is_empty() {
+            continue;
+        }
+
+        // Encode to WebP before hashing, so `<hash>.webp` keeps its meaning:
+        // the SHA-256 of the file's own bytes (D-013/D-018). Writing raw PNG
+        // into a .webp name would still verify, but it would quietly break the
+        // convention every other reader relies on. Re-encoding the same source
+        // through the same pipeline yields the same hash the live row already
+        // points at, so this de-duplicates rather than adding a second copy.
+        let Ok(decoded) = image::load_from_memory(&bytes) else {
+            continue;
+        };
+        let mut webp_bytes = Vec::new();
+        if image::DynamicImage::ImageRgba8(decoded.to_rgba8())
+            .write_to(&mut Cursor::new(&mut webp_bytes), ImageFormat::WebP)
+            .is_err()
+        {
+            continue;
+        }
+
+        // Write the bytes out before rewriting the row, so the reference can
+        // never point at something that is not there.
+        let hash = compute_sha256(&webp_bytes);
+        let blob_path = media_dir.join(format!("{hash}.webp"));
+        if !blob_path.exists() {
+            let mut f = File::create(&blob_path)?;
+            f.write_all(&webp_bytes)?;
+        }
+
+        json["content"] = serde_json::Value::String(format!("/api/media/{hash}.webp"));
+        let rewritten = json.to_string();
+        conn.execute(
+            "UPDATE revisions SET payload = ?1 WHERE id = ?2",
+            params![rewritten, rev_id],
+        )?;
+        compacted += 1;
+    }
+
+    Ok(compacted)
+}
+
+/// Collapses runs of consecutive `vault_item/updated` revisions that describe
+/// the same state, keeping the newest of each run.
+///
+/// The autosave loop fixed in D-055 re-saved an open note roughly every 600 ms,
+/// producing thousands of snapshots that differ only in `updated_at`. They carry
+/// no information — the note did not change — but they are replayed to every
+/// peer and had grown the revision log to 13 MB across 5,276 rows.
+///
+/// This is deliberately narrow. Only consecutive duplicates within one entity
+/// are removed, and the newest of each run survives, so every state the item
+/// ever actually held is still represented and in order. Last-Write-Wins
+/// convergence depends on the newest revision per entity (D-017), which is
+/// always kept. Nothing is removed for folders, media, creations or deletions.
+/// See D-058.
+pub fn compact_redundant_item_revisions(conn: &mut Connection) -> Result<usize, MediaError> {
+    /// The fields that describe an item's actual state, ignoring `updated_at`.
+    fn state_signature(payload: &str) -> Option<String> {
+        let v: serde_json::Value = serde_json::from_str(payload).ok()?;
+        let field = |k: &str| v.get(k).map(|x| x.to_string()).unwrap_or_default();
+        Some([
+            field("title"),
+            field("content"),
+            field("folder_id"),
+            field("item_type"),
+            field("metadata"),
+            field("is_pinned"),
+            field("is_archived"),
+        ]
+        .join("\u{1f}"))
+    }
+
+    let rows: Vec<(i64, String, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, entity_id, payload FROM revisions
+             WHERE entity_type = 'vault_item' AND change_type = 'updated' AND payload IS NOT NULL
+             ORDER BY entity_id ASC, timestamp ASC, id ASC",
+        )?;
+        let mapped = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        mapped.flatten().collect()
+    };
+
+    // Walk each entity's history and mark all but the last of each identical run.
+    let mut doomed: Vec<i64> = Vec::new();
+    let mut run: Vec<i64> = Vec::new();
+    let mut run_key: Option<(String, String)> = None;
+    let flush = |run: &mut Vec<i64>, doomed: &mut Vec<i64>| {
+        if run.len() > 1 {
+            doomed.extend(run.drain(..run.len() - 1));
+        }
+        run.clear();
+    };
+
+    for (id, entity_id, payload) in rows {
+        let Some(sig) = state_signature(&payload) else { continue };
+        let key = (entity_id, sig);
+        if run_key.as_ref() != Some(&key) {
+            flush(&mut run, &mut doomed);
+            run_key = Some(key);
+        }
+        run.push(id);
+    }
+    flush(&mut run, &mut doomed);
+
+    if doomed.is_empty() {
+        return Ok(0);
+    }
+
+    let tx = conn.transaction()?;
+    for chunk in doomed.chunks(400) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        tx.execute(
+            &format!("DELETE FROM revisions WHERE id IN ({placeholders})"),
+            rusqlite::params_from_iter(chunk.iter()),
+        )?;
+    }
+    tx.commit()?;
+
+    Ok(doomed.len())
+}
+
+#[cfg(test)]
+mod revision_compaction_tests {
+    use super::*;
+    use crate::db::schema::initialize_schema;
+
+    fn insert_rev(conn: &Connection, entity: &str, change: &str, content: &str, updated_at: i64, ts: i64) {
+        let payload = format!(
+            r#"{{"id":"{entity}","title":"n","content":"{content}","folder_id":null,"item_type":"note","metadata":null,"is_pinned":false,"is_archived":false,"updated_at":{updated_at}}}"#
+        );
+        conn.execute(
+            "INSERT INTO revisions (entity_type, entity_id, device_id, change_type, payload, timestamp)
+             VALUES ('vault_item', ?1, 'dev', ?2, ?3, ?4)",
+            params![entity, change, payload, ts],
+        )
+        .unwrap();
+    }
+
+    fn remaining(conn: &Connection, change: &str) -> Vec<String> {
+        let mut stmt = conn
+            .prepare("SELECT payload FROM revisions WHERE change_type = ?1 ORDER BY timestamp ASC")
+            .unwrap();
+        let rows = stmt.query_map([change], |r| r.get::<_, String>(0)).unwrap();
+        rows.flatten().collect()
+    }
+
+    #[test]
+    fn collapses_autosave_duplicates_but_keeps_every_real_state() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+
+        // One creation, then the autosave loop's signature: the same state
+        // written over and over with only updated_at moving, a genuine edit,
+        // then more duplicates of the new state.
+        insert_rev(&conn, "item-a", "created", "hello", 100, 100);
+        for (i, ts) in [101, 102, 103, 104].iter().enumerate() {
+            insert_rev(&conn, "item-a", "updated", "hello", 100 + i as i64 + 1, *ts);
+        }
+        insert_rev(&conn, "item-a", "updated", "hello world", 200, 200);
+        insert_rev(&conn, "item-a", "updated", "hello world", 201, 201);
+        // A second item must not be confused with the first.
+        insert_rev(&conn, "item-b", "updated", "other", 300, 300);
+        insert_rev(&conn, "item-a", "deleted", "hello world", 400, 400);
+
+        let removed = compact_redundant_item_revisions(&mut conn).unwrap();
+        assert_eq!(removed, 4, "three redundant 'hello' plus one redundant 'hello world'");
+
+        let updates = remaining(&conn, "updated");
+        assert_eq!(updates.len(), 3, "one per distinct state per item");
+        assert!(updates[0].contains(r#""content":"hello""#) && updates[0].contains(r#""updated_at":104"#),
+            "the newest of a duplicate run must survive, not the oldest: {}", updates[0]);
+        assert!(updates[1].contains(r#""content":"hello world""#) && updates[1].contains(r#""updated_at":201"#));
+        assert!(updates[2].contains(r#""content":"other""#), "the other item is untouched");
+
+        assert_eq!(remaining(&conn, "created").len(), 1, "creations are never removed");
+        assert_eq!(remaining(&conn, "deleted").len(), 1, "deletions are never removed");
+
+        // Idempotent.
+        assert_eq!(compact_redundant_item_revisions(&mut conn).unwrap(), 0);
+    }
+}
