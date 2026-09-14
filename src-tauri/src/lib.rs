@@ -463,7 +463,12 @@ fn get_pairing_session_cmd(state: State<AppState>) -> Result<http_server::Active
         }
     }
 
-    let entropy = (chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0).abs() as u128) ^ 0x5DEECE66D;
+    // Cryptographically random, not timestamp-derived: the previous generator
+    // was `timestamp_nanos ^ constant`, which anyone who knew roughly when a PIN
+    // was issued could narrow to a handful of candidates. UUIDv4 is backed by
+    // getrandom, so this needs no new dependency. See D-057.
+    let bytes = *uuid::Uuid::new_v4().as_bytes();
+    let entropy = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64;
     let num = (entropy % 900_000) + 100_000;
     let pin_raw = format!("{:06}", num);
     let session = http_server::ActivePairingSession {

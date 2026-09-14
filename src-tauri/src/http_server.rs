@@ -27,6 +27,48 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// Failed pairing attempts per source address, as (count, window_start_ms).
+static PAIR_ATTEMPTS: std::sync::OnceLock<Mutex<HashMap<std::net::IpAddr, (u32, i64)>>> =
+    std::sync::OnceLock::new();
+
+/// How many wrong PINs one address may submit inside `PAIR_WINDOW_MS`.
+const PAIR_MAX_ATTEMPTS: u32 = 5;
+const PAIR_WINDOW_MS: i64 = 60_000;
+
+fn pair_attempts(
+) -> std::sync::MutexGuard<'static, HashMap<std::net::IpAddr, (u32, i64)>> {
+    lock_recover(PAIR_ATTEMPTS.get_or_init(|| Mutex::new(HashMap::new())))
+}
+
+/// True once an address has burned its budget of wrong PINs for this window.
+///
+/// Without this the 900,000-value PIN space is walkable inside a session's
+/// 120-second lifetime, which makes the length of the PIN irrelevant.
+fn pair_attempts_exhausted(ip: std::net::IpAddr, now: i64) -> bool {
+    let mut map = pair_attempts();
+    match map.get(&ip) {
+        Some(&(count, started)) if now - started < PAIR_WINDOW_MS => count >= PAIR_MAX_ATTEMPTS,
+        Some(_) => {
+            map.remove(&ip);
+            false
+        }
+        None => false,
+    }
+}
+
+fn record_failed_pair_attempt(ip: std::net::IpAddr, now: i64) {
+    let mut map = pair_attempts();
+    let entry = map.entry(ip).or_insert((0, now));
+    if now - entry.1 >= PAIR_WINDOW_MS {
+        *entry = (0, now);
+    }
+    entry.0 += 1;
+}
+
+fn clear_pair_attempts(ip: std::net::IpAddr) {
+    pair_attempts().remove(&ip);
+}
+
 /// Locks a mutex, recovering from poisoning rather than aborting the process.
 ///
 /// The release profile sets `panic = "abort"` (D-030), so a panic on any
@@ -981,25 +1023,49 @@ fn handle_connection(
         }
 
         let now = chrono::Utc::now().timestamp_millis();
-        let session_lock = lock_recover(&pairing_session);
 
-        // Verify against active session if one exists
-        let is_valid = if let Some(ref active) = *session_lock {
-            if now > active.expires_at {
-                false
-            } else {
-                let clean_active = active.pin.replace(' ', "");
-                clean_pin == clean_active
+        // Throttle before doing any comparison, so the 900,000-value PIN space
+        // cannot be walked during a session's 120-second lifetime.
+        let peer_ip = stream.peer_addr().map(|a| a.ip()).ok();
+        if let Some(ip) = peer_ip {
+            if pair_attempts_exhausted(ip, now) {
+                let err_json = serde_json::json!({
+                    "error": "Too many pairing attempts. Wait a minute and request a new PIN on the desktop."
+                });
+                send_response(&mut stream, 429, "Too Many Requests", "application/json", &err_json.to_string().into_bytes(), &[])?;
+                return Ok(());
             }
-        } else {
-            // Fallback for direct local testing or initial pairing if no session was requested
-            true
+        }
+
+        let mut session_lock = lock_recover(&pairing_session);
+
+        // A PIN is only valid against a session the desktop actually issued.
+        // This previously fell back to `true` when no session existed, which
+        // meant any caller could pair with any PIN whenever the user had not
+        // opened Connect Device — a complete bypass of the API gate. See D-057.
+        let is_valid = match *session_lock {
+            Some(ref active) if now <= active.expires_at => {
+                clean_pin == active.pin.replace(' ', "")
+            }
+            _ => false,
         };
 
         if !is_valid {
+            if let Some(ip) = peer_ip {
+                record_failed_pair_attempt(ip, now);
+            }
             let err_json = serde_json::json!({ "error": "Invalid or expired authorization PIN. Please check the PIN displayed on the desktop." });
             send_response(&mut stream, 401, "Unauthorized", "application/json", &err_json.to_string().into_bytes(), &[])?;
             return Ok(());
+        }
+
+        // Burn the session: a PIN authorises exactly one device. Leaving it live
+        // for the rest of its 120 seconds would let anyone who glimpsed the
+        // screen pair a second device afterwards.
+        *session_lock = None;
+        drop(session_lock);
+        if let Some(ip) = peer_ip {
+            clear_pair_attempts(ip);
         }
 
         let dev_name = req.device_name.unwrap_or_else(|| "Tablet Peer".to_string());
@@ -1730,6 +1796,31 @@ mod tests {
         assert!(
             resp.contains("401 Unauthorized"),
             "A lookalike *.tauri.localhost origin must not be treated as the desktop app"
+        );
+
+        // 15. Pairing must be impossible when the desktop has issued no PIN.
+        // This previously fell back to accepting ANY pin whenever no session
+        // existed — i.e. whenever the user had not opened Connect Device — so a
+        // caller could mint itself a permanent token and walk straight past the
+        // API gate. The test server starts with no session, which is exactly
+        // that state.
+        let pair_payload = br#"{"pin":"000000","device_name":"attacker","device_id":"attacker-device"}"#;
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        let req = format!(
+            "POST /api/pair HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            pair_payload.len(),
+            std::str::from_utf8(pair_payload).unwrap()
+        );
+        stream.write_all(req.as_bytes()).unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            !resp.contains("auth_token"),
+            "Pairing with no active session must never issue a token: {resp}"
+        );
+        assert!(
+            resp.contains("401 Unauthorized"),
+            "Pairing with no active session must be rejected, got: {resp}"
         );
 
         // Clean shutdown
