@@ -411,7 +411,19 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
                     } else if share_type == "image" {
                         if let Some(bin_file) = v.get("bin_file").and_then(|s| s.as_str()) {
                             let bin_path = std::path::PathBuf::from(bin_file);
-                            if bin_path.exists() {
+                            // The path comes out of a dropped file, so it only
+                            // gets to name something inside the app's own folder,
+                            // and only up to the size an upload is allowed to be.
+                            let inside_vault = bin_path
+                                .canonicalize()
+                                .ok()
+                                .zip(state.base_dir.canonicalize().ok())
+                                .map(|(p, base)| p.starts_with(&base))
+                                .unwrap_or(false);
+                            let sane_size = std::fs::metadata(&bin_path)
+                                .map(|m| m.len() <= 50 * 1024 * 1024)
+                                .unwrap_or(false);
+                            if inside_vault && sane_size {
                                 if let Ok(raw_bytes) = std::fs::read(&bin_path) {
                                     if let Ok(item) = storage::create_item(
                                         &mut conn,
@@ -422,18 +434,32 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
                                         None,
                                         &state.device_id,
                                     ) {
-                                        let _ = media::save_image_media(
+                                        // An unreadable image used to leave an
+                                        // empty item behind and delete the only
+                                        // copy of the picture with it.
+                                        match media::save_image_media(
                                             &mut conn,
                                             &state.base_dir,
                                             &item.id,
                                             &raw_bytes,
                                             &state.device_id,
-                                        );
-                                        processed_items.push(item);
+                                        ) {
+                                            Ok(_) => processed_items.push(item),
+                                            Err(e) => {
+                                                eprintln!("[share] could not store shared image: {e:?}");
+                                                let _ = storage::delete_item(
+                                                    &mut conn,
+                                                    &item.id,
+                                                    &state.device_id,
+                                                );
+                                            }
+                                        }
                                     }
                                 }
-                                let _ = std::fs::remove_file(&bin_path);
                             }
+                            // The shared file is a copy the share sheet made for
+                            // us; leaving it behind would pile up unread.
+                            let _ = std::fs::remove_file(&bin_path);
                         }
                     }
                 }

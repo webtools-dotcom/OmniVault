@@ -85,6 +85,34 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     onSaveRef.current = onSave;
   }, [onSave]);
 
+  // Writing the note is its own function so that closing the editor can flush a
+  // save that is still inside the debounce window. The effect cleanup cancels
+  // that pending timer, so typing and closing within 600ms used to drop the
+  // last edit without a word.
+  const persist = async (): Promise<boolean> => {
+    try {
+      const finalTitle = title.trim() || "Untitled Note";
+      const saved = await onSaveRef.current(
+        currentId,
+        finalTitle,
+        content,
+        folderId,
+        itemType
+      );
+      if (saved && saved.id) {
+        setCurrentId(saved.id);
+      }
+      setSaveStatus("saved");
+      return true;
+    } catch (err) {
+      console.error("Auto-save failed:", err);
+      setSaveStatus("error");
+      return false;
+    }
+  };
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+
   // Debounced auto-save effect
   useEffect(() => {
     if (!isOpen) return;
@@ -100,24 +128,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       window.clearTimeout(saveTimeoutRef.current);
     }
 
-    saveTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        const finalTitle = title.trim() || "Untitled Note";
-        const saved = await onSaveRef.current(
-          currentId,
-          finalTitle,
-          content,
-          folderId,
-          itemType
-        );
-        if (saved && saved.id) {
-          setCurrentId(saved.id);
-        }
-        setSaveStatus("saved");
-      } catch (err) {
-        console.error("Auto-save failed:", err);
-        setSaveStatus("error");
-      }
+    saveTimeoutRef.current = window.setTimeout(() => {
+      void persistRef.current();
     }, 600);
 
     return () => {
@@ -159,8 +171,15 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const charCount = content.length;
   const activeFolders = folders.filter((f) => !f.is_deleted);
 
-  const handleRequestClose = () => {
-    if (saveStatus === "error") {
+  const handleRequestClose = async () => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    // A save still inside the debounce window is finished here rather than
+    // thrown away by the effect cleanup.
+    const stillUnsaved = saveStatus === "saving" ? !(await persist()) : saveStatus === "error";
+    if (stillUnsaved) {
       const discard = window.confirm(
         "This note has not been saved to the vault. Close anyway and lose the unsaved changes?"
       );
