@@ -665,7 +665,14 @@ export const StorageService = {
       });
 
       if (!res.ok) {
+        // Returning null here sends the caller down the inline-data-URL path,
+        // which is exactly the base64-in-the-database bloat D-035 removed - and
+        // it says nothing while doing it. Local-only mode still wants that
+        // fallback; a device with somewhere to put the file does not.
         console.warn(`Failed to upload media, status: ${res.status}`);
+        if (isTauriEnvironment() || StorageService.isPaired()) {
+          throw new VaultWriteError("store this image");
+        }
         return null;
       }
 
@@ -683,7 +690,11 @@ export const StorageService = {
       }
       return result;
     } catch (err) {
+      if (err instanceof VaultWriteError) throw err;
       console.warn("Upload media error:", err);
+      if (isTauriEnvironment() || StorageService.isPaired()) {
+        throw new VaultWriteError("store this image");
+      }
       return null;
     }
   },

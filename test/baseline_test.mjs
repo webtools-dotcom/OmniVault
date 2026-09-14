@@ -307,3 +307,33 @@ assert.ok(
 );
 
 console.log("✅ Link scheme guard passed!");
+
+// 14. Regression guard: a pasted image must go through the media pipeline.
+// Handing the data URL straight to createItem writes the whole image into the
+// database and into a revision row, which is the base64 bloat D-035 removed.
+const appSrc = fs.readFileSync(path.resolve(process.cwd(), "src/App.tsx"), "utf-8");
+const pasteHandler = appSrc.slice(
+  appSrc.indexOf("onPasteImage"),
+  appSrc.indexOf("onPasteImage") + 1400
+);
+assert.ok(
+  pasteHandler.includes("uploadMedia"),
+  "the clipboard paste handler must upload the image rather than inline it"
+);
+
+// Upload failures must not degrade silently into an inline copy on a device
+// that has somewhere to put the file.
+const storageSrc = fs.readFileSync(
+  path.resolve(process.cwd(), "src/services/storageService.ts"),
+  "utf-8"
+);
+const uploadFn = storageSrc.slice(
+  storageSrc.indexOf("async uploadMedia"),
+  storageSrc.indexOf("async uploadMedia") + 2600
+);
+assert.ok(
+  uploadFn.includes("VaultWriteError"),
+  "a failed media upload must raise rather than return null on a paired device"
+);
+
+console.log("✅ Media capture path guards passed!");

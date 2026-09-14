@@ -5,7 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
 import { getFolderPath } from "./utils/folderTree";
-import { StorageService, isTauriEnvironment } from "./services/storageService";
+import { StorageService, isTauriEnvironment, cacheLocalMedia } from "./services/storageService";
 import { QuickInboxView } from "./components/inbox/QuickInboxView";
 import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
 import { MoveItemModal } from "./components/inbox/MoveItemModal";
@@ -376,6 +376,25 @@ export function App() {
       const now = new Date();
       const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
       const title = `Pasted Screenshot (${timeStr})`;
+
+      // Go through the media pipeline, as Quick Capture does. Handing the raw
+      // data URL to createItem writes the whole image into the database and
+      // into a revision row - the base64 bloat D-035 removed, re-created on
+      // every paste until the next restart cleaned it up again.
+      const uploaded = await StorageService.uploadMedia(dataUrl, { title });
+      if (uploaded?.item) {
+        if (uploaded.url) cacheLocalMedia(uploaded.url, dataUrl);
+        if (uploaded.file_hash) cacheLocalMedia(uploaded.file_hash, dataUrl);
+        await handleCaptureItem(
+          "image",
+          uploaded.item.title,
+          uploaded.item.content,
+          uploaded.item.metadata || undefined,
+          uploaded.item
+        );
+        return;
+      }
+
       await handleCaptureItem(
         "image",
         title,
