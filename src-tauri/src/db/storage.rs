@@ -46,6 +46,62 @@ pub fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+/// Serialises an item's current row as a revision payload.
+///
+/// `apply_remote_revisions` only applies a revision whose payload deserialises
+/// into a complete `VaultItem`, so a partial payload such as `"{}"` is silently
+/// discarded by the peer. Every item revision must therefore carry a full
+/// snapshot taken *after* the mutation. See D-060.
+fn item_snapshot_tx(tx: &Transaction, item_id: &str) -> String {
+    tx.query_row(
+        "SELECT id, folder_id, item_type, title, content, metadata, is_pinned, is_archived, is_deleted, created_at, updated_at
+         FROM vault_items WHERE id = ?1",
+        params![item_id],
+        |row| {
+            Ok(VaultItem {
+                id: row.get(0)?,
+                folder_id: row.get(1)?,
+                item_type: row.get(2)?,
+                title: row.get(3)?,
+                content: row.get(4)?,
+                metadata: row.get(5)?,
+                is_pinned: row.get::<_, i64>(6)? != 0,
+                is_archived: row.get::<_, i64>(7)? != 0,
+                is_deleted: row.get::<_, i64>(8)? != 0,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        },
+    )
+    .ok()
+    .and_then(|item| serde_json::to_string(&item).ok())
+    .unwrap_or_else(|| "{}".to_string())
+}
+
+/// Serialises a folder's current row as a revision payload. Same reasoning as
+/// `item_snapshot_tx`.
+fn folder_snapshot_tx(tx: &Transaction, folder_id: &str) -> String {
+    tx.query_row(
+        "SELECT id, parent_id, name, color, created_at, updated_at, is_deleted
+         FROM folders WHERE id = ?1",
+        params![folder_id],
+        |row| {
+            Ok(Folder {
+                id: row.get(0)?,
+                parent_id: row.get(1)?,
+                name: row.get(2)?,
+                color: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+                is_deleted: row.get::<_, i64>(6)? != 0,
+            })
+        },
+    )
+    .ok()
+    .and_then(|f| serde_json::to_string(&f).ok())
+    .unwrap_or_else(|| "{}".to_string())
+}
+
 fn record_revision_tx(
     tx: &Transaction,
     entity_type: &str,
@@ -214,7 +270,8 @@ pub fn delete_folder(
             "UPDATE folders SET is_deleted = 1, updated_at = ?1 WHERE id = ?2",
             params![now, fid],
         )?;
-        record_revision_tx(&tx, "folder", fid, device_id, "deleted", "{}", now)?;
+        let payload = folder_snapshot_tx(&tx, fid);
+        record_revision_tx(&tx, "folder", fid, device_id, "deleted", &payload, now)?;
     }
 
     // 3. Re-parent child items across all deleted folders to Quick Inbox (folder_id = NULL)
@@ -239,7 +296,7 @@ pub fn delete_folder(
                 &item_id,
                 device_id,
                 "moved",
-                "{\"folder_id\":null}",
+                &item_snapshot_tx(&tx, &item_id),
                 now,
             )?;
         }
@@ -425,7 +482,8 @@ pub fn set_item_archive(
     )?;
 
     let action = if is_archived { "archived" } else { "unarchived" };
-    record_revision_tx(&tx, "vault_item", item_id, device_id, action, "{}", now)?;
+    let payload = item_snapshot_tx(&tx, item_id);
+    record_revision_tx(&tx, "vault_item", item_id, device_id, action, &payload, now)?;
 
     tx.commit()?;
     Ok(())
@@ -445,7 +503,8 @@ pub fn set_item_pin(
         params![if is_pinned { 1 } else { 0 }, now, item_id],
     )?;
 
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "pinned", "{}", now)?;
+    let payload = item_snapshot_tx(&tx, item_id);
+    record_revision_tx(&tx, "vault_item", item_id, device_id, "pinned", &payload, now)?;
 
     tx.commit()?;
     Ok(())
@@ -505,7 +564,8 @@ pub fn delete_item(
         params![now, item_id],
     )?;
 
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "deleted", "{}", now)?;
+    let payload = item_snapshot_tx(&tx, item_id);
+    record_revision_tx(&tx, "vault_item", item_id, device_id, "deleted", &payload, now)?;
 
     tx.commit()?;
     Ok(())
