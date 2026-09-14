@@ -696,16 +696,29 @@ fn handle_connection(
         // token for itself. A browser cannot forge Origin, so a hostile page
         // cannot use this path; a local native process could, but it can already
         // read the SQLite file directly, so nothing is lost by allowing it.
-        let is_desktop_self = stream
+        let from_loopback = stream
             .peer_addr()
             .map(|a| a.ip().is_loopback())
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        let is_desktop_self = from_loopback
             && cors_origin
                 .as_deref()
                 .map(|o| TAURI_ORIGINS.contains(&o))
                 .unwrap_or(false);
 
-        if !is_desktop_self {
+        // A plain `<img src>` is a no-CORS request, so the browser sends no
+        // `Origin` header at all - which meant the app's own webview, desktop and
+        // Android alike, was answered 401 for every one of its own pictures. Only
+        // freshly captured images rendered, because those are still in the
+        // in-memory cache; everything older showed a broken thumbnail. Reading a
+        // blob back over loopback exposes nothing a local process could not get
+        // from the media folder directly, and a foreign page still cannot read
+        // the pixels: it would need the 64-hex hash and it gets no CORS grant.
+        let is_local_media_read =
+            from_loopback && method == "GET" && path.starts_with("/api/media/");
+
+        if !is_desktop_self && !is_local_media_read {
             let (caller_id, caller_token) = extract_caller_credentials(&headers, query);
             // Absent credentials are a rejection, never a skipped check.
             let authorized = match (caller_id.as_deref(), caller_token.as_deref()) {
@@ -1954,6 +1967,45 @@ Connection: close
         assert!(
             resp.contains("400 Bad Request"),
             "A truncated body must be rejected, got: {resp}"
+        );
+
+        // 17. A `<img src>` from the app's own webview carries no Origin header,
+        // because a plain image load is a no-CORS request. It used to be answered
+        // 401, so every picture older than the current session showed as broken.
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(
+                b"GET /api/media/0000000000000000000000000000000000000000000000000000000000000000.webp HTTP/1.1
+Host: localhost
+Connection: close
+
+",
+            )
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            !resp.contains("401 Unauthorized"),
+            "a loopback media read must not be rejected for having no Origin: {resp}"
+        );
+        // 404 is the right answer for a hash that does not exist; the point is
+        // that the request reached the media route at all.
+        assert!(resp.contains("404 Not Found"), "expected the media route, got: {resp}");
+
+        // The exemption is loopback-only: everything else still needs a token.
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(b"GET /api/items HTTP/1.1
+Host: localhost
+Connection: close
+
+")
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            resp.contains("401 Unauthorized"),
+            "the media exemption must not widen to the rest of the API: {resp}"
         );
 
         // Clean shutdown

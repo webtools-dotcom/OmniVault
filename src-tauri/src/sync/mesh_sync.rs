@@ -50,7 +50,15 @@ fn collect_missing_media_hashes(
 ) -> Vec<String> {
     let mut hashes: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
 
-    if let Ok(mut stmt) = conn.prepare("SELECT file_hash FROM media_files") {
+    // Only media belonging to a live item. Without the join this asked for every
+    // blob the vault had ever heard of, including those of deleted items - which
+    // the startup sweep then removed again, so a deleted photo was re-downloaded
+    // from the peer on every sync and deleted on every launch, forever.
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT m.file_hash FROM media_files m
+         JOIN vault_items i ON i.id = m.item_id
+         WHERE i.is_deleted = 0",
+    ) {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for hash in rows.flatten() {
                 hashes.insert(hash);
@@ -508,6 +516,21 @@ mod tests {
         // Once it lands it must drop out of the repair set.
         std::fs::write(dir.join(format!("{}.webp", absent)), b"blob").unwrap();
         assert!(collect_missing_media_hashes(&conn, &dir, 25).is_empty());
+
+        // A deleted item's blob must not be asked for again: the startup sweep
+        // removes it, so fetching it would restart the same loop every sync.
+        conn.execute(
+            "INSERT INTO media_files (id, item_id, file_hash, relative_path, mime_type, byte_size, created_at)
+             VALUES ('m2', 'i2', ?1, ?2, 'image/webp', 4, 0)",
+            rusqlite::params![absent, format!("media/{}.webp", absent)],
+        )
+        .unwrap();
+        conn.execute("UPDATE vault_items SET is_deleted = 1", []).unwrap();
+        std::fs::remove_file(dir.join(format!("{absent}.webp"))).unwrap();
+        assert!(
+            collect_missing_media_hashes(&conn, &dir, 25).is_empty(),
+            "media of deleted items must not be re-fetched"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
