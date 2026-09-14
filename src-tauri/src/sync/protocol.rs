@@ -71,6 +71,29 @@ pub fn query_revisions_since(
     Ok(revisions)
 }
 
+/// A revision can name a parent that has not reached this device yet - clock
+/// skew reorders a batch, or the parent predates the window the peer sent. The
+/// schema enforces foreign keys, so inserting one aborted the whole
+/// transaction, and since the peer resends the same batch every round sync
+/// stalled permanently. Dropping just the unresolvable link keeps the row (an
+/// item lands in Quick Inbox, a folder at the root) and lets a later revision
+/// put it back where it belongs.
+fn resolve_parent(tx: &rusqlite::Transaction, table: &str, id: Option<&str>) -> Option<String> {
+    let id = id?;
+    let exists: i64 = tx
+        .query_row(
+            &format!("SELECT COUNT(*) FROM {table} WHERE id = ?1"),
+            params![id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if exists > 0 {
+        Some(id.to_string())
+    } else {
+        None
+    }
+}
+
 /// Deterministic Last-Write-Wins.
 ///
 /// Wall-clock timestamps do tie: two devices editing the same row inside the
@@ -162,7 +185,7 @@ pub fn apply_remote_revisions(
                                     is_deleted = excluded.is_deleted",
                                 params![
                                     folder.id,
-                                    folder.parent_id,
+                                    resolve_parent(&tx, "folders", folder.parent_id.as_deref()),
                                     folder.name,
                                     folder.color,
                                     folder.created_at,
@@ -220,7 +243,7 @@ pub fn apply_remote_revisions(
                                     updated_at = excluded.updated_at",
                                 params![
                                     item.id,
-                                    item.folder_id,
+                                    resolve_parent(&tx, "folders", item.folder_id.as_deref()),
                                     item.item_type,
                                     item.title,
                                     item.content,
@@ -240,7 +263,13 @@ pub fn apply_remote_revisions(
 
             "media_file" => {
                 if let Some(payload_str) = &rev.payload {
-                    if let Ok(media) = serde_json::from_str::<MediaFile>(payload_str) {
+                    // Same reasoning as resolve_parent: a media row whose item has
+                    // not arrived would abort the batch. The blob is re-fetched by
+                    // the missing-media sweep once the item lands.
+                    let media = serde_json::from_str::<MediaFile>(payload_str)
+                        .ok()
+                        .filter(|m| resolve_parent(&tx, "vault_items", Some(&m.item_id)).is_some());
+                    if let Some(media) = media {
                         tx.execute(
                             "INSERT INTO media_files (id, item_id, file_hash, relative_path, mime_type, byte_size, width, height, created_at)
                              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -399,5 +428,70 @@ mod tests {
         assert_eq!(read(&node_a), read(&node_b), "devices diverged on a timestamp tie");
         // Deterministic winner: the lexicographically greater row.
         assert_eq!(read(&node_a), "edit made on the tablet");
+    }
+
+    /// Foreign keys are on, so a revision naming a folder this device has never
+    /// seen used to abort the whole batch - and the peer resends the same batch
+    /// every round, so sync stopped for good.
+    #[test]
+    fn an_item_in_an_unknown_folder_still_lands_and_does_not_stall_the_batch() {
+        let mut conn = setup_node_db();
+        conn.execute_batch("PRAGMA foreign_keys = ON").unwrap();
+
+        let ts = 1_700_000_000_000i64;
+        let orphan = VaultItem {
+            id: "item-orphan".to_string(),
+            folder_id: Some("folder-nobody-has-seen".to_string()),
+            item_type: "note".to_string(),
+            title: "Arrived early".to_string(),
+            content: "body".to_string(),
+            metadata: None,
+            is_pinned: false,
+            is_archived: false,
+            is_deleted: false,
+            created_at: ts,
+            updated_at: ts,
+        };
+        let revs = vec![
+            Revision {
+                id: 0,
+                entity_type: "vault_item".to_string(),
+                entity_id: orphan.id.clone(),
+                device_id: "peer".to_string(),
+                change_type: "created".to_string(),
+                payload: Some(serde_json::to_string(&orphan).unwrap()),
+                timestamp: ts,
+            },
+            Revision {
+                id: 0,
+                entity_type: "vault_item".to_string(),
+                entity_id: "item-normal".to_string(),
+                device_id: "peer".to_string(),
+                change_type: "created".to_string(),
+                payload: Some(
+                    serde_json::to_string(&VaultItem {
+                        id: "item-normal".to_string(),
+                        folder_id: None,
+                        title: "Behind the orphan".to_string(),
+                        ..orphan.clone()
+                    })
+                    .unwrap(),
+                ),
+                timestamp: ts + 1,
+            },
+        ];
+
+        let applied = apply_remote_revisions(&mut conn, &revs)
+            .expect("an unresolvable folder must not fail the batch");
+        assert_eq!(applied, 2, "the revision behind the orphan must still apply");
+
+        let folder_id: Option<String> = conn
+            .query_row(
+                "SELECT folder_id FROM vault_items WHERE id = ?1",
+                ["item-orphan"],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(folder_id, None, "the orphan should land in Quick Inbox");
     }
 }
