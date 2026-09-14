@@ -159,6 +159,18 @@ export function App() {
     }
   }, [activeView, refreshFolderItems]);
 
+  // The server can stop accepting this device (pairing revoked, vault moved to
+  // a new machine, token rotated). Prompt to re-pair instead of showing what
+  // looks like an empty vault.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setIsPaired(false);
+      setIsPeerPinModalOpen(true);
+    };
+    window.addEventListener("omnivault:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("omnivault:unauthorized", handleUnauthorized);
+  }, []);
+
   const isPollingRef = useRef(false);
 
   // Real-time Auto-Sync: 2.5-second background polling + window focus revalidation + Android shares

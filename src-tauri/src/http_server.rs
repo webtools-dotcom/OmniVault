@@ -27,6 +27,23 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// Ceiling on concurrently handled connections.
+///
+/// The accept loop spawns one thread per connection. Unbounded, a caller on the
+/// LAN could open sockets faster than they complete and exhaust threads and
+/// memory — the listener is on 0.0.0.0, so this needs no credentials to attempt.
+/// Excess connections are closed immediately rather than queued. See D-061.
+const MAX_CONCURRENT_CONNECTIONS: usize = 64;
+static LIVE_CONNECTIONS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Decrements the live-connection count when a handler thread ends, however it ends.
+struct ConnectionSlot;
+impl Drop for ConnectionSlot {
+    fn drop(&mut self) {
+        LIVE_CONNECTIONS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Whether this device serves the browser client (the SPA and its assets).
 ///
 /// The sync API always listens, because mesh sync reaches a peer on this very
@@ -523,6 +540,16 @@ fn run_server_loop(
 
         match listener.accept() {
             Ok((stream, _addr)) => {
+                // Refuse rather than queue: a queue under flood is just a
+                // slower way to run out of memory.
+                if LIVE_CONNECTIONS.load(std::sync::atomic::Ordering::SeqCst)
+                    >= MAX_CONCURRENT_CONNECTIONS
+                {
+                    drop(stream);
+                    continue;
+                }
+                LIVE_CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
                 let db_clone = db.clone();
                 let dev_id_clone = device_id.clone();
                 let dist_clone = dist_dir.clone();
@@ -530,6 +557,8 @@ fn run_server_loop(
                 let reg_clone = peer_registry.clone();
 
                 thread::spawn(move || {
+                    // Released even if the handler panics or returns early.
+                    let _slot = ConnectionSlot;
                     let _ = handle_connection(stream, db_clone, &dev_id_clone, dist_clone.as_deref(), pair_clone, reg_clone);
                 });
             }
@@ -568,8 +597,22 @@ fn handle_connection(
     };
 
     let mut reader = BufReader::new(&stream);
+    // Bounded like the header lines below. Reading this unbounded let a caller
+    // on the LAN grow the buffer without limit by sending a long request line
+    // and never a newline — memory exhaustion from one socket. See D-061.
     let mut request_line = String::new();
-    if reader.read_line(&mut request_line)? == 0 {
+    if (&mut reader).take(8192).read_line(&mut request_line)? == 0 {
+        return Ok(());
+    }
+    if request_line.len() >= 8192 && !request_line.ends_with('\n') {
+        send_response(
+            &mut stream,
+            414,
+            "URI Too Long",
+            "text/plain",
+            b"Request line too long",
+            &[],
+        )?;
         return Ok(());
     }
 

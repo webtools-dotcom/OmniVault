@@ -205,6 +205,43 @@ pub fn move_folder(
     let now = Utc::now().timestamp_millis();
     let tx = conn.transaction()?;
 
+    // A folder must never become its own ancestor. D-021 described this guard,
+    // but it lived only in the TypeScript layer, so the Tauri command and
+    // POST /api/folders/move could both build a cycle — after which the
+    // recursive descendant walk in delete_folder has no base case. Enforcing it
+    // here means every caller inherits it. See D-061.
+    if let Some(target) = new_parent_id {
+        if target == folder_id {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "A folder cannot be moved into itself".to_string(),
+            ));
+        }
+        let mut cursor = Some(target.to_string());
+        let mut hops = 0;
+        while let Some(current) = cursor {
+            if current == folder_id {
+                return Err(rusqlite::Error::InvalidParameterName(
+                    "A folder cannot be moved inside one of its own subfolders".to_string(),
+                ));
+            }
+            // Defensive bound: if the tree is already cyclic from an older
+            // build or a peer, stop rather than spin.
+            hops += 1;
+            if hops > 256 {
+                return Err(rusqlite::Error::InvalidParameterName(
+                    "Folder hierarchy is too deep or already contains a cycle".to_string(),
+                ));
+            }
+            cursor = tx
+                .query_row(
+                    "SELECT parent_id FROM folders WHERE id = ?1",
+                    params![current],
+                    |r| r.get::<_, Option<String>>(0),
+                )
+                .unwrap_or(None);
+        }
+    }
+
     tx.execute(
         "UPDATE folders SET parent_id = ?1, updated_at = ?2 WHERE id = ?3 AND is_deleted = 0",
         params![new_parent_id, now, folder_id],

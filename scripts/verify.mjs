@@ -13,7 +13,7 @@ const steps = [
   },
   {
     name: "Rust Core Compilation & Unit Test Suite (cargo test)",
-    command: "cargo test --lib --test storage_integration_test --test sync_integration_test --test delete_propagation_test",
+    command: "cargo test --lib --test storage_integration_test --test sync_integration_test --test delete_propagation_test --test folder_cycle_test",
     cwd: "src-tauri",
   },
   {

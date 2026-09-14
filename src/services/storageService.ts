@@ -135,6 +135,20 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
     });
     if (!res.ok) {
       console.warn(`HTTP ${res.status} from ${path}`);
+      if (res.status === 401) {
+        // The server no longer accepts this device. Without saying so, the app
+        // would fall back to empty local storage and present an empty vault as
+        // though the notes were gone. Drop the stale credential and ask the
+        // app to prompt for re-pairing. See D-061.
+        try {
+          localStorage.removeItem(STORAGE_KEY_PAIRED);
+          localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
+          localStorage.removeItem(STORAGE_KEY_PEER_ID);
+          window.dispatchEvent(new CustomEvent("omnivault:unauthorized"));
+        } catch {
+          // Non-browser context; nothing to clear or notify.
+        }
+      }
       return null;
     }
     return (await res.json()) as T;
@@ -434,11 +448,11 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = await apiFetch<Folder>("/api/folders", {
+      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), parent_id: parentId, color }),
-      });
+      }), "create folder");
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().filter((f) => f.id !== serverFolder.id);
         folders.push(serverFolder);
@@ -474,11 +488,11 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = await apiFetch<Folder>("/api/folders/rename", {
+      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders/rename", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: folderId, name: newName.trim() }),
-      });
+      }), "rename folder");
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().map((f) => (f.id === folderId ? serverFolder : f));
         saveLocalFolders(folders);
@@ -510,11 +524,11 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = await apiFetch<Folder>("/api/folders/move", {
+      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: folderId, parent_id: newParentId }),
-      });
+      }), "move folder");
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().map((f) => (f.id === folderId ? serverFolder : f));
         saveLocalFolders(folders);
@@ -541,11 +555,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      await apiFetch("/api/folders/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: folderId }),
-      });
+      assertServerWrite(
+        await apiFetch<{ status: string }>("/api/folders/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: folderId }),
+        }),
+        "delete folder"
+      );
     }
 
     const folders = getLocalFolders();
@@ -909,11 +926,11 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItem = await apiFetch<VaultItem>("/api/items/toggle-pin", {
+      const serverItem = assertServerWrite(await apiFetch<VaultItem>("/api/items/toggle-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: itemId }),
-      });
+      }), "pin note");
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
         saveLocalItems(items);
@@ -940,11 +957,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      await apiFetch("/api/items/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: itemId }),
-      });
+      assertServerWrite(
+        await apiFetch<{ status: string }>("/api/items/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: itemId }),
+        }),
+        "delete note"
+      );
     }
 
     const items = getLocalItems();
