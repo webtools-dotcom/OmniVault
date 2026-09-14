@@ -22,6 +22,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [justSynced, setJustSynced] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +42,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
+    setCaptureError(null);
 
     try {
       let metadata: string | null = null;
@@ -112,7 +114,12 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       setTimeout(() => setJustSynced(false), 2000);
       inputRef.current?.focus();
     } catch (err) {
+      // Silence here used to mean a failed capture looked identical to a
+      // successful one apart from the text staying in the box.
       console.error("Quick capture failed:", err);
+      setCaptureError(
+        err instanceof Error ? err.message : "Could not save that. Try again."
+      );
     } finally {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
@@ -241,6 +248,12 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           )}
         </button>
       </form>
+
+      {captureError && (
+        <div className="mt-2 pt-1.5 border-t border-white/[0.06] text-xs text-rose-300 font-sans">
+          {captureError}
+        </div>
+      )}
 
       {/* Uploading progress status bar for large photos */}
       {isSubmitting && itemType === "image" && (

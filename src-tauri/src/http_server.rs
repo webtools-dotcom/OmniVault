@@ -751,10 +751,28 @@ fn handle_connection(
         return Ok(());
     }
 
-    // Read body if Content-Length specified
-    let mut body = vec![0u8; content_length];
+    // Read the body without trusting Content-Length for the allocation: a
+    // header claiming 50 MB used to reserve 50 MB before a single byte
+    // arrived, so 64 such claims could ask for 3 GB from a LAN peer that then
+    // sends nothing. Grow with what actually arrives, capped by the bound
+    // already enforced above.
+    let mut body = Vec::with_capacity(content_length.min(64 * 1024));
     if content_length > 0 {
-        reader.read_exact(&mut body)?;
+        let read = std::io::Read::by_ref(&mut reader)
+            .take(content_length as u64)
+            .read_to_end(&mut body)?;
+        if read != content_length {
+            let err = serde_json::json!({ "error": "Incomplete request body" });
+            send_response(
+                &mut stream,
+                400,
+                "Bad Request",
+                "application/json",
+                &err.to_string().into_bytes(),
+                &[],
+            )?;
+            return Ok(());
+        }
     }
 
     // Preflight CORS OPTIONS
@@ -1912,6 +1930,30 @@ mod tests {
         assert!(
             resp.contains("401 Unauthorized"),
             "Pairing with no active session must be rejected, got: {resp}"
+        );
+
+        // 16. A body that never arrives must not be believed. The declared
+        // Content-Length used to size the buffer up front, so a peer could
+        // claim megabytes, send nothing, and still cost the allocation.
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(
+                b"POST /api/folders HTTP/1.1
+Host: localhost
+Origin: http://tauri.localhost
+Content-Type: application/json
+Content-Length: 1048576
+Connection: close
+
+{}",
+            )
+            .unwrap();
+        stream.shutdown(std::net::Shutdown::Write).unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(
+            resp.contains("400 Bad Request"),
+            "A truncated body must be rejected, got: {resp}"
         );
 
         // Clean shutdown

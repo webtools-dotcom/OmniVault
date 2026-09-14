@@ -12,6 +12,8 @@ pub const DISCOVERY_PORT: u16 = 42424;
 pub const MULTICAST_IPV4: Ipv4Addr = Ipv4Addr::new(239, 255, 42, 99);
 pub const PROTOCOL_IDENTIFIER: &str = "omnivault-v1";
 pub const PEER_EXPIRY_SECONDS: i64 = 15;
+const MAX_TRACKED_PEERS: usize = 64;
+const MAX_PEER_NAME_CHARS: usize = 64;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveryBeacon {
@@ -43,8 +45,23 @@ impl PeerRegistry {
         }
     }
 
-    pub async fn register_or_update(&self, peer: PeerInfo) {
+    pub async fn register_or_update(&self, mut peer: PeerInfo) {
+        // Beacons are unauthenticated by nature, so anything in one is a claim,
+        // not a fact: a name is truncated before it reaches the UI, and the
+        // registry is capped so a flood of invented device ids cannot grow it
+        // without bound or point the sync loop at hundreds of made-up peers.
+        if peer.device_name.chars().count() > MAX_PEER_NAME_CHARS {
+            peer.device_name = peer.device_name.chars().take(MAX_PEER_NAME_CHARS).collect();
+        }
+
         let mut lock = self.peers.write().await;
+        if !lock.contains_key(&peer.device_id) && lock.len() >= MAX_TRACKED_PEERS {
+            let now = Utc::now().timestamp();
+            lock.retain(|_, p| (now - p.last_seen) < PEER_EXPIRY_SECONDS);
+            if lock.len() >= MAX_TRACKED_PEERS {
+                return;
+            }
+        }
         lock.insert(peer.device_id.clone(), peer);
     }
 
@@ -313,5 +330,25 @@ mod tests {
         assert_eq!(peers[0].device_id, "device-b");
         assert_eq!(peers[0].device_name, "Mobile Phone");
         assert_eq!(peers[0].sync_port, 42426);
+    }
+
+    #[tokio::test]
+    async fn a_beacon_flood_cannot_grow_the_registry_without_bound() {
+        let registry = PeerRegistry::new();
+        let now = Utc::now().timestamp();
+        for i in 0..500 {
+            registry
+                .register_or_update(PeerInfo {
+                    device_id: format!("spoofed-{i}"),
+                    device_name: "x".repeat(4000),
+                    sync_port: 42420,
+                    addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2)),
+                    last_seen: now,
+                })
+                .await;
+        }
+        assert_eq!(registry.peer_count().await, MAX_TRACKED_PEERS);
+        let peers = registry.get_active_peers().await;
+        assert!(peers.iter().all(|p| p.device_name.chars().count() <= MAX_PEER_NAME_CHARS));
     }
 }

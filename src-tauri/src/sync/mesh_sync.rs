@@ -19,6 +19,15 @@ use crate::sync::protocol::{apply_remote_revisions, query_revisions_since};
 // ponytail: fixed cap, make it adaptive only if cold-start catchup feels slow.
 const MAX_MEDIA_FETCH_PER_SYNC: usize = 25;
 
+/// Nothing this app serves is larger than a 50 MB media upload, so anything
+/// past this is either a broken peer or something on the LAN pretending to be
+/// one. Without it a peer could declare a four-gigabyte body and have us
+/// reserve it up front - and with `panic = "abort"` a failed allocation takes
+/// the whole app down, not just the sync thread.
+const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RESPONSE_HEADERS: usize = 100;
+const MAX_HEADER_LINE: u64 = 8 * 1024;
+
 /// Pull the `<hash>` out of a `/api/media/<hash>.webp` reference.
 fn extract_media_hash(content: &str) -> Option<String> {
     let start = content.rfind("/api/media/")? + "/api/media/".len();
@@ -133,9 +142,11 @@ pub fn send_http_request(
     let mut resp_headers = HashMap::new();
     let mut resp_content_length: Option<usize> = None;
 
-    loop {
+    for _ in 0..MAX_RESPONSE_HEADERS {
         let mut line = String::new();
-        let bytes_read = reader.read_line(&mut line)?;
+        let bytes_read = Read::by_ref(&mut reader)
+            .take(MAX_HEADER_LINE)
+            .read_line(&mut line)?;
         if bytes_read == 0 {
             break;
         }
@@ -155,12 +166,23 @@ pub fn send_http_request(
         }
     }
 
-    let mut resp_body = Vec::new();
-    if let Some(len) = resp_content_length {
-        resp_body.resize(len, 0);
-        reader.read_exact(&mut resp_body)?;
-    } else {
-        reader.read_to_end(&mut resp_body)?;
+    let declared = resp_content_length.unwrap_or(MAX_RESPONSE_BYTES);
+    if declared > MAX_RESPONSE_BYTES {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("peer declared a {declared} byte response"),
+        ));
+    }
+    // Grow with what arrives rather than with what the peer claims.
+    let mut resp_body = Vec::with_capacity(declared.min(64 * 1024));
+    let read = Read::by_ref(&mut reader)
+        .take(declared as u64)
+        .read_to_end(&mut resp_body)?;
+    if resp_content_length.is_some() && read != declared {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "peer sent a shorter body than it declared",
+        ));
     }
 
     Ok(HttpResponse {
@@ -488,5 +510,38 @@ mod tests {
         assert!(collect_missing_media_hashes(&conn, &dir, 25).is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A peer on the LAN is not trusted to describe its own response.
+    #[test]
+    fn a_peer_declaring_an_absurd_body_is_refused_not_allocated() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                // Drain the request first: dropping a socket with unread data
+                // queued makes Windows reset the connection instead of closing
+                // it cleanly, and the client would never see the headers.
+                let mut junk = [0u8; 1024];
+                let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
+                let _ = stream.read(&mut junk);
+                let _ = stream.write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 4294967295\r\n\r\nnot four gigabytes",
+                );
+                let _ = stream.flush();
+                std::thread::sleep(Duration::from_millis(300));
+            }
+        });
+
+        let err = send_http_request(
+            addr,
+            "GET",
+            "/api/deltas",
+            &[],
+            None,
+            Duration::from_secs(5),
+        )
+        .expect_err("a 4 GB declared body must be refused");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }

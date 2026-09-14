@@ -206,7 +206,13 @@ function getLocalFolders(): Folder[] {
         ].includes(f.name)
     );
     if (cleaned.length !== parsed.length) {
-      saveLocalFolders(cleaned);
+      // Best-effort tidy-up of legacy demo rows; failing to persist it
+      // loses nothing the user wrote.
+      try {
+        saveLocalFolders(cleaned);
+      } catch {
+        /* keep the cleaned view even if it cannot be written back */
+      }
     }
     return cleaned;
   } catch {
@@ -214,11 +220,14 @@ function getLocalFolders(): Folder[] {
   }
 }
 
+// In an unpaired "Browse Local" session localStorage IS the vault, so a quota
+// failure here is lost data, not a cache miss. Surface it the same way a failed
+// server write is surfaced instead of reporting success the user cannot keep.
 function saveLocalFolders(folders: Folder[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(folders));
   } catch {
-    // Ignore quota errors
+    throw new VaultWriteError("save folders on this device");
   }
 }
 
@@ -233,7 +242,13 @@ function getLocalItems(): VaultItem[] {
       (item) => !DUMMY_ITEM_IDS.has(item.id) && !DUMMY_TITLES.has(item.title)
     );
     if (cleaned.length !== parsed.length) {
-      saveLocalItems(cleaned);
+      // Best-effort tidy-up of legacy demo rows; failing to persist it
+      // loses nothing the user wrote.
+      try {
+        saveLocalItems(cleaned);
+      } catch {
+        /* keep the cleaned view even if it cannot be written back */
+      }
     }
     return cleaned;
   } catch {
@@ -245,7 +260,7 @@ function saveLocalItems(items: VaultItem[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
   } catch {
-    // Ignore quota errors
+    throw new VaultWriteError("save this item on this device");
   }
 }
 
