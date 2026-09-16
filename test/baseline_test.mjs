@@ -337,3 +337,33 @@ assert.ok(
 );
 
 console.log("✅ Media capture path guards passed!");
+
+// 15. Regression guard: the Android release build must be allowed to load its
+// own images. A release APK sets usesCleartextTraffic=false, which blocks the
+// WebView from reading anything over plain HTTP - including the vault server on
+// loopback - so every picture rendered as a broken thumbnail while the same
+// code worked in a debug build. See D-069.
+const androidRes = path.resolve(
+  process.cwd(),
+  "src-tauri/gen/android/app/src/main/res/xml/network_security_config.xml"
+);
+assert.ok(fs.existsSync(androidRes), "android network security config is missing");
+const netCfg = fs.readFileSync(androidRes, "utf-8");
+assert.ok(
+  /<domain[^>]*>127\.0\.0\.1<\/domain>/.test(netCfg),
+  "loopback must be allowed to serve the app its own media over http"
+);
+assert.ok(
+  /<base-config[^>]*cleartextTrafficPermitted="false"/.test(netCfg),
+  "cleartext must stay off for everything that is not loopback"
+);
+const androidManifest = fs.readFileSync(
+  path.resolve(process.cwd(), "src-tauri/gen/android/app/src/main/AndroidManifest.xml"),
+  "utf-8"
+);
+assert.ok(
+  androidManifest.includes("@xml/network_security_config"),
+  "the manifest must reference the network security config, or it does nothing"
+);
+
+console.log("✅ Android cleartext policy guard passed!");
