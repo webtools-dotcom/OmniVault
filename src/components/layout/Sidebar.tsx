@@ -191,13 +191,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Node Profile & Mesh Status Dock */}
-      <div className="h-11 px-3 border-t border-white/[0.06] bg-vault-sidebar shrink-0 flex items-center justify-between text-xs select-none">
+      <div className="px-3 py-2.5 bg-vault-sidebar shrink-0 flex flex-col gap-2 text-xs select-none">
         <div
           onClick={onOpenPairing}
-          className={cn("flex items-center gap-2.5 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
+          className={cn("flex items-center gap-2.5 min-w-0 w-full", onOpenPairing && "cursor-pointer hover:opacity-90")}
           title={onOpenPairing ? "Connect a device" : undefined}
         >
-          <div className="w-6.5 h-6.5 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-primary shrink-0 shadow-xs">
+          <div className="w-6.5 h-6.5 rounded-lg bg-vault-elevated flex items-center justify-center text-vault-secondary shrink-0">
             {isMobile ? <Tablet className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
           </div>
           <div className="truncate min-w-0">
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={cn(
                   "w-1.5 h-1.5 rounded-full shrink-0",
                   meshState.peerCount > 0
-                    ? "bg-vault-success shadow-[0_0_6px_rgba(121,194,164,0.40)]"
+                    ? "bg-vault-success"
                     : "bg-vault-muted"
                 )}
               />
@@ -222,13 +222,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 pl-9">
           {onCycleZoom && (
             <button
               type="button"
               onClick={onCycleZoom}
-              title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle)`}
-              className="px-1.5 py-0.5 rounded bg-vault-primary/[0.04] hover:bg-vault-primary/[0.08] text-[0.667rem] text-vault-secondary hover:text-vault-primary border border-white/[0.06] transition-colors cursor-pointer"
+              title="Text size — click to cycle"
+              className="px-2 h-6 rounded-md bg-vault-elevated hover:bg-vault-overlay text-[0.6875rem] text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
             >
               {Math.round(zoomScale * 100)}%
             </button>
@@ -238,8 +238,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onOpenPairing}
-              title="Pairing & Network Settings"
-              className="w-6 h-6 flex items-center justify-center rounded-md text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.08] transition-colors cursor-pointer"
+              title="Connect a device"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated transition-colors cursor-pointer"
             >
               <QrCode className="w-3.5 h-3.5" />
             </button>
