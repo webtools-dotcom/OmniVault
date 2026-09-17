@@ -17,6 +17,14 @@ export default {
         "8.5": "2.125rem",
         "9.5": "2.375rem",
       },
+      fontFamily: {
+        // Archivo for the interface, Fraunces for titles. Both are self-hosted
+        // in public/fonts: a vault that works with the Wi-Fi off cannot fetch
+        // a webfont, and the fallbacks are what the UI would otherwise ship as.
+        sans: ["Archivo", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        display: ["Fraunces", "Georgia", "Times New Roman", "serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+      },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.28)",
       },
@@ -25,26 +33,36 @@ export default {
       },
       colors: {
         vault: {
-          bg: "#0A0B0E",
-          sidebar: "#0F1117",
-          panel: "#13151F",
-          card: "#181A24",
-          "card-hover": "#1F2230",
-          elevated: "#222536",
-          overlay: "#292C40",
-          border: "rgba(255, 255, 255, 0.08)",
-          "border-subtle": "rgba(255, 255, 255, 0.04)",
-          "border-active": "rgba(99, 102, 241, 0.5)",
-          primary: "#F4F4F7",
-          secondary: "#9EA4B5",
-          muted: "#666C80",
-          subtle: "#4B5063",
-          accent: "#4F46E5",
-          "accent-hover": "#6366F1",
-          "accent-subtle": "rgba(79, 70, 229, 0.12)",
-          success: "#10B981",
-          pending: "#F59E0B",
-          error: "#EF4444",
+          // Every neutral carries the same cool hue, so nothing reads as dead
+          // grey. D-070.
+          bg: "#0D0E11",
+          sidebar: "#101116",
+          panel: "#101116",
+          card: "#15161B",
+          "card-hover": "#191A20",
+          elevated: "#1C1D23",
+          overlay: "#24252C",
+          border: "rgba(233, 234, 239, 0.07)",
+          "border-subtle": "rgba(233, 234, 239, 0.04)",
+          "border-active": "rgba(233, 234, 239, 0.22)",
+          primary: "#E9EAEF",
+          secondary: "#A8AAB6",
+          muted: "#868A96",
+          subtle: "#6E7280",
+          // The primary action is ink on the ground, not a colour. The only
+          // chromatic values in the product are the two that mean something.
+          accent: "#E9EAEF",
+          "accent-hover": "#FFFFFF",
+          "accent-subtle": "rgba(233, 234, 239, 0.10)",
+          ink: "#12131A",
+          success: "#79C2A4",
+          pending: "#8E9AA8",
+          error: "#DE8A80",
+          // Folder identity: the one place a hue is picked for recognition
+          // rather than meaning, and never the only way to tell two apart.
+          moss: "#7E9E86",
+          slate: "#7D8CA8",
+          plum: "#9E86A0",
         }
       }
     },

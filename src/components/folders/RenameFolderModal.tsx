@@ -100,7 +100,7 @@ export const RenameFolderModal: React.FC<RenameFolderModalProps> = ({
               className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-xl text-xs sm:text-sm text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors"
               disabled={isSubmitting}
             />
-            {error && <p className="text-xs text-rose-400 mt-1.5">{error}</p>}
+            {error && <p className="text-xs text-vault-error mt-1.5">{error}</p>}
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-vault-border/60">

@@ -199,7 +199,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
         </div>
 
         {error && (
-          <div className="px-5 py-2.5 text-xs text-rose-400 bg-rose-500/10 border-t border-rose-500/20">
+          <div className="px-5 py-2.5 text-xs text-vault-error bg-vault-error/10 border-t border-vault-error/20">
             {error}
           </div>
         )}

@@ -43,9 +43,9 @@ export const DeleteFolderModal: React.FC<DeleteFolderModalProps> = ({
         aria-labelledby="delete-folder-title"
       >
         <div className="px-5 py-4 border-b border-vault-border flex items-center justify-between bg-vault-card/90">
-          <div className="flex items-center gap-2.5 text-rose-400 font-semibold text-sm">
-            <div className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+          <div className="flex items-center gap-2.5 text-vault-error font-semibold text-sm">
+            <div className="w-7 h-7 rounded-lg bg-vault-error/15 border border-vault-error/30 flex items-center justify-center text-vault-error shrink-0">
+              <AlertTriangle className="w-4 h-4 text-vault-error" />
             </div>
             <span id="delete-folder-title">Delete Folder</span>
           </div>
@@ -65,7 +65,7 @@ export const DeleteFolderModal: React.FC<DeleteFolderModalProps> = ({
           <p className="text-xs text-vault-muted leading-relaxed">
             Subfolders and items inside this folder will be soft-deleted. Changes will be synced across your local mesh network.
           </p>
-          {error && <p className="text-xs text-rose-400 mt-2">{error}</p>}
+          {error && <p className="text-xs text-vault-error mt-2">{error}</p>}
         </div>
 
         <div className="px-5 py-3.5 bg-vault-bg/60 border-t border-vault-border flex items-center justify-end gap-2">

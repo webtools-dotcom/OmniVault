@@ -198,7 +198,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         {/* Editor Header */}
         <div className="px-4 sm:px-6 py-3.5 border-b border-vault-border flex items-center justify-between gap-3 shrink-0 bg-vault-card/90">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-xl bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0 shadow-[0_0_12px_rgba(59,130,246,0.2)]">
+            <div className="w-8 h-8 rounded-xl bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0 shadow-xs">
               <FileText className="w-4 h-4 text-vault-accent" />
             </div>
 
@@ -206,8 +206,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Note Title..."
-              className="w-full font-semibold text-sm sm:text-base text-vault-primary bg-transparent focus:outline-none placeholder-vault-muted transition-colors tracking-tight"
+              placeholder="Untitled note"
+              className="w-full font-display font-semibold text-lg sm:text-xl text-vault-primary bg-transparent focus:outline-none placeholder-vault-subtle tracking-[-0.015em]"
             />
           </div>
 
@@ -275,20 +275,20 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Auto-save Status Badge */}
           <div className="shrink-0 flex items-center">
             {saveStatus === "saving" ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-vault-pending/10 text-vault-pending border border-vault-pending/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-vault-pending animate-pulse" />
                 <span>Saving</span>
               </span>
             ) : saveStatus === "error" ? (
               <span
                 title="This note has not reached the vault. Keep this window open and check your connection — typing again retries."
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-vault-error/10 text-vault-error border border-vault-error/30"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <span className="w-1.5 h-1.5 rounded-full bg-vault-error" />
                 <span>Not saved</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-vault-success/10 text-vault-success border border-vault-success/20">
                 <Check className="w-3 h-3" />
                 <span>Saved</span>
               </span>
@@ -325,7 +325,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Write your note in Markdown... Press $ to detect stock tickers automatically."
-                className="w-full h-full p-4 sm:p-6 bg-transparent text-vault-primary text-xs sm:text-sm font-sans placeholder-vault-muted resize-none focus:outline-none leading-relaxed selection:bg-vault-accent/30 selection:text-white"
+                className="w-full h-full p-4 sm:p-6 bg-transparent text-vault-primary text-xs sm:text-sm font-sans placeholder-vault-muted resize-none focus:outline-none leading-relaxed selection:bg-vault-accent/30 selection:text-vault-primary"
               />
             </div>
           )}
@@ -339,7 +339,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               )}
             >
               {content.trim() ? (
-                <div className="prose prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-100 prose-p:text-slate-300 prose-p:leading-relaxed prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-code:text-sky-300 prose-code:bg-vault-elevated prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l prose-blockquote:border-vault-accent/40 prose-blockquote:text-slate-400 prose-blockquote:bg-vault-elevated/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-xl">
+                <div className="vault-prose prose prose-invert max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-[-0.015em] prose-headings:text-vault-primary prose-p:text-vault-secondary prose-p:leading-[1.75] prose-li:text-vault-secondary prose-strong:text-vault-primary prose-code:text-vault-primary prose-code:bg-vault-elevated prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l prose-blockquote:border-vault-border-active prose-blockquote:text-vault-secondary prose-blockquote:py-1 prose-blockquote:px-4">
                   {renderMarkdown(content)}
                 </div>
               ) : (
@@ -354,7 +354,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         {/* Live Detected Market Symbols Bar */}
         {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
           <div className="px-4 sm:px-6 py-2.5 border-t border-vault-border/60 bg-vault-bg/60 flex items-center gap-3">
-            <span className="text-[0.815rem] font-semibold text-vault-muted uppercase tracking-wider shrink-0">
+            <span className="text-[0.815rem] font-semibold text-vault-muted  shrink-0">
               Detected Symbols:
             </span>
             <div className="flex-1 overflow-x-auto">
@@ -366,9 +366,9 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         {/* Editor Footer */}
         <div className="px-4 sm:px-6 py-3 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-[0.815rem]">{wordCount} words</span>
+            <span className="text-[0.815rem]">{wordCount} words</span>
             <span className="text-vault-muted">•</span>
-            <span className="font-mono text-[0.815rem]">{charCount} characters</span>
+            <span className="text-[0.815rem]">{charCount} characters</span>
             {item && onTogglePin && (
               <>
                 <span className="text-vault-muted">•</span>
@@ -381,7 +381,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors cursor-pointer",
                     isPinned
-                      ? "text-amber-400 bg-amber-400/10 font-medium"
+                      ? "text-vault-pending bg-vault-pending/10 font-medium"
                       : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated"
                   )}
                 >

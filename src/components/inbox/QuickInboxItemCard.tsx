@@ -15,6 +15,9 @@ import { resolveMediaUrl } from "../../services/storageService";
 
 export interface QuickInboxItemCardProps {
   item: VaultItem;
+  /** Shown in the footer so an item says where it lives, not how long it is. */
+  folderName?: string | null;
+  folderTint?: string | null;
   onTogglePin: (itemId: string) => Promise<void> | void;
   onOpenMove: (item: VaultItem) => void;
   onDeleteItem: (itemId: string) => Promise<void> | void;
@@ -35,6 +38,8 @@ function formatRelativeTime(timestamp: number): string {
 
 export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   item,
+  folderName,
+  folderTint,
   onTogglePin,
   onOpenMove,
   onDeleteItem,
@@ -42,8 +47,6 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   onViewImage,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const isTicker = item.item_type === "ticker";
-  const isLink = item.item_type === "link";
   const isImage = item.item_type === "image";
 
   // Auto-detect any stock/crypto tickers and web links in the item
@@ -73,127 +76,119 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       onDragEnd={handleDragEnd}
       onClick={() => onSelectItem?.(item)}
       className={cn(
-        "group relative bg-vault-card/90 hover:bg-vault-card border rounded-xl overflow-hidden transition-all duration-150 shadow-sm hover:shadow-xl cursor-pointer flex flex-col",
-        isDragging
-          ? "opacity-30 ring-1 ring-indigo-500 scale-[0.98]"
-          : item.is_pinned
-          ? "border-amber-500/30 bg-vault-card ring-1 ring-amber-500/20"
-          : "border-white/[0.08] hover:border-white/[0.18]"
+        "group relative rounded-xl transition-colors duration-150 cursor-pointer flex flex-col",
+        // A photo needs no panel: the picture is the item. Text sits one step
+        // above the ground instead of inside a bordered box. D-070.
+        isImage ? "bg-transparent" : "bg-vault-card hover:bg-vault-card-hover",
+        isDragging && "opacity-30 scale-[0.98]"
       )}
     >
-      {/* Modern Card Header */}
-      <div className="h-8 px-3 border-b border-white/[0.06] bg-vault-panel/60 flex items-center justify-between select-none text-xs shrink-0">
-        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-          {/* Status Badge */}
-          <span
-            className={cn(
-              "text-[0.741rem] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
-              item.is_pinned
-                ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                : isTicker
-                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                : isLink
-                ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
-                : isImage
-                ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
-                : "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
-            )}
-          >
-            {isTicker ? "Market" : isImage ? "Photo" : isLink ? "Link" : "Note"}
-          </span>
-
-          <h3 className="font-sans text-xs font-semibold text-zinc-100 truncate">
-            {item.title || "Untitled"}
-          </h3>
-        </div>
-
-        {/* Header Right Actions */}
+      {isImage && item.content ? (
         <div
-          className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity shrink-0"
-          onClick={(e) => e.stopPropagation()}
+          className="relative rounded-xl overflow-hidden bg-vault-card group/img"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewImage?.(resolveMediaUrl(item.content), item.title);
+          }}
         >
-          {/* Drag Handle */}
-          <div
-            className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-0.5 transition-colors"
-            title="Drag to folder"
-          >
-            <GripVertical className="w-3.5 h-3.5" />
+          <img
+            src={resolveMediaUrl(item.content)}
+            alt={item.title}
+            className="w-full h-auto max-h-64 object-cover block"
+          />
+          <div className="absolute inset-0 bg-vault-bg/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-vault-primary text-xs font-medium">
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>Open</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onTogglePin(item.id)}
-            title={item.is_pinned ? "Unpin" : "Pin to top"}
-            className={cn(
-              "w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer",
-              item.is_pinned && "text-amber-400 hover:text-amber-300"
-            )}
-          >
-            <Pin className={cn("w-3.5 h-3.5", item.is_pinned && "fill-current")} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenMove(item)}
-            title="Move to folder"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-          >
-            <FolderInput className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onDeleteItem(item.id)}
-            title="Delete"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
         </div>
-      </div>
+      ) : (
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="flex items-start gap-2">
+            <h3 className="flex-1 min-w-0 text-sm font-semibold text-vault-primary leading-snug line-clamp-2">
+              {item.title || "Untitled"}
+            </h3>
+            {item.is_pinned && (
+              <Pin className="w-3.5 h-3.5 mt-0.5 shrink-0 fill-current text-vault-primary" />
+            )}
+          </div>
 
-      {/* Card Content Body */}
-      <div className="p-3 text-xs flex-1 flex flex-col justify-between">
-        {/* Image Thumbnail */}
-        {isImage && item.content && (
-          <div
-            className="relative mb-2.5 rounded-lg overflow-hidden border border-white/[0.08] bg-vault-bg group/img max-h-40 flex items-center justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewImage?.(resolveMediaUrl(item.content), item.title);
-            }}
-          >
-            <img
-              src={resolveMediaUrl(item.content)}
-              alt={item.title}
-              className="w-full h-auto max-h-40 object-cover rounded-lg transition-transform duration-200 group-hover/img:scale-[1.02]"
-            />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-medium">
-              <Maximize2 className="w-3.5 h-3.5" />
-              <span>Zoom</span>
+          {item.content && (
+            <p className="mt-2 text-[0.8125rem] text-vault-secondary leading-relaxed line-clamp-3">
+              {item.content}
+            </p>
+          )}
+
+          {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
+            <div className="mt-3">
+              <SmartMarketLauncher tickers={detectedTickers} links={detectedLinks} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {/* Text Content */}
-        {!isImage && item.content && (
-          <p className="text-xs text-zinc-300 line-clamp-3 leading-relaxed mb-2 font-sans font-normal">
-            {item.content}
-          </p>
+      {/* Folder and age. Nothing else — a character count told nobody anything. */}
+      <div
+        className={cn(
+          "flex items-center gap-2 select-none text-xs text-vault-muted",
+          isImage ? "px-0.5 pt-2.5" : "px-4 pb-3"
         )}
-
-        {/* Smart Ticker & Link Launchers */}
-        {(detectedTickers.length > 0 || detectedLinks.length > 0) && (
-          <div className="mb-1.5">
-            <SmartMarketLauncher tickers={detectedTickers} links={detectedLinks} />
-          </div>
+      >
+        {isImage && (
+          <span className="flex-1 min-w-0 truncate text-vault-secondary">
+            {item.title || "Untitled"}
+          </span>
         )}
+        {!isImage && folderName && (
+          <>
+            <span
+              className="w-1.5 h-1.5 rounded-sm shrink-0"
+              style={{ backgroundColor: folderTint || "#7D8CA8" }}
+            />
+            <span className="flex-1 min-w-0 truncate">{folderName}</span>
+          </>
+        )}
+        {!isImage && !folderName && <span className="flex-1 min-w-0 truncate">Quick Inbox</span>}
+        <span className="shrink-0 text-vault-subtle">{formatRelativeTime(item.updated_at)}</span>
       </div>
 
-      {/* Footer Status Bar */}
-      <div className="h-6.5 px-3 border-t border-white/[0.04] bg-vault-panel/40 flex items-center justify-between text-[0.815rem] text-zinc-500 select-none shrink-0 font-sans">
-        <span>{formatRelativeTime(item.updated_at)}</span>
-        <span>{item.content?.length ? `${item.content.length} chars` : ""}</span>
+      {/* Actions stay out of the way until the item is actually under the cursor. */}
+      <div
+        className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary cursor-grab active:cursor-grabbing"
+          title="Drag to a folder"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </div>
+        <button
+          type="button"
+          onClick={() => onTogglePin(item.id)}
+          title={item.is_pinned ? "Unpin" : "Pin to the top"}
+          className={cn(
+            "w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
+            item.is_pinned ? "text-vault-primary" : "text-vault-secondary hover:text-vault-primary"
+          )}
+        >
+          <Pin className={cn("w-3.5 h-3.5", item.is_pinned && "fill-current")} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenMove(item)}
+          title="Move to a folder"
+          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
+        >
+          <FolderInput className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDeleteItem(item.id)}
+          title="Delete"
+          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary hover:text-vault-error transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

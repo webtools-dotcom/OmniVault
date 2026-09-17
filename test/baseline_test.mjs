@@ -367,3 +367,47 @@ assert.ok(
 );
 
 console.log("✅ Android cleartext policy guard passed!");
+
+// 16. Regression guard: the interface carries no colour of its own.
+// Every neutral comes from the tinted ramp in tailwind.config.js, and the only
+// chromatic tokens are the ones that carry meaning — synced, lost, and the
+// three folder marks. A raw Tailwind palette class is how the slop gets back
+// in, one indigo button at a time. See D-070.
+const PALETTE_CLASS =
+  /\b(?:bg|text|border|ring|from|to|via|fill|stroke|decoration|placeholder|shadow)-(?:indigo|violet|purple|blue|emerald|green|teal|cyan|amber|yellow|orange|red|rose|pink|fuchsia|sky|lime|zinc|slate|gray|neutral|stone)-[0-9]{2,3}\b/g;
+const uiFiles = [];
+const walk = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (/\.(tsx|ts)$/.test(entry.name)) uiFiles.push(full);
+  }
+};
+walk(path.resolve(process.cwd(), "src"));
+const offenders = [];
+for (const file of uiFiles) {
+  const hits = fs.readFileSync(file, "utf-8").match(PALETTE_CLASS);
+  if (hits) offenders.push(`${path.relative(process.cwd(), file)}: ${[...new Set(hits)].join(", ")}`);
+}
+assert.strictEqual(
+  offenders.length,
+  0,
+  "stock palette colours are back in the UI: " + offenders.join(" | ")
+);
+
+// The tokens those classes would have bypassed must actually exist.
+const tw = fs.readFileSync(path.resolve(process.cwd(), "tailwind.config.js"), "utf-8");
+for (const token of ["#0D0E11", "#E9EAEF", "#79C2A4", "#DE8A80", "#12131A"]) {
+  assert.ok(tw.includes(token), `tailwind.config.js lost the ${token} token`);
+}
+assert.ok(tw.includes("Archivo") && tw.includes("Fraunces"), "the type system is not wired up");
+
+// Both faces are bundled, so the vault looks the same with the Wi-Fi off.
+for (const font of ["archivo-latin.woff2", "fraunces-latin.woff2"]) {
+  assert.ok(
+    fs.existsSync(path.resolve(process.cwd(), "public/fonts", font)),
+    `${font} is not bundled — the UI would fall back to a system face offline`
+  );
+}
+
+console.log("✅ Palette and type-system guards passed!");

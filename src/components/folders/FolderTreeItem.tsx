@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Folder as FolderIcon,
   FolderPlus,
   MoreVertical,
   Edit2,
@@ -10,6 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Folder, FolderTreeNode } from "../../types";
+import { folderTint } from "../../utils/folderTint";
 import { cn } from "../../utils/cn";
 
 export interface FolderTreeItemProps {
@@ -122,10 +122,10 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
         className={cn(
           "group relative flex items-center h-8 pr-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer",
           isDragOver
-            ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-[0_0_12px_rgba(59,130,246,0.3)] scale-[1.01]"
+            ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-xs scale-[1.01]"
             : isActive
             ? "bg-vault-accent-subtle text-vault-primary font-semibold ring-1 ring-vault-accent/30 shadow-xs"
-            : "text-vault-secondary hover:text-vault-primary hover:bg-white/[0.04]"
+            : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]"
         )}
         style={{ paddingLeft: `${depth * 14 + 6}px` }}
         onClick={() => onSelectFolder(folder.id)}
@@ -152,13 +152,11 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
           )}
         </button>
 
-        {/* Folder Icon */}
-        <FolderIcon
-          className={cn(
-            "w-3.5 h-3.5 mr-2 shrink-0 transition-colors",
-            isActive ? "text-vault-accent" : "text-vault-muted group-hover:text-vault-secondary"
-          )}
-          style={folder.color ? { color: folder.color } : undefined}
+        {/* A small square in the folder's own tint, always beside its name so
+            colour is never the only way to tell two folders apart. D-070. */}
+        <span
+          className="w-1.5 h-1.5 rounded-sm mr-2.5 shrink-0"
+          style={{ backgroundColor: folderTint(folder) }}
         />
 
         {/* Folder Name */}
@@ -216,10 +214,10 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenCreateSubfolder(folder.id);
                   }}
-                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
-                  <FolderPlus className="w-3.5 h-3.5 text-blue-400" />
+                  <FolderPlus className="w-3.5 h-3.5 text-vault-secondary" />
                   <span>New Subfolder</span>
                 </button>
 
@@ -229,7 +227,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenRename(folder);
                   }}
-                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-vault-muted" />
@@ -242,7 +240,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenMove(folder);
                   }}
-                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <FolderInput className="w-3.5 h-3.5 text-vault-muted" />
@@ -257,7 +255,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                     setMenuOpen(false);
                     onOpenDelete(folder);
                   }}
-                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-rose-400 hover:bg-rose-500/10 text-left transition-colors cursor-pointer"
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-vault-error hover:bg-vault-error/10 text-left transition-colors cursor-pointer"
                   role="menuitem"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

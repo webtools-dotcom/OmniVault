@@ -13,13 +13,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary:
-        "bg-vault-accent text-white hover:bg-vault-accent-hover shadow-[0_2px_10px_rgba(59,130,246,0.3)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.45)] border border-blue-400/20 active:shadow-xs",
+        "bg-vault-accent text-vault-ink hover:bg-vault-accent-hover",
       secondary:
         "bg-vault-elevated text-vault-primary hover:bg-vault-card border border-vault-border hover:border-vault-border-active shadow-xs",
       ghost:
         "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/80 border border-transparent",
       danger:
-        "bg-rose-500/10 text-rose-400 hover:text-white hover:bg-rose-600 border border-rose-500/20 hover:border-rose-600 shadow-xs",
+        "bg-transparent text-vault-error hover:bg-vault-error hover:text-vault-ink",
       outline:
         "bg-transparent text-vault-secondary hover:text-vault-primary border border-vault-border hover:border-vault-border-active hover:bg-vault-elevated/40",
     };

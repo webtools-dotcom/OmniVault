@@ -24,16 +24,16 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-screen w-screen items-center justify-center bg-[#0A0B0E] p-6 text-[#F4F4F7] font-mono select-none">
+        <div className="flex h-screen w-screen items-center justify-center bg-[#0A0B0E] p-6 text-[#F4F4F7] select-none">
           <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#141418] p-6 shadow-2xl">
-            <div className="flex items-center gap-2 text-red-400 mb-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]" />
-              <span className="text-xs font-bold uppercase tracking-wider">Workspace Runtime Exception</span>
+            <div className="flex items-center gap-2 text-vault-error mb-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-vault-error shadow-[0_0_8px_rgba(248,113,113,0.8)]" />
+              <span className="text-xs font-medium">Workspace Runtime Exception</span>
             </div>
-            <p className="text-xs text-zinc-400 mb-4 leading-relaxed font-sans">
+            <p className="text-xs text-vault-secondary mb-4 leading-relaxed font-sans">
               An unexpected runtime state occurred while rendering the workspace.
             </p>
-            <div className="p-3 bg-[#18181D] border border-white/[0.06] rounded-xl text-[0.815rem] text-zinc-300 font-mono mb-4 break-all max-h-32 overflow-auto">
+            <div className="p-3 bg-[#18181D] border border-white/[0.06] rounded-xl text-[0.815rem] text-vault-secondary mb-4 break-all max-h-32 overflow-auto">
               {this.state.error?.message || "Unknown error"}
             </div>
             <div className="flex items-center justify-end gap-2">
@@ -42,7 +42,7 @@ class ErrorBoundary extends React.Component<
                 onClick={() => {
                   window.location.reload();
                 }}
-                className="h-8 px-4 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors cursor-pointer"
+                className="h-8 px-4 text-xs font-medium text-vault-ink bg-vault-accent hover:bg-vault-accent rounded-lg transition-colors cursor-pointer"
               >
                 Reload Workspace
               </button>

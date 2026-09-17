@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        "flex flex-col bg-vault-sidebar border-r border-white/[0.08] h-full transition-transform duration-200 select-none",
+        "flex flex-col bg-vault-sidebar h-full transition-transform duration-200 select-none",
         isMobile
           ? cn(
               "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl",
@@ -72,16 +72,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     >
       {/* Brand & App Header */}
-      <div className="h-9.5 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-vault-sidebar/90">
+      <div className="h-9.5 px-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-xs">
-            <ShieldCheck className="w-3.5 h-3.5" />
-          </div>
-          <span className="font-semibold text-xs tracking-tight text-zinc-100">
+          <ShieldCheck className="w-4 h-4 text-vault-primary" />
+          <span className="font-display font-semibold text-sm tracking-[-0.01em] text-vault-primary">
             OmniVault
-          </span>
-          <span className="text-[0.667rem] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
-            v0.1
           </span>
         </div>
 
@@ -90,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onClose}
             aria-label="Close sidebar"
-            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -99,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={onToggleCollapse}
             title="Collapse Sidebar (Ctrl+B)"
             aria-label="Collapse sidebar"
-            className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
           >
             <PanelLeftClose className="w-3.5 h-3.5" />
           </button>
@@ -110,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2.5 scrollbar-none">
         {/* Workspaces Header & Quick Inbox */}
         <div>
-          <div className="px-2 py-1 text-[0.741rem] font-bold uppercase tracking-wider text-zinc-500">
+          <div className="px-2 py-1 text-xs text-vault-subtle">
             Workspaces
           </div>
           <button
@@ -143,22 +138,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className={cn(
               "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150 text-left cursor-pointer",
               isInboxDragOver
-                ? "bg-blue-500/20 text-white font-medium ring-1 ring-blue-500/50"
+                ? "bg-vault-accent/20 text-vault-primary font-medium ring-1 ring-vault-border-active/50"
                 : isInboxActive
-                ? "bg-vault-card-hover text-white font-medium shadow-xs"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
+                ? "bg-vault-card-hover text-vault-primary font-medium shadow-xs"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]"
             )}
           >
             <Inbox
               className={cn(
                 "w-3.5 h-3.5 shrink-0 transition-colors",
-                isInboxActive ? "text-blue-400" : "text-zinc-500"
+                isInboxActive ? "text-vault-secondary" : "text-vault-muted"
               )}
             />
             <span className="flex-1 truncate">
               {isInboxDragOver ? "Drop to unfile" : "Quick Inbox"}
             </span>
-            <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] text-zinc-400">
+            <span className="text-[0.741rem] px-1.5 py-0.2 rounded bg-vault-primary/[0.06] text-vault-secondary">
               {inboxCount}
             </span>
           </button>
@@ -167,14 +162,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Folders Section with Hierarchical Tree */}
         <div>
           <div className="flex items-center justify-between px-2 py-1 mb-0.5">
-            <span className="text-[0.741rem] font-bold uppercase tracking-wider text-zinc-500">
+            <span className="text-xs text-vault-subtle">
               Folders
             </span>
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
               title="Create new folder"
-              className="w-5 h-5 flex items-center justify-center rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="w-5 h-5 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -202,11 +197,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={cn("flex items-center gap-2.5 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
           title={onOpenPairing ? "Manage Device Pairing & Mesh Sync" : undefined}
         >
-          <div className="w-6.5 h-6.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0 shadow-xs">
+          <div className="w-6.5 h-6.5 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-primary shrink-0 shadow-xs">
             {isMobile ? <Tablet className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
           </div>
           <div className="truncate min-w-0">
-            <span className="text-zinc-200 text-xs font-medium block truncate leading-tight">
+            <span className="text-vault-primary text-xs font-medium block truncate leading-tight">
               {isMobile ? "Tablet Node" : "Desktop Vault"}
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -214,11 +209,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={cn(
                   "w-1.5 h-1.5 rounded-full shrink-0",
                   meshState.peerCount > 0
-                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"
-                    : "bg-zinc-500"
+                    ? "bg-vault-success shadow-[0_0_6px_rgba(121,194,164,0.40)]"
+                    : "bg-vault-muted"
                 )}
               />
-              <span className="text-[0.741rem] text-zinc-400 truncate">
+              <span className="text-[0.741rem] text-vault-secondary truncate">
                 {meshState.peerCount > 0 ? `${meshState.peerCount} connected` : "Standalone"}
               </span>
             </div>
@@ -231,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               onClick={onCycleZoom}
               title={`UI Density: ${Math.round(zoomScale * 100)}% (Click to cycle)`}
-              className="px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[0.667rem] font-mono text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
+              className="px-1.5 py-0.5 rounded bg-vault-primary/[0.04] hover:bg-vault-primary/[0.08] text-[0.667rem] text-vault-secondary hover:text-vault-primary border border-white/[0.06] transition-colors cursor-pointer"
             >
               {Math.round(zoomScale * 100)}%
             </button>
@@ -242,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               onClick={onOpenPairing}
               title="Pairing & Network Settings"
-              className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.08] transition-colors cursor-pointer"
             >
               <QrCode className="w-3.5 h-3.5" />
             </button>

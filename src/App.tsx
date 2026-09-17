@@ -5,6 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ContentPane } from "./components/layout/ContentPane";
 import { getFolderPath } from "./utils/folderTree";
+import { folderTint } from "./utils/folderTint";
 import { StorageService, isTauriEnvironment, cacheLocalMedia } from "./services/storageService";
 import { QuickInboxView } from "./components/inbox/QuickInboxView";
 import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
@@ -534,20 +535,21 @@ export function App() {
                   type="button"
                   onClick={() => setIsQrModalOpen(true)}
                   title="Vault Synced • Tap to view mesh devices"
-                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 rounded-lg transition-all cursor-pointer shadow-xs"
+                  className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium text-vault-secondary bg-vault-card hover:bg-vault-card-hover rounded-lg transition-colors cursor-pointer"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                  <span>{meshState.peerCount > 0 ? `Synced (${meshState.peerCount})` : "Synced"}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-vault-success" />
+                  <span className="hidden sm:inline">{meshState.peerCount > 0 ? `Synced (${meshState.peerCount})` : "Synced"}</span>
+                  <span className="sm:hidden">{meshState.peerCount || ""}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsQrModalOpen(true)}
                   title="Tap to connect & pair with desktop or phone"
-                  className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-all cursor-pointer shadow-xs animate-pulse"
+                  className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium text-vault-secondary bg-vault-card hover:bg-vault-card-hover rounded-lg transition-colors cursor-pointer"
                 >
-                  <Radio className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Connect Device</span>
+                  <Radio className="w-3.5 h-3.5 text-vault-muted" />
+                  <span className="hidden sm:inline">Connect device</span>
                 </button>
               )}
               <button
@@ -556,10 +558,10 @@ export function App() {
                   setEditorItem(null);
                   setIsEditorOpen(true);
                 }}
-                className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(99,102,241,0.4)]"
+                className="h-8 px-2.5 sm:px-3 flex items-center gap-1.5 text-xs font-semibold text-vault-ink bg-vault-accent hover:bg-vault-accent-hover rounded-lg transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>New Note</span>
+                <span className="hidden sm:inline">New note</span>
               </button>
             </div>
           }
@@ -600,33 +602,35 @@ export function App() {
                 <div className="w-full max-w-2xl border border-white/[0.08] rounded-xl bg-vault-panel overflow-hidden shadow-xs">
                   <div className="h-8 px-3.5 border-b border-white/[0.06] bg-vault-card flex items-center justify-between text-xs select-none">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
-                      <span className="font-mono text-xs text-zinc-300">
+                      <span className="w-2 h-2 rounded-full bg-vault-pending" />
+                      <span className="text-xs text-vault-secondary">
                         vault://folder/{activeFolder?.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed"}
                       </span>
-                      <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400">
+                      <span className="text-[0.741rem] px-1.5 py-0.2 rounded bg-vault-primary/[0.05] text-vault-secondary">
                         directory
                       </span>
                     </div>
-                    <span className="font-mono text-[0.741rem] text-zinc-500">0 items</span>
+                    <span className="text-[0.741rem] text-vault-muted">0 items</span>
                   </div>
-                  <div className="p-4 sm:p-5 font-mono text-xs space-y-2">
-                    <div className="text-zinc-300 font-semibold flex items-center gap-2">
-                      <span className="text-amber-400">❯</span>
+                  <div className="p-4 sm:p-5 text-xs space-y-2">
+                    <div className="text-vault-secondary font-semibold flex items-center gap-2">
+                      <span className="text-vault-pending">❯</span>
                       <span>directory empty</span>
                     </div>
-                    <p className="text-zinc-500 text-[0.815rem] leading-relaxed">
+                    <p className="text-vault-muted text-[0.815rem] leading-relaxed">
                       Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
                     </p>
                   </div>
                 </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2.5">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 items-start">
                   {displayedFolderItems.map((item) => (
                     <QuickInboxItemCard
                       key={item.id}
                       item={item}
+                      folderName={activeFolder?.name}
+                      folderTint={activeFolder ? folderTint(activeFolder) : null}
                       onTogglePin={handleTogglePin}
                       onOpenMove={setTargetMoveFolderItem}
                       onDeleteItem={handleDeleteItem}
@@ -702,12 +706,12 @@ export function App() {
           />
           {vaultError && (
             <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
-              <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-950/90 px-4 py-2.5 text-xs text-rose-100 shadow-lg backdrop-blur-sm">
+              <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-vault-error/40 bg-vault-error/90 px-4 py-2.5 text-xs text-vault-error shadow-lg backdrop-blur-sm">
                 <span className="flex-1 leading-relaxed">{vaultError}</span>
                 <button
                   type="button"
                   onClick={() => setVaultError(null)}
-                  className="shrink-0 text-rose-300 hover:text-white cursor-pointer"
+                  className="shrink-0 text-vault-error hover:text-vault-primary cursor-pointer"
                   aria-label="Dismiss"
                 >
                   ×

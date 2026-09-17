@@ -263,7 +263,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-white/[0.08] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.18)]">
+            <div className="w-9 h-9 rounded-xl bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-secondary">
               <Wifi className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -278,7 +278,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-vault-muted hover:text-vault-primary rounded-lg p-1.5 hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="text-vault-muted hover:text-vault-primary rounded-lg p-1.5 hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -286,20 +286,20 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="px-6 pt-3 pb-0 border-b border-white/[0.06] bg-white/[0.01] flex items-center gap-2 shrink-0">
+        <div className="px-6 pt-3 pb-0 border-b border-white/[0.06] bg-vault-primary/[0.01] flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("mesh")}
             className={`flex items-center gap-2 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
               activeTab === "mesh"
-                ? "border-blue-500 text-blue-400"
+                ? "border-vault-border-active text-vault-secondary"
                 : "border-transparent text-vault-muted hover:text-vault-secondary"
             }`}
           >
             <Radio className="w-3.5 h-3.5" />
             <span>Mesh Network</span>
             {activePeers.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-blue-500/20 text-blue-300 text-[0.741rem] font-bold rounded-full">
+              <span className="ml-1 px-1.5 py-0.2 bg-vault-accent/20 text-vault-primary text-[0.741rem] font-bold rounded-full">
                 {activePeers.length}
               </span>
             )}
@@ -309,7 +309,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
             onClick={() => setActiveTab("browser")}
             className={`flex items-center gap-2 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
               activeTab === "browser"
-                ? "border-blue-500 text-blue-400"
+                ? "border-vault-border-active text-vault-secondary"
                 : "border-transparent text-vault-muted hover:text-vault-secondary"
             }`}
           >
@@ -323,11 +323,11 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
           {activeTab === "mesh" ? (
             <>
               {/* Mesh Header & Sync All Action */}
-              <div className="flex items-center justify-between p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl">
+              <div className="flex items-center justify-between p-3.5 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl">
                 <div className="flex items-center gap-2.5">
                   <div className="relative">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-vault-success shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    <span className="absolute inset-0 rounded-full bg-vault-success animate-ping opacity-40" />
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-vault-primary block">
@@ -348,28 +348,28 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   disabled={isSyncingManual}
                   className="h-8 px-3 text-xs font-semibold shrink-0 gap-1.5"
                 >
-                  <RefreshCw className={`w-3 h-3 ${isSyncingManual ? "animate-spin text-blue-400" : ""}`} />
+                  <RefreshCw className={`w-3 h-3 ${isSyncingManual ? "animate-spin text-vault-secondary" : ""}`} />
                   <span>{isSyncingManual ? "Syncing..." : "Sync All"}</span>
                 </Button>
               </div>
 
               {/* Sync Feedback Toast */}
               {syncFeedback && (
-                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+                <div className="p-2.5 bg-vault-success/10 border border-vault-success/20 text-vault-success rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium">{syncFeedback}</span>
                 </div>
               )}
 
               {pairSuccess && (
-                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+                <div className="p-2.5 bg-vault-success/10 border border-vault-success/20 text-vault-success rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium">{pairSuccess}</span>
                 </div>
               )}
 
               {pairError && (
-                <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+                <div className="p-2.5 bg-vault-error/10 border border-vault-error/20 text-vault-error rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium">{pairError}</span>
                 </div>
@@ -377,7 +377,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
               {/* Discovered LAN Peers List */}
               <div className="space-y-2.5">
-                <div className="text-[0.815rem] font-semibold text-vault-secondary uppercase tracking-wider flex items-center justify-between">
+                <div className="text-[0.815rem] font-semibold text-vault-secondary  flex items-center justify-between">
                   <span>Discovered Wi-Fi Peers</span>
                   <span className="text-[0.741rem] text-vault-muted font-normal">
                     {activePeers.length} discovered
@@ -385,8 +385,8 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 </div>
 
                 {activePeers.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-center space-y-2">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto text-blue-400">
+                  <div className="p-6 rounded-2xl bg-vault-primary/[0.02] border border-white/[0.06] text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-vault-accent/10 border border-vault-border-active/20 flex items-center justify-center mx-auto text-vault-secondary">
                       <Radio className="w-5 h-5 animate-pulse" />
                     </div>
                     <h3 className="text-xs font-semibold text-vault-primary">
@@ -406,22 +406,22 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       return (
                         <div
                           key={peer.device_id}
-                          className="p-3.5 bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.08] rounded-2xl transition-all space-y-3"
+                          className="p-3.5 bg-vault-primary/[0.03] hover:bg-vault-primary/[0.05] border border-white/[0.08] rounded-2xl transition-all space-y-3"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-vault-secondary">
+                              <div className="w-8 h-8 rounded-xl bg-vault-primary/[0.05] border border-white/[0.08] flex items-center justify-center text-vault-secondary">
                                 {isDesktop ? (
-                                  <Laptop className="w-4 h-4 text-blue-400" />
+                                  <Laptop className="w-4 h-4 text-vault-secondary" />
                                 ) : (
-                                  <Tablet className="w-4 h-4 text-emerald-400" />
+                                  <Tablet className="w-4 h-4 text-vault-success" />
                                 )}
                               </div>
                               <div className="text-left">
                                 <div className="text-xs font-semibold text-vault-primary flex items-center gap-1.5">
                                   <span>{peer.device_name}</span>
                                   {isPaired && (
-                                    <span className="px-1.5 py-0.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[0.741rem] font-semibold rounded-md">
+                                    <span className="px-1.5 py-0.5 bg-vault-success/15 border border-vault-success/30 text-vault-success text-[0.741rem] font-semibold rounded-md">
                                       Paired
                                     </span>
                                   )}
@@ -434,7 +434,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
                             <div>
                               {isPaired ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[0.815rem] font-medium rounded-xl border border-emerald-500/20">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-vault-success/10 text-vault-success text-[0.815rem] font-medium rounded-xl border border-vault-success/20">
                                   <Check className="w-3 h-3" />
                                   <span>Auto-Syncing</span>
                                 </span>
@@ -471,7 +471,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") handlePairPeer(peer);
                                   }}
-                                  className="flex-1 h-8 px-3 text-xs font-mono font-semibold bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted focus:outline-hidden focus:border-blue-500/50"
+                                  className="flex-1 h-8 px-3 text-xs font-mono font-semibold bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted focus:outline-hidden focus:border-vault-border-active/50"
                                 />
                                 <Button
                                   variant="primary"
@@ -500,10 +500,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               </div>
 
               {/* Direct IP & PIN Connection Card */}
-              <div className="p-4 bg-white/[0.03] hover:bg-white/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
+              <div className="p-4 bg-vault-primary/[0.03] hover:bg-vault-primary/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <div className="w-6 h-6 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-secondary">
                       <Link2 className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-xs font-semibold text-vault-primary">
@@ -528,7 +528,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                         placeholder="e.g. 192.168.1.10:42420"
                         value={manualHostInput}
                         onChange={(e) => setManualHostInput(e.target.value)}
-                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-indigo-500/50"
+                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
                       />
                     </div>
                     <div>
@@ -544,7 +544,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleManualPair();
                         }}
-                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-indigo-500/50"
+                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
                       />
                     </div>
                   </div>
@@ -571,10 +571,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               </div>
 
               {/* Local Device's Authorization PIN Card */}
-              <div className="p-4 bg-white/[0.03] border border-white/[0.08] rounded-2xl space-y-2">
+              <div className="p-4 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-400" />
+                    <ShieldCheck className="w-4 h-4 text-vault-secondary" />
                     <span className="text-xs font-semibold text-vault-primary">
                       This Device's Pairing PIN
                     </span>
@@ -582,12 +582,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyPin}
-                    className="text-[0.815rem] font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                    className="text-[0.815rem] font-mono text-vault-secondary hover:text-vault-primary flex items-center gap-1 cursor-pointer"
                   >
                     {copiedPin ? (
                       <>
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-400 font-semibold">Copied!</span>
+                        <Check className="w-3 h-3 text-vault-success" />
+                        <span className="text-vault-success font-semibold">Copied!</span>
                       </>
                     ) : (
                       <>
@@ -615,7 +615,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               {/* Browser access is off by default: serving a UI to browsers is
                   the one surface that exposes the hand-written HTTP parser to
                   unknown clients. Mesh sync is unaffected either way (D-059). */}
-              <div className="flex items-center justify-between p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl">
+              <div className="flex items-center justify-between p-3.5 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl">
                 <div className="min-w-0 pr-3 text-left">
                   <span className="text-xs font-semibold text-vault-primary block">
                     Allow browser access
@@ -634,12 +634,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   onClick={handleToggleBrowserAccess}
                   className={cn(
                     "relative w-11 h-6 rounded-full shrink-0 transition-colors cursor-pointer",
-                    browserAccess ? "bg-emerald-500/80" : "bg-white/[0.12]"
+                    browserAccess ? "bg-vault-success/80" : "bg-vault-primary/[0.12]"
                   )}
                 >
                   <span
                     className={cn(
-                      "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                      "absolute top-0.5 w-5 h-5 rounded-full bg-vault-primary transition-transform",
                       browserAccess ? "translate-x-5.5" : "translate-x-0.5"
                     )}
                   />
@@ -647,7 +647,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               </div>
 
               {!browserAccess && (
-                <p className="text-[0.741rem] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+                <p className="text-[0.741rem] text-vault-pending/90 bg-vault-pending/10 border border-vault-pending/25 rounded-xl px-3 py-2">
                   Turn this on before scanning the code below, or the page will not load.
                 </p>
               )}
@@ -655,7 +655,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               {/* Browser Access Tab */}
               <div className="flex flex-col items-center text-center space-y-5">
                 {/* High-Contrast Crisp QR Code Card */}
-                <div className="p-3.5 bg-white rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.06)] ring-4 ring-white/10">
+                <div className="p-3.5 bg-vault-primary rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.06)] ring-4 ring-white/10">
                   <svg
                     viewBox={`-4 -4 ${viewBoxSize} ${viewBoxSize}`}
                     className="w-44 h-44 shape-rendering-crispEdges block"
@@ -668,24 +668,24 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
                 {/* Connection URL Pill with 1-Click Copy */}
                 <div className="w-full space-y-2">
-                  <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider">
-                    <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 ">
+                    <Wifi className="w-3.5 h-3.5 text-vault-success" />
                     <span>Local Network URL</span>
                   </div>
                   <div className="flex items-center gap-2 p-1.5 pl-3.5 bg-vault-bg/90 border border-white/[0.08] rounded-xl shadow-inner">
-                    <span className="text-xs font-mono text-blue-400 flex-1 truncate text-left select-all font-medium">
+                    <span className="text-xs font-mono text-vault-secondary flex-1 truncate text-left select-all font-medium">
                       {lanInfo.url}
                     </span>
                     <Button
                       variant={copiedUrl ? "secondary" : "ghost"}
                       size="sm"
                       onClick={handleCopyUrl}
-                      className="h-8 px-3 text-xs shrink-0 rounded-lg hover:bg-white/[0.08]"
+                      className="h-8 px-3 text-xs shrink-0 rounded-lg hover:bg-vault-primary/[0.08]"
                     >
                       {copiedUrl ? (
                         <>
-                          <Check className="w-3.5 h-3.5 mr-1 text-emerald-400" />
-                          <span className="text-emerald-400 font-semibold">Copied!</span>
+                          <Check className="w-3.5 h-3.5 mr-1 text-vault-success" />
+                          <span className="text-vault-success font-semibold">Copied!</span>
                         </>
                       ) : (
                         <>
@@ -698,21 +698,21 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 </div>
 
                 {/* Step-by-Step Instructions */}
-                <div className="w-full bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 text-left space-y-2.5 text-xs">
+                <div className="w-full bg-vault-primary/[0.02] border border-white/[0.06] rounded-2xl p-4 text-left space-y-2.5 text-xs">
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       1
                     </span>
                     <span className="leading-snug">Connect phone/tablet to the same Wi-Fi or mobile hotspot.</span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       2
                     </span>
                     <span className="leading-snug">Open camera and scan the QR code above.</span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       3
                     </span>
                     <span className="leading-snug">
@@ -728,7 +728,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         {/* Modal Footer */}
         <div className="px-6 py-3.5 border-t border-white/[0.08] bg-vault-bg/40 flex items-center justify-between text-xs shrink-0">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+            <span className="w-2 h-2 rounded-full bg-vault-success shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
             <span className="text-[0.815rem] text-vault-muted font-medium">
               LAN Port {lanInfo.port} • Local Mesh Only
             </span>

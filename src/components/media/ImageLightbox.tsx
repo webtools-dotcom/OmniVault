@@ -133,7 +133,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             {title}
           </h2>
           {metadata?.byteSize && (
-            <span className="text-[0.815rem] px-2.5 py-0.5 rounded-lg bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block font-mono">
+            <span className="text-[0.815rem] px-2.5 py-0.5 rounded-lg bg-vault-elevated text-vault-secondary border border-vault-border hidden sm:inline-block">
               {formatSize(metadata.byteSize)} WebP
             </span>
           )}
@@ -143,8 +143,8 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         <div className="flex items-center gap-2">
           {/* Download Status Notification */}
           {downloadStatus && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono animate-in fade-in duration-200">
-              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-vault-success/15 border border-vault-success/30 text-vault-success text-xs animate-in fade-in duration-200">
+              <Check className="w-3 h-3 text-vault-success shrink-0" />
               <span className="truncate max-w-[120px] sm:max-w-none">{downloadStatus.text}</span>
               {downloadStatus.filePath && (
                 <button
@@ -153,7 +153,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     e.stopPropagation();
                     StorageService.openFileInFolder(downloadStatus.filePath!);
                   }}
-                  className="ml-1 px-1.5 py-0.5 rounded bg-emerald-500/25 hover:bg-emerald-500/40 text-[0.741rem] text-white flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                  className="ml-1 px-1.5 py-0.5 rounded bg-vault-success/25 hover:bg-vault-success/40 text-[0.741rem] text-vault-primary flex items-center gap-1 cursor-pointer transition-colors shrink-0"
                   title="Open in File Explorer"
                 >
                   <span>Show</span>
@@ -174,7 +174,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               <Minus className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-[0.815rem] font-mono text-vault-primary px-2.5 min-w-11 text-center select-none">
+            <span className="text-[0.815rem] text-vault-primary px-2.5 min-w-11 text-center select-none">
               {Math.round(zoom * 100)}%
             </span>
 
@@ -206,7 +206,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             title="Download Image to Computer"
           >
             {isDownloading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-vault-secondary" />
             ) : (
               <Download className="w-3.5 h-3.5" />
             )}
@@ -250,7 +250,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       <div className="h-9 px-6 border-t border-vault-border bg-vault-card/60 flex items-center justify-between text-[0.815rem] text-vault-muted shrink-0">
         <div className="flex items-center gap-2">
           {metadata?.fileHash && (
-            <span className="font-mono truncate max-w-[180px] sm:max-w-xs">
+            <span className="truncate max-w-[180px] sm:max-w-xs">
               SHA: {metadata.fileHash.slice(0, 16)}...
             </span>
           )}

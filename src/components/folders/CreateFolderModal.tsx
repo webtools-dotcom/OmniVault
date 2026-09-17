@@ -1,3 +1,4 @@
+import { FOLDER_TINTS } from "../../utils/folderTint";
 import React, { useState, useEffect, useRef } from "react";
 import { FolderPlus, X } from "lucide-react";
 import { Folder } from "../../types";
@@ -11,13 +12,12 @@ export interface CreateFolderModalProps {
   folders: Folder[];
 }
 
+// Three low-chroma marks, not a paintbox: a folder tag sits beside a note and
+// must not out-shout it. D-070.
 const PRESET_COLORS = [
-  { label: "Blue", value: "#2F81F7" },
-  { label: "Green", value: "#238636" },
-  { label: "Amber", value: "#D29922" },
-  { label: "Purple", value: "#A371F7" },
-  { label: "Red", value: "#F85149" },
-  { label: "Slate", value: "#8B949E" },
+  { label: "Moss", value: FOLDER_TINTS[0] },
+  { label: "Slate", value: FOLDER_TINTS[1] },
+  { label: "Plum", value: FOLDER_TINTS[2] },
 ];
 
 export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
@@ -29,7 +29,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
 }) => {
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState<string | null>(initialParentId);
-  const [selectedColor, setSelectedColor] = useState<string | null>("#2F81F7");
+  const [selectedColor, setSelectedColor] = useState<string | null>(FOLDER_TINTS[1]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,7 +38,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
     if (isOpen) {
       setName("");
       setParentId(initialParentId);
-      setSelectedColor("#2F81F7");
+      setSelectedColor(FOLDER_TINTS[1]);
       setError(null);
       setIsSubmitting(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -112,7 +112,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
               className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-xl text-xs sm:text-sm text-vault-primary placeholder-vault-muted focus:outline-none focus:border-vault-accent/50 transition-colors"
               disabled={isSubmitting}
             />
-            {error && <p className="text-xs text-rose-400 mt-1.5">{error}</p>}
+            {error && <p className="text-xs text-vault-error mt-1.5">{error}</p>}
           </div>
 
           {/* Parent Folder */}
@@ -156,7 +156,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
                     title={c.label}
                   >
                     {isSelected && (
-                      <span className="w-2 h-2 rounded-full bg-white shadow-xs" />
+                      <span className="w-2 h-2 rounded-full bg-vault-primary shadow-xs" />
                     )}
                   </button>
                 );

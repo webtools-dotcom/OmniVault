@@ -21,7 +21,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
         elements.push(
           <pre
             key={`code-${index}`}
-            className="p-3 my-2 rounded-lg bg-vault-bg border border-vault-border font-mono text-xs text-vault-primary overflow-x-auto"
+            className="p-3 my-2 rounded-lg bg-vault-bg border border-vault-border text-xs text-vault-primary overflow-x-auto"
           >
             <code>{codeBlockLines.join("\n")}</code>
           </pre>
@@ -170,7 +170,7 @@ function parseInline(text: string): React.ReactNode {
           href={`https://www.tradingview.com/symbols/${ticker}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-1.5 py-0.2 mx-0.5 rounded bg-vault-elevated text-vault-success font-mono font-medium text-[0.815rem] border border-vault-border hover:border-vault-success transition-colors"
+          className="inline-block px-1.5 py-0.2 mx-0.5 rounded bg-vault-elevated text-vault-success font-medium text-[0.815rem] border border-vault-border hover:border-vault-success transition-colors"
           title={`View ${ticker} on TradingView`}
           onClick={(e) => e.stopPropagation()}
         >
@@ -216,7 +216,7 @@ function parseInline(text: string): React.ReactNode {
       nodes.push(
         <code
           key={`inline-code-${match.index}`}
-          className="px-1 py-0.5 mx-0.5 rounded bg-vault-bg text-vault-primary font-mono text-[0.815rem] border border-vault-border"
+          className="px-1 py-0.5 mx-0.5 rounded bg-vault-bg text-vault-primary text-[0.815rem] border border-vault-border"
         >
           {match[8]}
         </code>

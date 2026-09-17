@@ -151,7 +151,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-vault-panel/80 border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 transition-all shadow-sm mb-3 backdrop-blur-sm">
+    <div className="bg-vault-card rounded-xl px-3 py-2 mb-4 ring-1 ring-vault-border focus-within:ring-vault-border-active transition-shadow">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -162,7 +162,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       />
 
       <form onSubmit={handleCapture} className="flex items-center gap-2.5">
-        <Sparkles className="w-3.5 h-3.5 text-indigo-400 select-none shrink-0" />
+        <Sparkles className="w-3.5 h-3.5 text-vault-muted select-none shrink-0" />
 
         {/* Format selector pill */}
         <select
@@ -174,7 +174,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               fileInputRef.current?.click();
             }
           }}
-          className="bg-vault-card text-zinc-300 text-xs px-2 py-1 rounded-lg border border-white/[0.08] focus:outline-none focus:border-indigo-500/50 cursor-pointer shrink-0 font-sans"
+          className="bg-vault-elevated text-vault-secondary text-xs h-7 pl-2 pr-1 rounded-lg border-0 focus:outline-none cursor-pointer shrink-0"
         >
           <option value="note">Note</option>
           <option value="ticker">$ Ticker</option>
@@ -190,20 +190,20 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           onChange={(e) => setTitle(e.target.value)}
           placeholder={
             itemType === "ticker"
-              ? "Enter ticker symbol (e.g. $NVDA, BTC)..."
+              ? "Ticker symbol — NVDA, BTC…"
               : itemType === "link"
-              ? "Paste web link (e.g. https://...)..."
+              ? "Paste a link…"
               : itemType === "image"
-              ? "Click to choose photo or press Ctrl+V to paste..."
-              : "Capture note, task, or fleeting thought (press Enter)..."
+              ? "Choose a photo, or paste one…"
+              : "Capture a thought, a link, a ticker…"
           }
-          className="flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none font-sans"
+          className="flex-1 min-w-0 bg-transparent text-xs sm:text-[0.8125rem] text-vault-primary placeholder:text-vault-subtle focus:outline-none"
           disabled={isSubmitting}
         />
 
         {/* Image preview badge if loaded */}
         {imagePreview && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs shrink-0">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 text-vault-primary text-xs shrink-0">
             <img
               src={imagePreview}
               alt="Preview"
@@ -216,7 +216,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
                 setImagePreview(null);
                 setImageInfo(null);
               }}
-              className="text-zinc-400 hover:text-white ml-1 cursor-pointer text-xs"
+              className="text-vault-secondary hover:text-vault-primary ml-1 cursor-pointer text-xs"
               title="Remove photo"
             >
               ×
@@ -228,41 +228,41 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="h-7 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white rounded-lg text-xs font-medium border border-indigo-400/20 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
+          className="h-7 px-3 bg-vault-accent hover:bg-vault-accent-hover disabled:opacity-30 text-vault-ink rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-3 h-3 animate-spin text-white" />
+              <Loader2 className="w-3 h-3 animate-spin text-vault-ink" />
               <span className="hidden sm:inline">Saving...</span>
             </>
           ) : justSynced ? (
             <>
-              <Check className="w-3.5 h-3.5 text-white" />
-              <span className="text-white font-medium">Saved</span>
+              <Check className="w-3.5 h-3.5 text-vault-ink" />
+              <span className="text-vault-primary font-medium">Saved</span>
             </>
           ) : (
             <>
               <span>Capture</span>
-              <CornerDownLeft className="w-3 h-3 text-indigo-200" />
+              <CornerDownLeft className="w-3 h-3 text-vault-primary" />
             </>
           )}
         </button>
       </form>
 
       {captureError && (
-        <div className="mt-2 pt-1.5 border-t border-white/[0.06] text-xs text-rose-300 font-sans">
+        <div className="mt-2 pt-1.5 border-t border-white/[0.06] text-xs text-vault-error font-sans">
           {captureError}
         </div>
       )}
 
       {/* Uploading progress status bar for large photos */}
       {isSubmitting && itemType === "image" && (
-        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-xs text-indigo-300 animate-pulse font-sans">
+        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-xs text-vault-primary animate-pulse font-sans">
           <div className="flex items-center gap-1.5">
-            <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+            <Loader2 className="w-3 h-3 animate-spin text-vault-secondary" />
             <span>Compressing and syncing photo to mesh vault...</span>
           </div>
-          {imageInfo?.sizeStr && <span className="text-indigo-400/80">{imageInfo.sizeStr}</span>}
+          {imageInfo?.sizeStr && <span className="text-vault-secondary/80">{imageInfo.sizeStr}</span>}
         </div>
       )}
     </div>

@@ -1,0 +1,12 @@
+Fonts bundled with OmniVault
+============================
+
+Archivo   — Copyright (c) Omnibus-Type. SIL Open Font License 1.1.
+            https://github.com/Omnibus-Type/Archivo
+Fraunces  — Copyright (c) Undercase Type. SIL Open Font License 1.1.
+            https://github.com/undercasetype/Fraunces
+
+Both files are the latin subset, served from this folder so the app renders
+the same with no network. The SIL Open Font License permits bundling and
+redistribution; the full licence text travels with each upstream project at
+the links above.

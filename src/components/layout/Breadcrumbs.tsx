@@ -9,17 +9,17 @@ export interface BreadcrumbsProps {
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center space-x-1 text-xs overflow-x-auto select-none">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 overflow-x-auto select-none scrollbar-none">
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
         return (
           <React.Fragment key={item.id}>
             {index > 0 && (
-              <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0" aria-hidden="true" />
+              <ChevronRight className="w-3 h-3 text-vault-subtle shrink-0" aria-hidden="true" />
             )}
             {isLast ? (
               <span
-                className="text-zinc-200 font-medium text-xs truncate max-w-[160px] sm:max-w-[240px] px-1 py-0.5"
+                className="font-display font-semibold text-vault-primary text-base sm:text-xl tracking-[-0.012em] truncate max-w-[9.5rem] sm:max-w-[20rem]"
                 aria-current="page"
                 title={item.label}
               >
@@ -28,7 +28,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
             ) : (
               <button
                 onClick={item.onClick}
-                className="text-zinc-400 hover:text-zinc-200 text-xs transition-colors truncate max-w-[120px] sm:max-w-[180px] rounded px-1 py-0.5 focus:outline-none cursor-pointer"
+                className="text-vault-secondary hover:text-vault-primary text-xs transition-colors truncate max-w-[120px] sm:max-w-[180px] rounded px-1 py-0.5 focus:outline-none cursor-pointer"
                 title={item.label}
               >
                 {item.label}

@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted so the vault renders identically with the Wi-Fi off. Both faces
+   are SIL OFL; see public/fonts/OFL-NOTICE.txt. Latin subset only — the whole
+   type system costs 70 KB. */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/archivo-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
 }
@@ -15,15 +34,15 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Browser Surface Theming */
+/* Browser surfaces are part of the palette, not the browser's to choose. */
 ::selection {
-  background-color: rgba(99, 102, 241, 0.35);
-  color: #FFFFFF;
+  background-color: #2E3039;
+  color: #E9EAEF;
 }
 
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -31,21 +50,32 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.10);
+  background: #262832;
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.20);
+  background: #33353F;
+  background-clip: padding-box;
+}
+
+:focus-visible {
+  outline: 2px solid #9AA0B4;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
-  background-color: #0A0B0E;
-  color: #F4F4F7;
-  caret-color: #6366F1;
+  font-family: "Archivo", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Times, counts and prices line up without a monospace costume. */
+  font-variant-numeric: tabular-nums;
+  background-color: #0D0E11;
+  color: #E9EAEF;
+  caret-color: #E9EAEF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation;
@@ -54,6 +84,21 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
   padding-left: env(safe-area-inset-left, 0);
   padding-right: env(safe-area-inset-right, 0);
+}
+
+/* Prose links carry an underline rather than a colour, so a link reads as a
+   link without adding a hue the palette does not have. */
+.prose a,
+.vault-prose a {
+  color: #E9EAEF;
+  text-decoration: underline;
+  text-decoration-color: #4A4D5A;
+  text-underline-offset: 3px;
+}
+
+.prose a:hover,
+.vault-prose a:hover {
+  text-decoration-color: #9AA0B4;
 }
 
 /* Fluid responsive helpers */
@@ -72,4 +117,3 @@ body {
     height: 0;
   }
 }
-

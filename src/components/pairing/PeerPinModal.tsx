@@ -110,13 +110,13 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
         {/* Terminal Header */}
         <div className="h-9 px-3.5 border-b border-white/[0.08] bg-vault-card flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.5)]" />
-            <span className="font-mono text-xs text-zinc-300">vault://pair/authenticate</span>
+            <span className="w-2 h-2 rounded-full bg-vault-accent" />
+            <span className="font-mono text-xs text-vault-secondary">vault://pair/authenticate</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 p-1 rounded-md transition-colors cursor-pointer"
+            className="text-vault-muted hover:text-vault-secondary p-1 rounded-md transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-3.5 h-3.5" />
@@ -125,21 +125,21 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
 
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-vault-accent/10 border border-vault-border-active/20 flex items-center justify-center text-vault-secondary shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="peer-pin-title" className="text-sm font-semibold text-zinc-100">
+              <h2 id="peer-pin-title" className="text-sm font-semibold text-vault-primary">
                 Link to Desktop Vault
               </h2>
-              <p className="text-[0.815rem] text-zinc-400 font-mono">
+              <p className="text-[0.815rem] text-vault-secondary font-mono">
                 Enter authorization PIN from desktop
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[0.815rem] font-mono text-zinc-400 block">
+            <label className="text-[0.815rem] font-mono text-vault-secondary block">
               6-DIGIT AUTHORIZATION PIN
             </label>
             <div className="flex items-center justify-between gap-1.5 sm:gap-2">
@@ -154,7 +154,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   disabled={isSubmitting || success}
-                  className="w-10 h-12 text-center text-lg font-mono font-bold bg-vault-card border border-white/[0.1] rounded-xl text-zinc-100 focus:outline-hidden focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all disabled:opacity-50"
+                  className="w-10 h-12 text-center text-lg font-mono font-bold bg-vault-card border border-white/[0.1] rounded-xl text-vault-primary focus:outline-hidden focus:border-vault-border-active/50 focus:ring-1 focus:ring-vault-border-active/30 transition-all disabled:opacity-50"
                   aria-label={`Digit ${idx + 1}`}
                 />
               ))}
@@ -162,29 +162,29 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
           </div>
 
           <div className="space-y-1">
-            <label className="text-[0.741rem] font-mono text-zinc-500 uppercase block">
+            <label className="text-xs text-vault-subtle block">
               Device Name
             </label>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-vault-card border border-white/[0.08] rounded-lg">
-              <Laptop className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <Laptop className="w-3.5 h-3.5 text-vault-secondary shrink-0" />
               <input
                 type="text"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
                 placeholder="e.g. iPad Pro"
-                className="w-full text-xs font-mono text-zinc-200 bg-transparent outline-hidden"
+                className="w-full text-xs font-mono text-vault-primary bg-transparent outline-hidden"
               />
             </div>
           </div>
 
           {errorMsg && (
-            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+            <div className="p-2.5 rounded-lg bg-vault-error/10 border border-vault-error/20 text-vault-error text-xs font-mono">
               {errorMsg}
             </div>
           )}
 
           {success && (
-            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono flex items-center gap-2">
+            <div className="p-2.5 rounded-lg bg-vault-success/10 border border-vault-success/20 text-vault-success text-xs font-mono flex items-center gap-2">
               <Check className="w-4 h-4" />
               <span>Device linked successfully!</span>
             </div>
@@ -194,7 +194,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
             <button
               type="button"
               onClick={onClose}
-              className="h-8 px-3 text-xs font-mono text-zinc-400 hover:text-zinc-200 bg-transparent hover:bg-white/[0.05] rounded-lg transition-colors cursor-pointer"
+              className="h-8 px-3 text-xs font-mono text-vault-secondary hover:text-vault-primary bg-transparent hover:bg-vault-primary/[0.05] rounded-lg transition-colors cursor-pointer"
             >
               Browse Local
             </button>
@@ -202,7 +202,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting || success}
-              className="h-8 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+              className="h-8 px-4 text-xs font-semibold text-vault-ink bg-vault-accent hover:bg-vault-accent rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
             >
               {isSubmitting ? "Linking..." : success ? "Linked" : "Authorize PIN"}
             </button>

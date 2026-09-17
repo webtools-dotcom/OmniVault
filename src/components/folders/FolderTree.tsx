@@ -100,9 +100,9 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
             setCreateParentId(null);
             setInternalCreateOpen(true);
           }}
-          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition-colors text-left cursor-pointer"
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-vault-muted hover:text-vault-secondary hover:bg-vault-primary/[0.04] transition-colors text-left cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5 text-zinc-500" />
+          <Plus className="w-3.5 h-3.5 text-vault-muted" />
           <span>Add first folder</span>
         </button>
       ) : (

@@ -51,7 +51,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-vault-bg overflow-hidden">
       {/* Top Header / Navigation Bar */}
-      <header className="h-9.5 px-3.5 border-b border-white/[0.06] flex items-center justify-between gap-2.5 shrink-0 bg-vault-panel/70 backdrop-blur-sm z-10 select-none">
+      <header className="h-14 px-4 flex items-center justify-between gap-3 shrink-0 bg-vault-bg z-10 select-none">
         {/* Left: Sidebar Toggle & Location Breadcrumbs */}
         <div className="flex items-center gap-2 min-w-0">
           {(!isSidebarOpen || isMobile) && (
@@ -59,7 +59,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               onClick={onToggleSidebar}
               title="Open Sidebar (Ctrl+B)"
               aria-label="Open sidebar"
-              className="w-6.5 h-6.5 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
+              className="w-6.5 h-6.5 flex items-center justify-center rounded-md text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors shrink-0 cursor-pointer"
             >
               {isMobile ? <Menu className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
             </button>
@@ -67,7 +67,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
           <Breadcrumbs items={breadcrumbs} onNavigateHome={onNavigateHome} />
 
-          <span className="text-[0.741rem] font-mono px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0 hidden md:inline-block">
+          <span className="text-xs text-vault-subtle shrink-0 hidden md:inline-block">
             {itemCount}
           </span>
         </div>
@@ -81,8 +81,8 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "stream"
-                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
+                  : "text-vault-secondary hover:text-vault-primary"
               )}
             >
               Stream
@@ -93,8 +93,8 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "notes"
-                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
+                  : "text-vault-secondary hover:text-vault-primary"
               )}
             >
               Notes
@@ -105,8 +105,8 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
               className={cn(
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "markets"
-                  ? "bg-white/[0.08] text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
+                  : "text-vault-secondary hover:text-vault-primary"
               )}
             >
               Markets
@@ -117,25 +117,25 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
         {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative hidden sm:block w-36 md:w-44 lg:w-52">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-vault-muted pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search..."
-              className="w-full h-7 pl-8 pr-7.5 bg-vault-card border border-white/[0.08] rounded-lg text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/50 transition-colors font-sans"
+              className="w-full h-7 pl-8 pr-7.5 bg-vault-card border border-white/[0.08] rounded-lg text-xs text-vault-primary placeholder:text-vault-muted focus:outline-none focus:border-vault-border-active/50 transition-colors font-sans"
             />
             {searchQuery ? (
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-vault-muted hover:text-vault-secondary p-0.5 cursor-pointer"
                 aria-label="Clear filter"
               >
                 <X className="w-3 h-3" />
               </button>
             ) : (
-              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[0.667rem] font-mono text-zinc-600 bg-white/[0.03] px-1 py-0.2 rounded border border-white/[0.05] pointer-events-none">
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[0.667rem] text-vault-subtle bg-vault-primary/[0.03] px-1 py-0.2 rounded border border-white/[0.05] pointer-events-none">
                 ⌘K
               </kbd>
             )}

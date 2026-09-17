@@ -111,7 +111,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
                 );
               })}
             </select>
-            {error && <p className="text-xs text-rose-400 mt-1.5">{error}</p>}
+            {error && <p className="text-xs text-vault-error mt-1.5">{error}</p>}
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-vault-border/60">
