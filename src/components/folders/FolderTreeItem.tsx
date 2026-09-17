@@ -218,7 +218,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                   role="menuitem"
                 >
                   <FolderPlus className="w-3.5 h-3.5 text-vault-secondary" />
-                  <span>New Subfolder</span>
+                  <span>New subfolder</span>
                 </button>
 
                 <button

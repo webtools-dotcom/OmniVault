@@ -47,7 +47,7 @@ export const DeleteFolderModal: React.FC<DeleteFolderModalProps> = ({
             <div className="w-7 h-7 rounded-lg bg-vault-error/15 border border-vault-error/30 flex items-center justify-center text-vault-error shrink-0">
               <AlertTriangle className="w-4 h-4 text-vault-error" />
             </div>
-            <span id="delete-folder-title">Delete Folder</span>
+            <span id="delete-folder-title">Delete folder</span>
           </div>
           <button
             onClick={onClose}

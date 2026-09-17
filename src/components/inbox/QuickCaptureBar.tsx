@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Check, Loader2, Sparkles, CornerDownLeft } from "lucide-react";
 import { ItemType, VaultItem } from "../../types";
+import { cn } from "../../utils/cn";
 import { StorageService, cacheLocalMedia } from "../../services/storageService";
 
 export interface QuickCaptureBarProps {
@@ -13,6 +14,13 @@ export interface QuickCaptureBarProps {
   ) => Promise<void> | void;
   folderId?: string | null;
 }
+
+const CAPTURE_TYPES: { value: ItemType; label: string }[] = [
+  { value: "note", label: "Note" },
+  { value: "ticker", label: "Ticker" },
+  { value: "link", label: "Link" },
+  { value: "image", label: "Photo" },
+];
 
 export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, folderId: _folderId = null }) => {
   const [itemType, setItemType] = useState<ItemType>("note");
@@ -151,7 +159,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className="bg-vault-card rounded-xl px-3 py-2 mb-4 ring-1 ring-vault-border focus-within:ring-vault-border-active transition-shadow">
+    <div className={cn(
+        "bg-vault-card transition-shadow",
+        // Phone: parked at the bottom edge, clear of the home indicator.
+        "fixed inset-x-0 bottom-0 z-30 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(9,10,13,0.5)]",
+        // Anything wider: back in the flow above the list.
+        "sm:static sm:rounded-xl sm:px-3 sm:py-2 sm:mb-4 sm:shadow-none sm:ring-1 sm:ring-vault-border sm:focus-within:ring-vault-border-active"
+      )}>
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -161,27 +175,34 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         className="hidden"
       />
 
-      <form onSubmit={handleCapture} className="flex items-center gap-2.5">
-        <Sparkles className="w-3.5 h-3.5 text-vault-muted select-none shrink-0" />
+      <form onSubmit={handleCapture} className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-2.5">
+        <Sparkles className="hidden sm:block w-3.5 h-3.5 text-vault-muted select-none shrink-0" />
 
-        {/* Format selector pill */}
-        <select
-          value={itemType}
-          onChange={(e) => {
-            const next = e.target.value as ItemType;
-            setItemType(next);
-            if (next === "image") {
-              fileInputRef.current?.click();
-            }
-          }}
-          className="bg-vault-elevated text-vault-secondary text-xs h-7 pl-2 pr-1 rounded-lg border-0 focus:outline-none cursor-pointer shrink-0"
-        >
-          <option value="note">Note</option>
-          <option value="ticker">$ Ticker</option>
-          <option value="link">Link</option>
-          <option value="image">Photo</option>
-        </select>
-
+        {/* Our own control, not the platform's: a native select drops a
+            system-styled menu into the middle of the design. */}
+        <div className="order-1 sm:order-none flex items-center gap-0.5 shrink-0" role="group" aria-label="What are you capturing?">
+          {CAPTURE_TYPES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              aria-pressed={itemType === t.value}
+              onClick={() => {
+                setItemType(t.value);
+                if (t.value === "image") {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className={cn(
+                "h-7 px-2.5 rounded-lg text-xs transition-colors cursor-pointer",
+                itemType === t.value
+                  ? "bg-vault-elevated text-vault-primary font-medium"
+                  : "text-vault-muted hover:text-vault-secondary"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         {/* Unified rapid capture input */}
         <input
           ref={inputRef}
@@ -197,13 +218,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               ? "Choose a photo, or paste one…"
               : "Capture a thought, a link, a ticker…"
           }
-          className="flex-1 min-w-0 bg-transparent text-xs sm:text-[0.8125rem] text-vault-primary placeholder:text-vault-subtle focus:outline-none"
+          className="order-3 sm:order-none basis-full sm:basis-auto flex-1 min-w-0 h-8 sm:h-auto bg-vault-elevated sm:bg-transparent rounded-lg sm:rounded-none px-2.5 sm:px-0 text-[0.8125rem] text-vault-primary placeholder:text-vault-subtle focus:outline-none"
           disabled={isSubmitting}
         />
 
         {/* Image preview badge if loaded */}
         {imagePreview && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 text-vault-primary text-xs shrink-0">
+          <div className="order-1 sm:order-none flex items-center gap-1.5 px-2 py-1 rounded-lg bg-vault-elevated text-vault-primary text-xs shrink-0">
             <img
               src={imagePreview}
               alt="Preview"
@@ -228,7 +249,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         <button
           type="submit"
           disabled={isSubmitting || (!title.trim() && !imagePreview)}
-          className="h-7 px-3 bg-vault-accent hover:bg-vault-accent-hover disabled:opacity-30 text-vault-ink rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+          className="order-2 sm:order-none ml-auto sm:ml-0 h-8 sm:h-7 px-3 bg-vault-accent hover:bg-vault-accent-hover disabled:opacity-30 text-vault-ink rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
         >
           {isSubmitting ? (
             <>
@@ -238,29 +259,29 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           ) : justSynced ? (
             <>
               <Check className="w-3.5 h-3.5 text-vault-ink" />
-              <span className="text-vault-primary font-medium">Saved</span>
+              <span className="font-semibold">Saved</span>
             </>
           ) : (
             <>
               <span>Capture</span>
-              <CornerDownLeft className="w-3 h-3 text-vault-primary" />
+              <CornerDownLeft className="hidden sm:block w-3 h-3" />
             </>
           )}
         </button>
       </form>
 
       {captureError && (
-        <div className="mt-2 pt-1.5 border-t border-white/[0.06] text-xs text-vault-error font-sans">
+        <div className="mt-2 text-xs text-vault-error">
           {captureError}
         </div>
       )}
 
       {/* Uploading progress status bar for large photos */}
       {isSubmitting && itemType === "image" && (
-        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-xs text-vault-primary animate-pulse font-sans">
+        <div className="mt-2 flex items-center justify-between text-xs text-vault-secondary">
           <div className="flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin text-vault-secondary" />
-            <span>Compressing and syncing photo to mesh vault...</span>
+            <span>Compressing and sending the photo…</span>
           </div>
           {imageInfo?.sizeStr && <span className="text-vault-secondary/80">{imageInfo.sizeStr}</span>}
         </div>

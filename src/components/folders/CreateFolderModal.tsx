@@ -82,7 +82,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
             <div className="w-7 h-7 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0">
               <FolderPlus className="w-4 h-4 text-vault-accent" />
             </div>
-            <span id="create-folder-title">Create New Folder</span>
+            <span id="create-folder-title">Create a folder</span>
           </div>
           <button
             onClick={onClose}
@@ -126,10 +126,10 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
               className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-xl text-xs text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors cursor-pointer"
               disabled={isSubmitting}
             >
-              <option value="">📁 Root (Top Level)</option>
+              <option value="">Top level</option>
               {activeFolders.map((folder) => (
                 <option key={folder.id} value={folder.id}>
-                  📁 {folder.name}
+                  {folder.name}
                 </option>
               ))}
             </select>

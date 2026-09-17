@@ -411,3 +411,18 @@ for (const font of ["archivo-latin.woff2", "fraunces-latin.woff2"]) {
 }
 
 console.log("✅ Palette and type-system guards passed!");
+
+// 17. Regression guard: no emoji standing in for an icon, and no terminal
+// costume. Both render differently on every platform and neither is the
+// product's voice. See D-070.
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
+const costume = [];
+for (const file of uiFiles) {
+  const src = fs.readFileSync(file, "utf-8");
+  const rel = path.relative(process.cwd(), file);
+  if (EMOJI.test(src)) costume.push(rel + ": emoji in the UI");
+  if (src.includes("vault://")) costume.push(rel + ": fake terminal chrome");
+}
+assert.strictEqual(costume.length, 0, "interface costume is back: " + costume.join(" | "));
+
+console.log("✅ Interface voice guard passed!");

@@ -218,10 +218,10 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               onChange={(e) => setFolderId(e.target.value ? e.target.value : null)}
               className="h-8 px-2.5 bg-vault-bg border border-vault-border rounded-lg text-xs text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors cursor-pointer"
             >
-              <option value="">📥 Quick Inbox</option>
+              <option value="">Quick Inbox</option>
               {activeFolders.map((f) => (
                 <option key={f.id} value={f.id}>
-                  📁 {f.name}
+                  {f.name}
                 </option>
               ))}
             </select>

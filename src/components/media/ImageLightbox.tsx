@@ -129,7 +129,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       {/* Top Header Controls */}
       <div className="h-14 px-4 sm:px-6 border-b border-vault-border flex items-center justify-between shrink-0 bg-vault-card/90">
         <div className="flex items-center gap-3 min-w-0">
-          <h2 className="text-sm font-semibold text-vault-primary truncate max-w-[160px] sm:max-w-md">
+          <h2 className="font-display text-base font-semibold tracking-[-0.01em] text-vault-primary truncate max-w-[160px] sm:max-w-md">
             {title}
           </h2>
           {metadata?.byteSize && (
@@ -210,7 +210,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             ) : (
               <Download className="w-3.5 h-3.5" />
             )}
-            <span className="text-xs font-medium hidden sm:inline">Save Image</span>
+            <span className="text-xs font-medium hidden sm:inline">Save image</span>
           </button>
 
           <button

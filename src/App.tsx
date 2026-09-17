@@ -598,30 +598,15 @@ export function App() {
 
               {/* Folder Items Grid */}
               {displayedFolderItems.length === 0 ? (
-                <div className="flex-1 min-h-0 flex items-center justify-center">
-                <div className="w-full max-w-2xl border border-white/[0.08] rounded-xl bg-vault-panel overflow-hidden shadow-xs">
-                  <div className="h-8 px-3.5 border-b border-white/[0.06] bg-vault-card flex items-center justify-between text-xs select-none">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-vault-pending" />
-                      <span className="text-xs text-vault-secondary">
-                        vault://folder/{activeFolder?.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed"}
-                      </span>
-                      <span className="text-[0.741rem] px-1.5 py-0.2 rounded bg-vault-primary/[0.05] text-vault-secondary">
-                        directory
-                      </span>
-                    </div>
-                    <span className="text-[0.741rem] text-vault-muted">0 items</span>
-                  </div>
-                  <div className="p-4 sm:p-5 text-xs space-y-2">
-                    <div className="text-vault-secondary font-semibold flex items-center gap-2">
-                      <span className="text-vault-pending">❯</span>
-                      <span>directory empty</span>
-                    </div>
-                    <p className="text-vault-muted text-[0.815rem] leading-relaxed">
-                      Capture notes, tickers, and charts directly into this folder above, or drag unfiled captures here from Quick Inbox.
+                <div className="flex-1 min-h-0 flex items-start justify-center pt-16 sm:pt-24">
+                  <div className="max-w-sm text-center px-6">
+                    <h2 className="font-display text-xl font-semibold text-vault-primary tracking-[-0.015em]">
+                      {activeFolder?.name || "This folder"} is empty
+                    </h2>
+                    <p className="mt-3 text-[0.8125rem] leading-relaxed text-vault-muted">
+                      Capture straight into it above, or drag anything here from Quick Inbox.
                     </p>
                   </div>
-                </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 items-start">

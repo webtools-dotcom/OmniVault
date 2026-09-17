@@ -15,7 +15,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
       const ua = navigator.userAgent;
       if (/iPad|Tablet/i.test(ua)) return "Tablet Peer";
       if (/iPhone|Android/i.test(ua)) return "Mobile Peer";
-      return "Web Peer";
+      return "This browser";
     }
     return "Tablet Peer";
   });
@@ -111,7 +111,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
         <div className="h-9 px-3.5 border-b border-white/[0.08] bg-vault-card flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-vault-accent" />
-            <span className="font-mono text-xs text-vault-secondary">vault://pair/authenticate</span>
+            <span className="text-xs text-vault-muted">Pair this browser</span>
           </div>
           <button
             type="button"
@@ -129,18 +129,18 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="peer-pin-title" className="text-sm font-semibold text-vault-primary">
-                Link to Desktop Vault
+              <h2 id="peer-pin-title" className="font-display text-base font-semibold tracking-[-0.01em] text-vault-primary">
+                Connect to the desktop
               </h2>
-              <p className="text-[0.815rem] text-vault-secondary font-mono">
-                Enter authorization PIN from desktop
+              <p className="text-[0.815rem] text-vault-secondary">
+                Type the PIN shown on the desktop
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[0.815rem] font-mono text-vault-secondary block">
-              6-DIGIT AUTHORIZATION PIN
+            <label className="text-xs text-vault-subtle block">
+              Six-digit PIN
             </label>
             <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               {digits.map((digit, idx) => (
@@ -163,7 +163,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
 
           <div className="space-y-1">
             <label className="text-xs text-vault-subtle block">
-              Device Name
+              What to call this device
             </label>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-vault-card border border-white/[0.08] rounded-lg">
               <Laptop className="w-3.5 h-3.5 text-vault-secondary shrink-0" />
@@ -172,7 +172,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
                 placeholder="e.g. iPad Pro"
-                className="w-full text-xs font-mono text-vault-primary bg-transparent outline-hidden"
+                className="w-full text-xs text-vault-primary bg-transparent outline-hidden"
               />
             </div>
           </div>
@@ -194,9 +194,9 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
             <button
               type="button"
               onClick={onClose}
-              className="h-8 px-3 text-xs font-mono text-vault-secondary hover:text-vault-primary bg-transparent hover:bg-vault-primary/[0.05] rounded-lg transition-colors cursor-pointer"
+              className="h-8 px-3 text-xs text-vault-secondary hover:text-vault-primary bg-transparent hover:bg-vault-primary/[0.05] rounded-lg transition-colors cursor-pointer"
             >
-              Browse Local
+              Skip for now
             </button>
             <button
               type="button"
@@ -204,7 +204,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
               disabled={isSubmitting || success}
               className="h-8 px-4 text-xs font-semibold text-vault-ink bg-vault-accent hover:bg-vault-accent rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
             >
-              {isSubmitting ? "Linking..." : success ? "Linked" : "Authorize PIN"}
+              {isSubmitting ? "Connecting…" : success ? "Connected" : "Connect"}
             </button>
           </div>
         </div>

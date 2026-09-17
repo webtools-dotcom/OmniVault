@@ -116,7 +116,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
         {/* Right: Quick Search & Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative hidden sm:block w-36 md:w-44 lg:w-52">
+          <div className="relative hidden sm:block w-32 md:w-36 lg:w-52 shrink">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-vault-muted pointer-events-none" />
             <input
               ref={searchInputRef}
@@ -147,7 +147,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
       {/* Content Viewport */}
       <div className="flex-1 overflow-y-auto p-2.5 sm:p-3.5 lg:p-4">
-        <div className="w-full h-full">
+        <div className="w-full h-full pb-24 sm:pb-0">
           {children}
         </div>
       </div>

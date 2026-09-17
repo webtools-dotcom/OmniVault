@@ -195,14 +195,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           onClick={onOpenPairing}
           className={cn("flex items-center gap-2.5 min-w-0 flex-1 mr-1", onOpenPairing && "cursor-pointer hover:opacity-90")}
-          title={onOpenPairing ? "Manage Device Pairing & Mesh Sync" : undefined}
+          title={onOpenPairing ? "Connect a device" : undefined}
         >
           <div className="w-6.5 h-6.5 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-primary shrink-0 shadow-xs">
             {isMobile ? <Tablet className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
           </div>
           <div className="truncate min-w-0">
             <span className="text-vault-primary text-xs font-medium block truncate leading-tight">
-              {isMobile ? "Tablet Node" : "Desktop Vault"}
+              {isMobile ? "This tablet" : "This computer"}
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
@@ -214,7 +214,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               />
               <span className="text-[0.741rem] text-vault-secondary truncate">
-                {meshState.peerCount > 0 ? `${meshState.peerCount} connected` : "Standalone"}
+                {meshState.peerCount > 0
+                  ? `${meshState.peerCount} device${meshState.peerCount === 1 ? "" : "s"}`
+                  : "No devices yet"}
               </span>
             </div>
           </div>

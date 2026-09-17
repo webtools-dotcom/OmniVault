@@ -97,7 +97,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
               className="w-full h-9 px-3 bg-vault-bg border border-vault-border rounded-xl text-xs sm:text-sm text-vault-primary focus:outline-none focus:border-vault-accent/50 transition-colors cursor-pointer"
               disabled={isSubmitting}
             >
-              <option value="">📁 Root (Top Level Workspace)</option>
+              <option value="">Top level</option>
               {activeFolders.map((target) => {
                 const isInvalid = isSelfOrDescendant(folder.id, target.id, folders);
                 return (
@@ -106,7 +106,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
                     value={target.id}
                     disabled={isInvalid}
                   >
-                    📁 {target.name} {isInvalid ? "(Cannot move inside itself)" : ""}
+                    {target.name} {isInvalid ? "— cannot move inside itself" : ""}
                   </option>
                 );
               })}

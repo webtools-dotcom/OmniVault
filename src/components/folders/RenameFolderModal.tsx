@@ -73,7 +73,7 @@ export const RenameFolderModal: React.FC<RenameFolderModalProps> = ({
             <div className="w-7 h-7 rounded-lg bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0">
               <Edit2 className="w-4 h-4 text-vault-accent" />
             </div>
-            <span id="rename-folder-title">Rename Folder</span>
+            <span id="rename-folder-title">Rename folder</span>
           </div>
           <button
             onClick={onClose}

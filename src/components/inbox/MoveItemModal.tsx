@@ -113,7 +113,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
         {/* Item Summary Pill */}
         <div className="px-5 py-3 bg-vault-bg/60 border-b border-vault-border/60 flex items-center justify-between text-xs">
           <div className="truncate text-vault-secondary pr-2">
-            Filing: <span className="font-semibold text-vault-primary">{item.title || "Untitled Capture"}</span>
+            Filing: <span className="font-semibold text-vault-primary">{item.title || "Untitled"}</span>
           </div>
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[0.815rem] font-medium bg-vault-elevated text-vault-secondary border border-vault-border shrink-0">
             {item.folder_id ? "Filed" : "Inbox"}
@@ -150,7 +150,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <Inbox className="w-4 h-4 text-vault-accent shrink-0" />
-              <span className="truncate font-medium">📥 Quick Inbox (Unfiled)</span>
+              <span className="truncate font-medium">Quick Inbox</span>
             </div>
             {item.folder_id === null && (
               <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>

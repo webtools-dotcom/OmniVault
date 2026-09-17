@@ -267,11 +267,11 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               <Wifi className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 id="qr-modal-title" className="text-sm font-bold text-vault-primary tracking-tight">
-                Connect & Sync Devices
+              <h2 id="qr-modal-title" className="font-display text-base font-semibold text-vault-primary tracking-tight">
+                Connect a device
               </h2>
               <p className="text-[0.815rem] text-vault-muted font-medium">
-                Local Wi-Fi mesh network • Zero cloud dependence
+                Same Wi-Fi, no cloud, nothing leaves your network
               </p>
             </div>
           </div>
@@ -314,7 +314,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
             }`}
           >
             <QrCode className="w-3.5 h-3.5" />
-            <span>Browser Access (QR)</span>
+            <span>Open in a browser</span>
           </button>
         </div>
 
@@ -331,12 +331,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-vault-primary block">
-                      Wi-Fi Discovery Active
+                      Listening for devices
                     </span>
                     <span className="text-[0.741rem] text-vault-muted">
                       {activePeers.length > 0
                         ? `${activePeers.length} device${activePeers.length > 1 ? "s" : ""} online on local network`
-                        : "Listening for local OmniVault devices via UDP"}
+                        : "Any OmniVault on this Wi-Fi will appear below"}
                     </span>
                   </div>
                 </div>
@@ -378,7 +378,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               {/* Discovered LAN Peers List */}
               <div className="space-y-2.5">
                 <div className="text-[0.815rem] font-semibold text-vault-secondary  flex items-center justify-between">
-                  <span>Discovered Wi-Fi Peers</span>
+                  <span>Devices found</span>
                   <span className="text-[0.741rem] text-vault-muted font-normal">
                     {activePeers.length} discovered
                   </span>
@@ -390,10 +390,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       <Radio className="w-5 h-5 animate-pulse" />
                     </div>
                     <h3 className="text-xs font-semibold text-vault-primary">
-                      Searching local Wi-Fi mesh...
+                      Nothing found yet
                     </h3>
                     <p className="text-[0.815rem] text-vault-muted max-w-xs mx-auto leading-relaxed">
-                      Connect your laptop, tablet, and phone to the same Wi-Fi or mobile hotspot. Devices discover each other automatically.
+                      Put both devices on the same Wi-Fi or hotspot and they will find each other.
                     </p>
                   </div>
                 ) : (
@@ -507,21 +507,21 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       <Link2 className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-xs font-semibold text-vault-primary">
-                      Direct Desktop Connection
+                      Connect by address
                     </span>
                   </div>
                   <span className="text-[0.741rem] text-vault-muted font-medium">
-                    Manual IP Fallback
+                    If discovery is blocked
                   </span>
                 </div>
                 <p className="text-[0.815rem] text-vault-secondary leading-relaxed">
-                  If your router isolates devices or auto-discovery is delayed, connect directly by entering your Desktop's IP and 6-digit PIN.
+                  Some routers keep devices from seeing each other. Type the desktop's address and PIN instead.
                 </p>
                 <div className="space-y-2.5 pt-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
-                        Desktop IP & Port
+                        Desktop address
                       </label>
                       <input
                         type="text"
@@ -533,7 +533,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     </div>
                     <div>
                       <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
-                        6-Digit Desktop PIN
+                        Pairing PIN
                       </label>
                       <input
                         type="text"
@@ -561,7 +561,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                         "Linking to Desktop..."
                       ) : (
                         <>
-                          <span>Connect to Desktop</span>
+                          <span>Connect</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </>
                       )}
@@ -576,7 +576,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-vault-secondary" />
                     <span className="text-xs font-semibold text-vault-primary">
-                      This Device's Pairing PIN
+                      This device's PIN
                     </span>
                   </div>
                   <button
@@ -670,7 +670,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 <div className="w-full space-y-2">
                   <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 ">
                     <Wifi className="w-3.5 h-3.5 text-vault-success" />
-                    <span>Local Network URL</span>
+                    <span>Address on this network</span>
                   </div>
                   <div className="flex items-center gap-2 p-1.5 pl-3.5 bg-vault-bg/90 border border-white/[0.08] rounded-xl shadow-inner">
                     <span className="text-xs font-mono text-vault-secondary flex-1 truncate text-left select-all font-medium">
@@ -690,7 +690,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       ) : (
                         <>
                           <Copy className="w-3.5 h-3.5 mr-1 text-vault-secondary" />
-                          <span>Copy URL</span>
+                          <span>Copy address</span>
                         </>
                       )}
                     </Button>

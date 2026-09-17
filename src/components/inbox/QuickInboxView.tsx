@@ -53,36 +53,17 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
 
       {/* Inbox Items Grid */}
       {filteredItems.length === 0 ? (
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-        <div className="w-full max-w-2xl border border-white/[0.08] rounded-xl bg-vault-panel overflow-hidden shadow-xs">
-          <div className="h-8 px-3.5 border-b border-white/[0.06] bg-vault-card flex items-center justify-between text-xs select-none">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-vault-success shadow-[0_0_6px_rgba(121,194,164,0.35)]" />
-              <span className="text-xs text-vault-secondary">vault://stream</span>
-              <span className="text-[0.741rem] px-1.5 py-0.2 rounded bg-vault-primary/[0.05] text-vault-secondary">ready</span>
-            </div>
-            <span className="text-[0.741rem] text-vault-muted">local mesh • 42420</span>
-          </div>
-          <div className="p-4 sm:p-5 text-xs space-y-3">
-            <div className="text-vault-secondary font-semibold flex items-center gap-2">
-              <span className="text-vault-success">❯</span>
-              <span>omnivault stream initialized</span>
-            </div>
-            <p className="text-vault-muted text-[0.815rem] leading-relaxed">
+        <div className="flex-1 min-h-0 flex items-start justify-center pt-16 sm:pt-24">
+          <div className="max-w-sm text-center px-6">
+            <h2 className="font-display text-xl font-semibold text-vault-primary tracking-[-0.015em]">
+              {searchQuery ? "Nothing matches that" : "Nothing here yet"}
+            </h2>
+            <p className="mt-3 text-[0.8125rem] leading-relaxed text-vault-muted">
               {searchQuery
-                ? `No captures matching "${searchQuery}". Clear query or try another keyword.`
-                : "Your local knowledge stream is clear. All data is persisted locally in SQLite with zero cloud dependencies."}
+                ? `No capture contains “${searchQuery}”. Try a shorter word, or clear the search.`
+                : "Anything you capture lands here first — a thought, a link, a ticker, a screenshot pasted with Ctrl+V. File it into a folder later, or leave it."}
             </p>
-            {!searchQuery && (
-              <div className="pt-3 border-t border-white/[0.06] flex flex-col gap-1 text-[0.815rem] leading-relaxed text-vault-muted">
-                <span>
-                  <span className="text-vault-secondary">💡 Tip:</span> Type above to save notes, paste screenshots with Ctrl+V, or drop images directly.
-                </span>
-                <span className="text-vault-subtle">Press Enter to capture</span>
-              </div>
-            )}
           </div>
-        </div>
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 items-start">
