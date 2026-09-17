@@ -85,7 +85,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
     >
       {isImage && item.content ? (
         <div
-          className="relative rounded-xl overflow-hidden bg-vault-card group/img aspect-[4/3]"
+          className="relative rounded-xl overflow-hidden bg-vault-card group/img aspect-[16/10] max-h-52"
           onClick={(e) => {
             e.stopPropagation();
             onViewImage?.(resolveMediaUrl(item.content), item.title);
