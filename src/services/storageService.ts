@@ -164,6 +164,20 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
  * truth. Falling back to localStorage here would look like success while the
  * note silently failed to leave the device.
  */
+export interface BackupFile {
+  path: string;
+  name: string;
+  bytes: number;
+  modified_ms: number;
+}
+
+export interface ImportSummary {
+  applied: number;
+  notes_in_backup: number;
+  media_added: number;
+  taken_at: string | null;
+}
+
 export interface ExportSummary {
   path: string;
   notes: number;
@@ -1076,6 +1090,23 @@ export const StorageService = {
       throw new VaultWriteError("export from a browser");
     }
     return invoke<ExportSummary>("export_vault_cmd");
+  },
+
+  async listBackups(): Promise<BackupFile[]> {
+    if (!isTauriEnvironment()) return [];
+    return invoke<BackupFile[]>("list_backups_cmd");
+  },
+
+  /**
+   * Merges a backup into this vault. A restore is never a mirror — see D-073:
+   * nothing already here is deleted, and anything edited since the backup was
+   * taken keeps the newer version.
+   */
+  async importVault(path: string): Promise<ImportSummary> {
+    if (!isTauriEnvironment()) {
+      throw new VaultWriteError("restore from a browser");
+    }
+    return invoke<ImportSummary>("import_vault_cmd", { path });
   },
 
   async openFileInFolder(filePath: string): Promise<void> {

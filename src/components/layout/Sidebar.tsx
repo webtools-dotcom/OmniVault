@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Archive,
   Download,
   Inbox,
   Laptop,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
 import { StorageService, isTauriEnvironment } from "../../services/storageService";
+import { RestoreModal } from "../backup/RestoreModal";
 import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
@@ -34,6 +36,8 @@ export interface SidebarProps {
   onOpenPairing?: () => void;
   zoomScale?: number;
   onCycleZoom?: () => void;
+  /** Called after a restore so the views pick the new rows up. */
+  onVaultRestored?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -55,9 +59,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenPairing,
   zoomScale = 1,
   onCycleZoom,
+  onVaultRestored,
 }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [exportState, setExportState] = useState<"idle" | "working" | "done" | "failed">("idle");
+  const [isRestoreOpen, setIsRestoreOpen] = useState(false);
   const [exportNote, setExportNote] = useState<string | null>(null);
 
   const handleExport = async () => {
@@ -271,6 +277,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
+          {isTauriEnvironment() && (
+            <button
+              type="button"
+              onClick={() => setIsRestoreOpen(true)}
+              title="Bring a backup back in"
+              aria-label="Restore from a backup"
+              className="w-6 h-6 flex items-center justify-center rounded-md bg-vault-elevated hover:bg-vault-overlay text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
+            >
+              <Archive className="w-3 h-3" />
+            </button>
+          )}
+
           {onOpenPairing && (
             <button
               type="button"
@@ -294,6 +312,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </p>
         )}
       </div>
+      <RestoreModal
+        isOpen={isRestoreOpen}
+        onClose={() => setIsRestoreOpen(false)}
+        onRestored={onVaultRestored ?? (() => undefined)}
+      />
     </aside>
   );
 };

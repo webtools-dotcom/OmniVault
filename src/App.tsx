@@ -512,6 +512,11 @@ export function App() {
           onOpenPairing={() => setIsQrModalOpen(true)}
           zoomScale={zoomScale}
           onCycleZoom={handleCycleZoom}
+          onVaultRestored={() => {
+            refreshFolders();
+            refreshInboxItems();
+            if (activeView.type === "folder") refreshFolderItems(activeView.folderId);
+          }}
         />
       )}
     >

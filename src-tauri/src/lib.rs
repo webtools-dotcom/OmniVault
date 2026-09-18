@@ -314,6 +314,29 @@ fn export_vault_cmd(state: State<AppState>) -> Result<db::export::ExportSummary,
     db::export::export_vault(&mut conn, &state.base_dir, &dest).map_err(|e| e.to_string())
 }
 
+/// The backups this device can see without a file picker: the ones it wrote,
+/// where it writes them.
+#[tauri::command]
+fn list_backups_cmd(state: State<AppState>) -> Result<Vec<db::import::BackupFile>, String> {
+    let dirs = vec![downloads_dir(&state.base_dir), state.base_dir.clone()];
+    Ok(db::import::list_backups(&dirs))
+}
+
+/// Merges a backup into this vault. Never a mirror: see D-073 for what happens
+/// on every kind of collision.
+#[tauri::command]
+fn import_vault_cmd(
+    state: State<AppState>,
+    path: String,
+) -> Result<db::import::ImportSummary, String> {
+    let archive = std::path::PathBuf::from(&path);
+    if !archive.is_file() {
+        return Err("That backup is no longer where it was.".to_string());
+    }
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::import::import_vault(&mut conn, &state.base_dir, &archive).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn save_media_to_downloads_cmd(
     state: State<AppState>,
@@ -824,6 +847,8 @@ pub fn run() {
             get_browser_access_cmd,
             set_browser_access_cmd,
             export_vault_cmd,
+            list_backups_cmd,
+            import_vault_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");
