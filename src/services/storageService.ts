@@ -164,6 +164,13 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
  * truth. Falling back to localStorage here would look like success while the
  * note silently failed to leave the device.
  */
+export interface ExportSummary {
+  path: string;
+  notes: number;
+  media_files: number;
+  bytes: number;
+}
+
 export class VaultWriteError extends Error {
   constructor(operation: string) {
     super(`Could not save to the vault (${operation}). Your device may have lost the connection.`);
@@ -1056,6 +1063,19 @@ export const StorageService = {
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : "Download failed" };
     }
+  },
+
+  /**
+   * Writes the whole vault to one archive in the downloads folder.
+   *
+   * Only the devices that hold a vault can do this — a paired browser is a
+   * window onto someone else's, not a copy of it.
+   */
+  async exportVault(): Promise<ExportSummary> {
+    if (!isTauriEnvironment()) {
+      throw new VaultWriteError("export from a browser");
+    }
+    return invoke<ExportSummary>("export_vault_cmd");
   },
 
   async openFileInFolder(filePath: string): Promise<void> {

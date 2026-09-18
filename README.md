@@ -266,6 +266,20 @@ If you want it reachable beyond your own LAN, put it behind a VPN or an SSH tunn
 
 ---
 
+## Getting your notes back out
+
+**Back up** in the sidebar writes the whole vault to a single `.zip` in your downloads folder. It holds three things:
+
+- `notes/` — every note as plain Markdown, in the folders you filed it under. These need no app at all. Open them in any text editor, now or in twenty years.
+- `media/` — the images, named by content hash. The Markdown links to them by relative path, so a Markdown viewer shows them in place.
+- `omnivault.db` — the vault itself, an ordinary SQLite database, for an exact restore.
+
+Nothing in the archive is encrypted. Anyone holding that file can read everything in it, so keep it where you would keep the notes themselves.
+
+This exists because a vault you cannot get out of is a trap. If the app stops being maintained, or you stop trusting it, or the device dies, your writing should not go with it.
+
+---
+
 ## 📄 License
 
 OmniVault is licensed under the [MIT License](LICENSE).

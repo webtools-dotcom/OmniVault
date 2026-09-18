@@ -266,13 +266,60 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
     http_server::get_lan_connection_info(state.server_port)
 }
 
+/// Where a file the person wants to keep should land. On Android the public
+/// Download folder if it is reachable, otherwise the app's own directory so an
+/// export never silently fails for want of a path.
+fn downloads_dir(base_dir: &std::path::Path) -> std::path::PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        for candidate in ["/sdcard/Download", "/storage/emulated/0/Download"] {
+            let p = std::path::PathBuf::from(candidate);
+            if p.exists() {
+                return p;
+            }
+        }
+        return base_dir.join("downloads");
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = base_dir;
+        std::env::var("USERPROFILE")
+            .map(|p| std::path::PathBuf::from(p).join("Downloads"))
+            .or_else(|_| std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads")))
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+    }
+}
+
+/// Writes the whole vault to one archive in the downloads folder.
+///
+/// This is the lid on the box (D-072): without it a person's notes live only
+/// inside an app they cannot open the files of, on a device that can be lost.
+#[tauri::command]
+fn export_vault_cmd(state: State<AppState>) -> Result<db::export::ExportSummary, String> {
+    let dir = downloads_dir(&state.base_dir);
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|e| format!("Could not open the downloads folder: {e}"))?;
+    }
+
+    let mut dest = dir.join(db::export::export_filename(chrono::Utc::now()));
+    let mut n = 2;
+    while dest.exists() {
+        let stem = db::export::export_filename(chrono::Utc::now());
+        let stem = stem.trim_end_matches(".zip").to_string();
+        dest = dir.join(format!("{stem} ({n}).zip"));
+        n += 1;
+    }
+
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::export::export_vault(&mut conn, &state.base_dir, &dest).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn save_media_to_downloads_cmd(
     state: State<AppState>,
     media_url_or_hash: String,
     suggested_filename: Option<String>,
 ) -> Result<String, String> {
-    let _ = &state;
     let clean_hash = media_url_or_hash
         .split('?')
         .next()
@@ -290,25 +337,7 @@ fn save_media_to_downloads_cmd(
     let src_path = http_server::find_media_file(clean_hash, None)
         .ok_or_else(|| format!("Media file for hash '{}' not found on disk", clean_hash))?;
 
-    #[cfg(target_os = "android")]
-    let downloads_dir = {
-        let pub_dl = std::path::PathBuf::from("/sdcard/Download");
-        if pub_dl.exists() {
-            pub_dl
-        } else {
-            let emulated = std::path::PathBuf::from("/storage/emulated/0/Download");
-            if emulated.exists() {
-                emulated
-            } else {
-                state.base_dir.join("downloads")
-            }
-        }
-    };
-    #[cfg(not(target_os = "android"))]
-    let downloads_dir = std::env::var("USERPROFILE")
-        .map(|p| std::path::PathBuf::from(p).join("Downloads"))
-        .or_else(|_| std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads")))
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let downloads_dir = downloads_dir(&state.base_dir);
 
     if !downloads_dir.exists() {
         let _ = std::fs::create_dir_all(&downloads_dir);
@@ -794,6 +823,7 @@ pub fn run() {
             get_pairing_session_cmd,
             get_browser_access_cmd,
             set_browser_access_cmd,
+            export_vault_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

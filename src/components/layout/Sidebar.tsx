@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Download,
   Inbox,
   Laptop,
   PanelLeftClose,
@@ -10,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
+import { StorageService, isTauriEnvironment } from "../../services/storageService";
 import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
@@ -55,6 +57,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCycleZoom,
 }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [exportState, setExportState] = useState<"idle" | "working" | "done" | "failed">("idle");
+  const [exportNote, setExportNote] = useState<string | null>(null);
+
+  const handleExport = async () => {
+    if (exportState === "working") return;
+    setExportState("working");
+    setExportNote(null);
+    try {
+      const summary = await StorageService.exportVault();
+      const mb = summary.bytes / (1024 * 1024);
+      const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(summary.bytes / 1024))} KB`;
+      setExportNote(`${summary.notes} note${summary.notes === 1 ? "" : "s"} saved to Downloads · ${size}`);
+      setExportState("done");
+      window.setTimeout(() => {
+        setExportState("idle");
+        setExportNote(null);
+      }, 6000);
+    } catch (err) {
+      setExportNote(err instanceof Error ? err.message : "The export did not finish.");
+      setExportState("failed");
+    }
+  };
   const [isInboxDragOver, setIsInboxDragOver] = useState(false);
   const isInboxActive = activeView.type === "inbox";
   const activeFolderId = activeView.type === "folder" ? activeView.folderId : null;
@@ -234,6 +258,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
+          {isTauriEnvironment() && (
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exportState === "working"}
+              title="Save a copy of everything to Downloads"
+              className="h-6 px-2 flex items-center gap-1.5 rounded-md bg-vault-elevated hover:bg-vault-overlay text-[0.6875rem] text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer disabled:opacity-60"
+            >
+              <Download className="w-3 h-3" />
+              <span>{exportState === "working" ? "Saving…" : exportState === "done" ? "Saved" : "Back up"}</span>
+            </button>
+          )}
+
           {onOpenPairing && (
             <button
               type="button"
@@ -245,6 +282,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
+
+        {exportNote && (
+          <p
+            className={cn(
+              "text-[0.6875rem] leading-relaxed pl-9",
+              exportState === "failed" ? "text-vault-error" : "text-vault-muted"
+            )}
+          >
+            {exportNote}
+          </p>
+        )}
       </div>
     </aside>
   );
