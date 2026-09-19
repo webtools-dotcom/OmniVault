@@ -414,6 +414,42 @@ fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
     }
 }
 
+/// Opens a link in the system browser rather than inside the app's own webview,
+/// which would navigate the vault away and strand the person on a web page.
+///
+/// Only http and https: a URL arriving here is a string from the UI, and a
+/// scheme like `file:` or a shell-special one has no business being handed to
+/// the operating system's opener.
+#[tauri::command]
+fn open_url_cmd(url: String) -> Result<(), String> {
+    let url = url.trim();
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("Only web links can be opened.".into());
+    }
+    if url.contains('"') || url.contains('\n') || url.contains('\r') {
+        return Err("That link is malformed.".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // `explorer` takes the URL as a single argument, with no shell in
+        // between to reinterpret it.
+        std::process::Command::new("explorer")
+            .arg(url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct PendingShareResult {
     pub count: usize,
@@ -849,6 +885,7 @@ pub fn run() {
             export_vault_cmd,
             list_backups_cmd,
             import_vault_cmd,
+            open_url_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

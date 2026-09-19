@@ -26,7 +26,7 @@ const steps = [
   },
   {
     name: "Windows Release Packaging & Multi-Platform Asset Integrity Check (Windows + Android)",
-    command: "node scripts/package_windows.mjs && node scripts/package_android.mjs",
+    command: "node scripts/package_windows.mjs && node scripts/package_android.mjs && node scripts/check_signing_key.mjs",
   },
 ];
 

@@ -266,6 +266,16 @@ If you want it reachable beyond your own LAN, put it behind a VPN or an SSH tunn
 
 ---
 
+## Updating
+
+**Back up before you update.** Not as a ritual — for a specific reason.
+
+Android identifies an app by the key it was signed with. If a release is ever signed with a different key than the one already on your device, Android will not install it over the top: you would have to uninstall first, **and uninstalling deletes the vault.** The project guards against that on its side — `npm test` refuses to package an APK signed with the wrong key — but a backup in your downloads folder is the thing that makes it survivable no matter what.
+
+There is no automatic update check. The app makes no network requests at all unless you press **Check for updates** in the sidebar, which asks the releases page once and tells you what it found. Nothing about your vault goes with that request, nothing is remembered, and nothing checks in the background.
+
+---
+
 ## Getting your notes back out
 
 **Back up** in the sidebar writes the whole vault to a single `.zip` in your downloads folder. It holds three things:

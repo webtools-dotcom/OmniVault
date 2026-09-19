@@ -426,3 +426,36 @@ for (const file of uiFiles) {
 assert.strictEqual(costume.length, 0, "interface costume is back: " + costume.join(" | "));
 
 console.log("✅ Interface voice guard passed!");
+
+// 18. Regression guard: one version number, in three places that must agree.
+// A drifting APP_VERSION makes the update check wrong in the one direction
+// that matters — it would stop offering an update that exists, silently. And a
+// tauri.conf.json that disagrees ships an installer labelled as something it
+// is not. See D-074.
+const pkgVersion = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf-8")).version;
+const tauriVersion = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf-8")
+).version;
+const updatesSrc = fs.readFileSync(path.resolve(process.cwd(), "src/services/updates.ts"), "utf-8");
+const appVersion = (updatesSrc.match(/APP_VERSION = "([^"]+)"/) || [])[1];
+
+assert.strictEqual(
+  tauriVersion,
+  pkgVersion,
+  `tauri.conf.json says ${tauriVersion} and package.json says ${pkgVersion}`
+);
+assert.strictEqual(
+  appVersion,
+  pkgVersion,
+  `APP_VERSION says ${appVersion} and package.json says ${pkgVersion} — the update check would be wrong`
+);
+
+// The signing key note must keep recording a fingerprint, because the harness
+// reads it from there to check what the APK was actually signed with.
+const signingNote = fs.readFileSync(path.resolve(process.cwd(), "SIGNING-KEY.md"), "utf-8");
+assert.ok(
+  /\b[0-9a-f]{64}\b/.test(signingNote),
+  "SIGNING-KEY.md no longer records a certificate fingerprint, so nothing checks the APK"
+);
+
+console.log("✅ Version and signing-key guards passed!");

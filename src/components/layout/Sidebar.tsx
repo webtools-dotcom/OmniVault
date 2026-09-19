@@ -14,6 +14,7 @@ import {
 import { ActiveView, Folder, MeshSyncState } from "../../types";
 import { StorageService, isTauriEnvironment } from "../../services/storageService";
 import { RestoreModal } from "../backup/RestoreModal";
+import { APP_VERSION, UpdateCheck, checkForUpdate, openExternal } from "../../services/updates";
 import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
@@ -64,6 +65,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [exportState, setExportState] = useState<"idle" | "working" | "done" | "failed">("idle");
   const [isRestoreOpen, setIsRestoreOpen] = useState(false);
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  // The only outbound request the app makes, and only because someone asked:
+  // no background poll, no stored preference quietly checking. D-074.
+  const handleCheckForUpdate = async () => {
+    if (isCheckingUpdate) return;
+    setIsCheckingUpdate(true);
+    try {
+      setUpdate(await checkForUpdate());
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
   const [exportNote, setExportNote] = useState<string | null>(null);
 
   const handleExport = async () => {
@@ -300,6 +315,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
+
+        <div className="flex items-center gap-2 pl-9 text-[0.6875rem] text-vault-subtle">
+          <span>Version {APP_VERSION}</span>
+          {!update && (
+            <button
+              type="button"
+              onClick={handleCheckForUpdate}
+              disabled={isCheckingUpdate}
+              className="text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
+            >
+              {isCheckingUpdate ? "Checking…" : "Check for updates"}
+            </button>
+          )}
+        </div>
+
+        {update && (
+          <div className="pl-9 text-[0.6875rem] leading-relaxed">
+            {update.status === "available" ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-vault-primary">Version {update.latest} is out.</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (update.url && !(await openExternal(update.url))) {
+                        try {
+                          await navigator.clipboard.writeText(update.url);
+                          setUpdate({ ...update, message: "Link copied." });
+                        } catch {
+                          setUpdate({ ...update, message: update.url });
+                        }
+                      }
+                    }}
+                    className="text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
+                  >
+                    Open the release page
+                  </button>
+                  <span className="text-vault-subtle">Back up first.</span>
+                </div>
+                {update.message && <span className="text-vault-muted">{update.message}</span>}
+              </div>
+            ) : update.status === "current" ? (
+              <span className="text-vault-muted">This is the newest version.</span>
+            ) : (
+              <span className="text-vault-muted">{update.message}</span>
+            )}
+          </div>
+        )}
 
         {exportNote && (
           <p
