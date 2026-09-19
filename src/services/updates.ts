@@ -4,11 +4,15 @@ import { invoke } from "@tauri-apps/api/core";
 /**
  * Where releases are published, as `owner/repo`.
  *
- * Empty until the repository is public. An update check against a repository
- * that does not exist would tell people "up to date" forever, which is worse
- * than telling them there is no update channel yet.
+ * This is the only channel that reaches somebody who already installed the app.
+ * Without it there is no mechanism by which a person running a broken build
+ * learns that a fix exists — they keep running it until told in person.
+ *
+ * It was deliberately empty until the repository was public, because an update
+ * check against a repository that does not exist would have reported "up to
+ * date" forever, which is the one lie an update checker must never tell.
  */
-export const RELEASES_REPO = "";
+export const RELEASES_REPO = "webtools-dotcom/OmniVault";
 
 /**
  * Kept in step with package.json and tauri.conf.json by a harness guard, because

@@ -81,9 +81,9 @@ A few consequences of that shape worth knowing:
 
 ## Getting it
 
-There is no published release yet. The app has an update check built in, and it will tell you so plainly — it is wired to a repository that does not exist until this one is published, and it says "no update channel is set up yet" rather than pretending you are up to date.
+There is no published release yet. The app has an update check built into the sidebar, and it will say so plainly — "No releases have been published yet" — rather than pretending you are up to date. It asks the releases page of this repository once, only when you press the button, and nothing about your vault goes with the request.
 
-Until then, build it yourself with the steps below.
+Until a release exists, build it yourself with the steps below.
 
 Two things to expect when releases do exist, because both look alarming and neither is a fault:
 
