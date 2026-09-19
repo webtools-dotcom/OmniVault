@@ -16,6 +16,7 @@ import {
   Link2,
 } from "lucide-react";
 import { Button } from "../common/Button";
+import { PairingGuide } from "./PairingGuide";
 import { generateQrMatrix, generateQrPath } from "../../utils/qrCode";
 import { StorageService } from "../../services/storageService";
 import { PeerInfo, MeshSyncState } from "../../types";
@@ -322,6 +323,8 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {activeTab === "mesh" ? (
             <>
+              <PairingGuide />
+
               {/* Mesh Header & Sync All Action */}
               <div className="flex items-center justify-between p-3.5 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl">
                 <div className="flex items-center gap-2.5">
@@ -349,7 +352,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   className="h-8 px-3 text-xs font-semibold shrink-0 gap-1.5"
                 >
                   <RefreshCw className={`w-3 h-3 ${isSyncingManual ? "animate-spin text-vault-secondary" : ""}`} />
-                  <span>{isSyncingManual ? "Syncing..." : "Sync All"}</span>
+                  <span>{isSyncingManual ? "Syncing…" : "Sync now"}</span>
                 </Button>
               </div>
 
@@ -730,7 +733,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-vault-success shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
             <span className="text-[0.815rem] text-vault-muted font-medium">
-              LAN Port {lanInfo.port} • Local Mesh Only
+              Listening on port {lanInfo.port} • this network only
             </span>
           </div>
           <Button variant="primary" size="sm" onClick={onClose} className="rounded-xl px-4 py-1.5 font-semibold">

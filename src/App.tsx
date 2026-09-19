@@ -8,6 +8,7 @@ import { getFolderPath } from "./utils/folderTree";
 import { folderTint } from "./utils/folderTint";
 import { StorageService, isTauriEnvironment, cacheLocalMedia } from "./services/storageService";
 import { QuickInboxView } from "./components/inbox/QuickInboxView";
+import { WelcomeScreen } from "./components/onboarding/WelcomeScreen";
 import { QuickInboxItemCard } from "./components/inbox/QuickInboxItemCard";
 import { MoveItemModal } from "./components/inbox/MoveItemModal";
 import { QuickCaptureBar } from "./components/inbox/QuickCaptureBar";
@@ -176,6 +177,28 @@ export function App() {
   // nothing at all, so a failed save used to disappear into the console. One
   // listener catches all of them, including paths added later.
   const [vaultError, setVaultError] = useState<string | null>(null);
+
+  // Shown once, on the app's own devices. A browser peer meets the pairing
+  // screen instead, which is its own introduction.
+  const ONBOARDED_KEY = "omnivault_onboarded_v1";
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (!isTauriEnvironment()) return false;
+    try {
+      return localStorage.getItem(ONBOARDED_KEY) !== "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const dismissWelcome = useCallback((thenConnect: boolean) => {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, "true");
+    } catch {
+      /* a vault that cannot remember this is still usable */
+    }
+    setShowWelcome(false);
+    if (thenConnect) setIsQrModalOpen(true);
+  }, []);
   useEffect(() => {
     const handleRejection = (e: PromiseRejectionEvent) => {
       const reason = e.reason;
@@ -489,6 +512,15 @@ export function App() {
 
   const currentItemCount =
     activeView.type === "inbox" ? filteredInboxItems.length : displayedFolderItems.length;
+
+  if (showWelcome) {
+    return (
+      <WelcomeScreen
+        onConnectDevice={() => dismissWelcome(true)}
+        onDismiss={() => dismissWelcome(false)}
+      />
+    );
+  }
 
   return (
     <AppLayout
