@@ -49,6 +49,15 @@ impl From<std::io::Error> for ImportError {
     }
 }
 
+/// The largest archive a restore will take in. Generous next to a real backup —
+/// an 18-note vault with seven images came to 8.8 MB — and small enough that a
+/// mistaken pick cannot run a phone out of memory.
+pub const MAX_ARCHIVE_BYTES: usize = 512 * 1024 * 1024;
+
+/// The smallest thing that could even be a zip: an empty archive's end-of-
+/// central-directory record.
+pub const MIN_ARCHIVE_BYTES: usize = 22;
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ImportSummary {
     /// Rows the vault actually took — a row the local copy already had in a
@@ -56,7 +65,6 @@ pub struct ImportSummary {
     pub applied: usize,
     pub notes_in_backup: usize,
     pub media_added: usize,
-    pub taken_at: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -168,8 +176,21 @@ pub fn import_vault(
     base_dir: &Path,
     archive: &Path,
 ) -> Result<ImportSummary, ImportError> {
-    let bytes = fs::read(archive)?;
-    let entries = read_directory(&bytes)?;
+    import_vault_bytes(conn, base_dir, &fs::read(archive)?)
+}
+
+/// The same restore, from an archive already in memory.
+///
+/// Android hands a chosen file over as a stream rather than a path — scoped
+/// storage does not give the app a readable path to a file it did not write —
+/// so the bytes arrive without ever having a name on this filesystem. Taking
+/// bytes rather than a path is what lets the same restore serve both.
+pub fn import_vault_bytes(
+    conn: &mut Connection,
+    base_dir: &Path,
+    bytes: &[u8],
+) -> Result<ImportSummary, ImportError> {
+    let entries = read_directory(bytes)?;
 
     let db_entry = entries
         .iter()
@@ -185,7 +206,7 @@ pub fn import_vault(
     let scratch = std::env::temp_dir().join(format!("ov-restore-{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&scratch)?;
     let scratch_db = scratch.join("backup.db");
-    fs::write(&scratch_db, read_entry(&bytes, db_entry)?)?;
+    fs::write(&scratch_db, read_entry(bytes, db_entry)?)?;
 
     let result = (|| -> Result<ImportSummary, ImportError> {
         let old = Connection::open(&scratch_db).map_err(|_| {
@@ -264,16 +285,11 @@ pub fn import_vault(
             if present.contains(name) {
                 continue;
             }
-            fs::write(media_dir.join(name), read_entry(&bytes, e)?)?;
+            fs::write(media_dir.join(name), read_entry(bytes, e)?)?;
             media_added += 1;
         }
 
-        let taken_at = fs::metadata(archive)
-            .and_then(|m| m.modified())
-            .ok()
-            .map(|t| chrono::DateTime::<Utc>::from(t).to_rfc3339());
-
-        Ok(ImportSummary { applied, notes_in_backup, media_added, taken_at })
+        Ok(ImportSummary { applied, notes_in_backup, media_added })
     })();
 
     let _ = fs::remove_dir_all(&scratch);

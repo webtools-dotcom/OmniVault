@@ -745,7 +745,9 @@ fn handle_connection(
     }
 
     // Enforce Content-Length bounds: max 50MB for media upload, max 2MB for standard endpoints
-    let max_allowed_body = if path == "/api/media/upload" || path == "/api/media" {
+    let max_allowed_body = if path == "/api/vault/restore" {
+        crate::db::import::MAX_ARCHIVE_BYTES
+    } else if path == "/api/media/upload" || path == "/api/media" {
         50 * 1024 * 1024 // 50 MB
     } else {
         2 * 1024 * 1024 // 2 MB
@@ -1288,6 +1290,37 @@ let conn = lock_recover(&db);
     }
 
     // Media Upload Route: POST /api/media/upload or POST /api/media
+    // A restore, with the archive as the request body.
+    //
+    // This does not go over Tauri's command IPC because on Android it cannot:
+    // Tauri's own transport says so — "on Android we never use it because
+    // Android does not have support to reading the request body" — so every
+    // invoke there is a JSON string through postMessage, and 8.8 MB of zip is
+    // not a JSON string. The app already posts image bytes to this same server
+    // from its own webview, so this is the road that is known to carry binary
+    // on the device. The gate above has already established the caller is this
+    // app's own webview on loopback. See D-077.
+    if method == "POST" && path == "/api/vault/restore" {
+        if body.len() < crate::db::import::MIN_ARCHIVE_BYTES {
+            let err = serde_json::json!({ "error": "That file is too small to be a backup." });
+            send_response(&mut stream, 400, "Bad Request", "application/json", &err.to_string().into_bytes(), &[])?;
+            return Ok(());
+        }
+        let base_dir = get_storage_base_dir();
+        let mut conn = lock_recover(&db);
+        match crate::db::import::import_vault_bytes(&mut conn, &base_dir, &body) {
+            Ok(summary) => {
+                let payload = serde_json::to_string(&summary).unwrap_or_else(|_| "{}".to_string());
+                send_response(&mut stream, 200, "OK", "application/json", &payload.into_bytes(), &[])?;
+            }
+            Err(e) => {
+                let err = serde_json::json!({ "error": e.to_string() });
+                send_response(&mut stream, 400, "Bad Request", "application/json", &err.to_string().into_bytes(), &[])?;
+            }
+        }
+        return Ok(());
+    }
+
     if method == "POST" && (path == "/api/media/upload" || path == "/api/media") {
         let upload_item_id: Option<String>;
         let upload_folder_id: Option<String>;

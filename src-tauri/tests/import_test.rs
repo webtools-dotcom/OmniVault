@@ -9,7 +9,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use omnivault_lib::db::export::export_vault;
-use omnivault_lib::db::import::{import_vault, list_backups};
+use omnivault_lib::db::import::{import_vault, import_vault_bytes, list_backups, MAX_ARCHIVE_BYTES, MIN_ARCHIVE_BYTES};
 use omnivault_lib::db::media::save_image_media;
 use omnivault_lib::db::schema::initialize_schema;
 use omnivault_lib::db::storage::{create_folder, create_item, delete_item, list_inbox_items, update_item};
@@ -292,4 +292,99 @@ fn backups_are_listed_newest_first() {
     assert_eq!(found.len(), 2, "something that is not a backup was offered: {found:?}");
     assert!(found[0].name.contains("2026-02-02"), "not newest first: {found:?}");
     let _ = fs::remove_dir_all(&dir);
+}
+
+/// Android cannot hand the app a path.
+///
+/// Scoped storage gives a chosen file over as a stream, and Tauri's own IPC
+/// cannot carry bytes on that platform at all, so the archive reaches the vault
+/// as a body on the loopback server with no name on this filesystem behind it.
+/// This is the same restore as every test above, minus the path — if it ever
+/// starts needing one again, Android silently loses the ability to restore.
+#[test]
+fn a_restore_works_from_bytes_with_no_file_behind_them() {
+    let mut source = vault("bytes-src");
+    let folder = create_folder(&mut source.conn, "Field Notes", None, None, "dev").unwrap();
+    create_item(
+        &mut source.conn,
+        Some(&folder.id),
+        "note",
+        "Battery observation",
+        "Minimal drain over four hours.",
+        None,
+        "dev",
+    )
+    .unwrap();
+    let item = create_item(&mut source.conn, None, "note", "Unfiled", "Inbox note.", None, "dev").unwrap();
+    save_image_media(&mut source.conn, &source.dir, &item.id, &png(6), "dev").unwrap();
+
+    let archive = source.dir.join("omnivault-backup-bytes.zip");
+    export_vault(&mut source.conn, &source.dir, &archive).unwrap();
+    let bytes = fs::read(&archive).unwrap();
+
+    // The archive is handed over as bytes; the file it came from is gone.
+    fs::remove_file(&archive).unwrap();
+    assert!(!archive.exists());
+
+    let mut fresh = vault("bytes-fresh");
+    let summary = import_vault_bytes(&mut fresh.conn, &fresh.dir, &bytes).unwrap();
+
+    assert_eq!(summary.notes_in_backup, 2);
+    assert!(summary.applied >= 3, "folder and both notes should have landed");
+    assert_eq!(summary.media_added, 1, "the image should have come back too");
+
+    let inbox = list_inbox_items(&fresh.conn).unwrap();
+    assert_eq!(inbox.len(), 1);
+    assert_eq!(inbox[0].title, "Unfiled");
+}
+
+/// The same bytes, offered as a path and as bytes, land identically.
+#[test]
+fn bytes_and_path_restores_agree() {
+    let mut source = vault("agree-src");
+    create_folder(&mut source.conn, "Shared", None, None, "dev").unwrap();
+    create_item(&mut source.conn, None, "note", "Only note", "Body.", None, "dev").unwrap();
+    let archive = source.dir.join("omnivault-backup-agree.zip");
+    export_vault(&mut source.conn, &source.dir, &archive).unwrap();
+    let bytes = fs::read(&archive).unwrap();
+
+    let mut by_path = vault("agree-path");
+    let a = import_vault(&mut by_path.conn, &by_path.dir, &archive).unwrap();
+
+    let mut by_bytes = vault("agree-bytes");
+    let b = import_vault_bytes(&mut by_bytes.conn, &by_bytes.dir, &bytes).unwrap();
+
+    assert_eq!(a.applied, b.applied);
+    assert_eq!(a.notes_in_backup, b.notes_in_backup);
+    assert_eq!(a.media_added, b.media_added);
+}
+
+/// Something that is not an archive is refused rather than parsed.
+#[test]
+fn bytes_that_are_not_an_archive_are_refused() {
+    let mut fresh = vault("bytes-junk");
+    let err = import_vault_bytes(&mut fresh.conn, &fresh.dir, b"not a zip at all, just text")
+        .expect_err("junk bytes must not be accepted as a backup");
+    let said = err.to_string();
+    assert!(
+        !said.is_empty() && !said.contains("panicked"),
+        "a refusal should explain itself: {said}"
+    );
+
+    // Nothing was written on the way to refusing.
+    let items: i64 = fresh
+        .conn
+        .query_row("SELECT COUNT(*) FROM vault_items", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(items, 0, "a refused archive must leave the vault untouched");
+}
+
+/// The bounds the callers enforce have to be worth enforcing.
+#[test]
+fn the_archive_bounds_are_sane() {
+    assert_eq!(MIN_ARCHIVE_BYTES, 22, "an empty zip is 22 bytes; below that nothing can parse");
+    assert!(
+        MAX_ARCHIVE_BYTES > 64 * 1024 * 1024,
+        "a real vault with images was 8.8 MB, so the ceiling must leave room to grow"
+    );
 }

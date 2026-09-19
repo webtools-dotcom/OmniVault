@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Archive, Check, Loader2, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Archive, Check, FolderOpen, Loader2, X } from "lucide-react";
 import {
   BackupFile,
   ImportSummary,
@@ -31,12 +31,26 @@ function formatWhen(ms: number): string {
   return `${stamp} · ${days} days ago`;
 }
 
+/**
+ * Tauri rejects a failed command with a plain string, not an Error, so the
+ * usual `err instanceof Error` check throws away every message the Rust side
+ * took the trouble to write and leaves the person with a generic one. That is
+ * how "That zip has no omnivault.db in it" reached the screen as "could not be
+ * read". See D-077.
+ */
+function messageFrom(err: unknown, fallback: string): string {
+  if (typeof err === "string" && err.trim()) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onRestored }) => {
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const [done, setDone] = useState<ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const onAndroid = deviceKind(isTauriEnvironment()) === "tablet" || deviceKind(isTauriEnvironment()) === "phone";
 
   useEffect(() => {
@@ -46,10 +60,34 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
     setSelected(null);
     StorageService.listBackups()
       .then(setBackups)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not look for backups."));
+      .catch((err) => setError(messageFrom(err, "Could not look for backups.")));
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  /**
+   * Restores a file the person pointed at, rather than one the app found.
+   *
+   * A plain file input, because the webview turns it into the system picker
+   * and the system picker is the only way an Android app may read a file it
+   * did not write. The bytes are read here and handed over whole; there is no
+   * path involved on that platform. See D-077.
+   */
+  const handlePicked = async (file: File | undefined) => {
+    if (!file || isWorking) return;
+    setIsWorking(true);
+    setError(null);
+    try {
+      const summary = await StorageService.importVaultBytes(file);
+      setDone(summary);
+      onRestored();
+    } catch (err) {
+      setError(messageFrom(err, "That file could not be read."));
+    } finally {
+      setIsWorking(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
 
   const handleRestore = async () => {
     if (!selected || isWorking) return;
@@ -60,7 +98,7 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
       setDone(summary);
       onRestored();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The restore did not finish.");
+      setError(messageFrom(err, "The restore did not finish."));
     } finally {
       setIsWorking(false);
     }
@@ -118,20 +156,22 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
             <div className="rounded-xl bg-vault-elevated px-4 py-4 text-xs leading-relaxed text-vault-muted">
               {onAndroid ? (
                 <>
-                  No backups this app can open. Android only lets an app read files in
-                  your downloads folder that it created itself, so a backup made before
-                  the app was reinstalled — or copied here from elsewhere — is invisible
-                  to it, even though you can see the file.
+                  Nothing here this app can list on its own. Android only lets an app see
+                  files in your downloads folder that it created itself, so a backup from
+                  before the app was reinstalled is invisible to it even though the file
+                  is sitting right there.
                   <span className="block mt-2 text-vault-secondary">
-                    To get that vault back: restore it on a computer running OmniVault,
-                    then pair this device and let it sync across.
+                    Use <strong className="font-medium">Choose a file</strong> below and
+                    point at it — handing it over yourself is what gives the app
+                    permission to read it.
                   </span>
                 </>
               ) : (
                 <>
                   No backups found in your downloads folder. Use{" "}
                   <strong className="text-vault-secondary font-medium">Back up</strong> first,
-                  or copy a backup there from another device.
+                  or <strong className="text-vault-secondary font-medium">Choose a file</strong>{" "}
+                  to point at one kept somewhere else.
                 </>
               )}
             </div>
@@ -162,7 +202,26 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
 
           {error && <p className="mt-3 text-xs leading-relaxed text-vault-error">{error}</p>}
 
-          <div className="flex items-center justify-end gap-2 pt-4">
+          <div className="flex items-center gap-2 pt-4">
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              onChange={(e) => handlePicked(e.target.files?.[0])}
+            />
+            {!done && (
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={isWorking}
+                className="h-9 px-3 rounded-lg text-xs text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                Choose a file
+              </button>
+            )}
+            <div className="flex-1" />
             <button
               type="button"
               onClick={onClose}

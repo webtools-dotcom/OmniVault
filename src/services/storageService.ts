@@ -175,7 +175,6 @@ export interface ImportSummary {
   applied: number;
   notes_in_backup: number;
   media_added: number;
-  taken_at: string | null;
 }
 
 export interface ExportSummary {
@@ -1107,6 +1106,32 @@ export const StorageService = {
       throw new VaultWriteError("restore from a browser");
     }
     return invoke<ImportSummary>("import_vault_cmd", { path });
+  },
+
+  /**
+   * The same restore, from a file the person picked rather than one the app
+   * found. Android will not let an app read a file in shared storage it did
+   * not create, so after a reinstall its own backups are invisible to it; the
+   * system picker hands over the one chosen file as bytes. See D-077.
+   */
+  async importVaultBytes(file: Blob): Promise<ImportSummary> {
+    const endpoint = isTauriEnvironment()
+      ? `http://127.0.0.1:${cachedServerPort}/api/vault/restore`
+      : "/api/vault/restore";
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", ...authHeaders() },
+      body: file,
+    });
+
+    if (!res.ok) {
+      const detail = await res.json().catch(() => null);
+      throw new Error(
+        (detail && detail.error) || `The restore did not finish (HTTP ${res.status}).`
+      );
+    }
+    return res.json();
   },
 
   async openFileInFolder(filePath: string): Promise<void> {
