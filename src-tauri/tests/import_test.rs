@@ -388,3 +388,63 @@ fn the_archive_bounds_are_sane() {
         "a real vault with images was 8.8 MB, so the ceiling must leave room to grow"
     );
 }
+
+/// A restore that brings almost nothing back has to say so.
+///
+/// This is the desktop's own case: a backup holding notes that were later
+/// deleted here reports a healthy-looking `applied` count while the notes stay
+/// gone. The summary used to say "N records taken from a backup holding 18
+/// notes" and leave the person to work out whether that was success, partial
+/// failure or a bug. See D-078.
+#[test]
+fn a_restore_says_how_many_notes_it_could_not_bring_back() {
+    let mut source = vault("silent-src");
+    let keep = create_item(&mut source.conn, None, "note", "Still wanted", "Body.", None, "dev").unwrap();
+    let dropped = create_item(&mut source.conn, None, "note", "Deleted later", "Body.", None, "dev").unwrap();
+    let also = create_item(&mut source.conn, None, "note", "Deleted later too", "Body.", None, "dev").unwrap();
+
+    let archive = source.dir.join("omnivault-backup-silent.zip");
+    export_vault(&mut source.conn, &source.dir, &archive).unwrap();
+
+    // The same vault, where two of those three were deleted after the backup.
+    let mut local = vault("silent-local");
+    import_vault(&mut local.conn, &local.dir, &archive).unwrap();
+    delete_item(&mut local.conn, &dropped.id, "dev").unwrap();
+    delete_item(&mut local.conn, &also.id, "dev").unwrap();
+
+    let summary = import_vault(&mut local.conn, &local.dir, &archive).unwrap();
+
+    assert_eq!(summary.notes_in_backup, 3);
+    assert_eq!(summary.notes_present, 1, "only the undeleted note should be here");
+    assert_eq!(
+        summary.notes_left_deleted, 2,
+        "the two deleted after the backup must be reported, not silently missing"
+    );
+
+    // And the note that survived really is the one that should have. The two
+    // others are still rows — a deletion is a tombstone, not an absence — so
+    // the check is on the flag, not on whether a title can be read.
+    assert_eq!(title_of(&local.conn, &keep.id).as_deref(), Some("Still wanted"));
+    let dropped_is_deleted: i64 = local
+        .conn
+        .query_row("SELECT is_deleted FROM vault_items WHERE id = ?1", [&dropped.id], |r| r.get(0))
+        .unwrap();
+    assert_eq!(dropped_is_deleted, 1, "the restore must not have resurrected it");
+}
+
+/// The happy case still reads as a clean success.
+#[test]
+fn a_full_restore_reports_nothing_left_behind() {
+    let mut source = vault("full-src");
+    create_item(&mut source.conn, None, "note", "One", "Body.", None, "dev").unwrap();
+    create_item(&mut source.conn, None, "note", "Two", "Body.", None, "dev").unwrap();
+    let archive = source.dir.join("omnivault-backup-full.zip");
+    export_vault(&mut source.conn, &source.dir, &archive).unwrap();
+
+    let mut fresh = vault("full-fresh");
+    let summary = import_vault(&mut fresh.conn, &fresh.dir, &archive).unwrap();
+
+    assert_eq!(summary.notes_in_backup, 2);
+    assert_eq!(summary.notes_present, 2);
+    assert_eq!(summary.notes_left_deleted, 0);
+}

@@ -65,6 +65,18 @@ pub struct ImportSummary {
     pub applied: usize,
     pub notes_in_backup: usize,
     pub media_added: usize,
+    /// Notes from the backup that are live in this vault now. Counted after
+    /// the merge, so it answers the question a person is actually asking —
+    /// "are my notes back" — rather than how many rows changed hands.
+    pub notes_present: usize,
+    /// Notes from the backup that this device deleted after the backup was
+    /// taken, and which a restore therefore did not bring back.
+    ///
+    /// Without this number the summary is true and useless: restoring 18 notes
+    /// into a vault that has since deleted 16 of them reports "8 records taken
+    /// from a backup holding 18 notes" and leaves the person to guess whether
+    /// that is success, partial failure, or a bug. See D-078.
+    pub notes_left_deleted: usize,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -289,7 +301,28 @@ pub fn import_vault_bytes(
             media_added += 1;
         }
 
-        Ok(ImportSummary { applied, notes_in_backup, media_added })
+        // What the merge actually left behind, asked of the vault rather than
+        // inferred from the revision count.
+        let mut present = 0usize;
+        let mut left_deleted = 0usize;
+        {
+            let mut stmt = conn.prepare("SELECT is_deleted FROM vault_items WHERE id = ?1")?;
+            for i in items.iter().filter(|i| !i.is_deleted) {
+                match stmt.query_row([&i.id], |r| r.get::<_, i64>(0)) {
+                    Ok(0) => present += 1,
+                    Ok(_) => left_deleted += 1,
+                    Err(_) => {}
+                }
+            }
+        }
+
+        Ok(ImportSummary {
+            applied,
+            notes_in_backup,
+            media_added,
+            notes_present: present,
+            notes_left_deleted: left_deleted,
+        })
     })();
 
     let _ = fs::remove_dir_all(&scratch);

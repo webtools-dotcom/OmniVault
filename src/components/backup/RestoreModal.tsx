@@ -146,11 +146,22 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
                 Restored
               </div>
               <p className="mt-2 text-xs leading-relaxed text-vault-secondary">
-                {done.applied} record{done.applied === 1 ? "" : "s"} taken from a backup holding{" "}
-                {done.notes_in_backup} note{done.notes_in_backup === 1 ? "" : "s"}
-                {done.media_added > 0 && `, and ${done.media_added} image${done.media_added === 1 ? "" : "s"} copied back`}
-                . Anything newer on this device was left as it was.
+                {done.notes_present} of {done.notes_in_backup} note
+                {done.notes_in_backup === 1 ? "" : "s"} from that backup{" "}
+                {done.notes_present === 1 ? "is" : "are"} here
+                {done.media_added > 0 &&
+                  `, and ${done.media_added} image${done.media_added === 1 ? "" : "s"} copied back`}
+                .
               </p>
+              {done.notes_left_deleted > 0 && (
+                <p className="mt-2 text-xs leading-relaxed text-vault-muted">
+                  The other {done.notes_left_deleted === 1 ? "one" : done.notes_left_deleted}{" "}
+                  {done.notes_left_deleted === 1 ? "was" : "were"} deleted on this device after the
+                  backup was taken, so{" "}
+                  {done.notes_left_deleted === 1 ? "it was" : "they were"} left deleted. A restore
+                  never undoes a deletion that came after the backup.
+                </p>
+              )}
             </div>
           ) : backups.length === 0 ? (
             <div className="rounded-xl bg-vault-elevated px-4 py-4 text-xs leading-relaxed text-vault-muted">

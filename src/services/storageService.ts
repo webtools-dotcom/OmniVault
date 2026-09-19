@@ -175,6 +175,8 @@ export interface ImportSummary {
   applied: number;
   notes_in_backup: number;
   media_added: number;
+  notes_present: number;
+  notes_left_deleted: number;
 }
 
 export interface ExportSummary {
