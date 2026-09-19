@@ -40,7 +40,10 @@ export function App() {
   const [isPeerPinModalOpen, setIsPeerPinModalOpen] = useState(() => {
     return !isTauriEnvironment() && !StorageService.isPaired();
   });
-  const [isPaired, setIsPaired] = useState(() => StorageService.isPaired());
+  // Tracks whether a browser peer has paired; the desktop and Android apps are
+  // always "paired" with their own vault, which is why the Synced pill counts
+  // real peers instead of reading this.
+  const [, setIsPaired] = useState(() => StorageService.isPaired());
 
   // BridgeMind Stream Filter State (Stream | Notes | Markets)
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
@@ -189,6 +192,20 @@ export function App() {
       return false;
     }
   });
+
+  // An upgrade is not a first run: a vault that already holds notes belongs to
+  // somebody who knows what this is.
+  useEffect(() => {
+    if (!showWelcome) return;
+    if (folders.length > 0 || inboxItems.length > 0) {
+      try {
+        localStorage.setItem(ONBOARDED_KEY, "true");
+      } catch {
+        /* nothing to do */
+      }
+      setShowWelcome(false);
+    }
+  }, [showWelcome, folders.length, inboxItems.length]);
 
   const dismissWelcome = useCallback((thenConnect: boolean) => {
     try {
@@ -567,7 +584,7 @@ export function App() {
           onStreamFilterChange={setStreamFilter}
           headerActions={
             <div className="flex items-center gap-2">
-              {isPaired || (meshState.pairedDeviceIds && meshState.pairedDeviceIds.length > 0) ? (
+              {meshState.pairedDeviceIds && meshState.pairedDeviceIds.length > 0 ? (
                 <button
                   type="button"
                   onClick={() => setIsQrModalOpen(true)}

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ActiveView, Folder, MeshSyncState } from "../../types";
 import { StorageService, isTauriEnvironment } from "../../services/storageService";
+import { deviceLabel } from "../../utils/platform";
 import { RestoreModal } from "../backup/RestoreModal";
 import { APP_VERSION, UpdateCheck, checkForUpdate, openExternal } from "../../services/updates";
 import { FolderTree } from "../folders/FolderTree";
@@ -247,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="truncate min-w-0">
             <span className="text-vault-primary text-xs font-medium block truncate leading-tight">
-              {isMobile ? "This tablet" : "This computer"}
+              {deviceLabel(isTauriEnvironment())}
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
@@ -288,7 +289,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="h-6 px-2 flex items-center gap-1.5 rounded-md bg-vault-elevated hover:bg-vault-overlay text-[0.6875rem] text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer disabled:opacity-60"
             >
               <Download className="w-3 h-3" />
-              <span>{exportState === "working" ? "Saving…" : exportState === "done" ? "Saved" : "Back up"}</span>
+              <span className="whitespace-nowrap">{exportState === "working" ? "Saving…" : exportState === "done" ? "Saved" : "Back up"}</span>
             </button>
           )}
 
@@ -316,14 +317,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2 pl-9 text-[0.6875rem] text-vault-subtle">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-9 text-[0.6875rem] text-vault-subtle">
           <span>Version {APP_VERSION}</span>
           {!update && (
             <button
               type="button"
               onClick={handleCheckForUpdate}
               disabled={isCheckingUpdate}
-              className="text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
+              className="whitespace-nowrap text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
             >
               {isCheckingUpdate ? "Checking…" : "Check for updates"}
             </button>

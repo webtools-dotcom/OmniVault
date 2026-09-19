@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from "react";
+import { isTauriEnvironment } from "../../services/storageService";
+import { isTouchDevice } from "../../utils/platform";
 import { Folder, ItemType, VaultItem } from "../../types";
 import { QuickCaptureBar } from "./QuickCaptureBar";
 import { QuickInboxItemCard } from "./QuickInboxItemCard";
@@ -61,6 +63,8 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
             <p className="mt-3 text-[0.8125rem] leading-relaxed text-vault-muted">
               {searchQuery
                 ? `No capture contains “${searchQuery}”. Try a shorter word, or clear the search.`
+                : isTouchDevice(isTauriEnvironment())
+                ? "Anything you capture lands here first — a thought, a link, a ticker, a photo. File it into a folder later, or leave it."
                 : "Anything you capture lands here first — a thought, a link, a ticker, a screenshot pasted with Ctrl+V. File it into a folder later, or leave it."}
             </p>
           </div>

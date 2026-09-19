@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Archive, Check, Loader2, X } from "lucide-react";
-import { BackupFile, ImportSummary, StorageService } from "../../services/storageService";
+import {
+  BackupFile,
+  ImportSummary,
+  StorageService,
+  isTauriEnvironment,
+} from "../../services/storageService";
 import { cn } from "../../utils/cn";
+import { deviceKind } from "../../utils/platform";
 
 export interface RestoreModalProps {
   isOpen: boolean;
@@ -31,6 +37,7 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
   const [isWorking, setIsWorking] = useState(false);
   const [done, setDone] = useState<ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const onAndroid = deviceKind(isTauriEnvironment()) === "tablet" || deviceKind(isTauriEnvironment()) === "phone";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,8 +116,24 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
             </div>
           ) : backups.length === 0 ? (
             <div className="rounded-xl bg-vault-elevated px-4 py-4 text-xs leading-relaxed text-vault-muted">
-              No backups found in your downloads folder. Use <strong className="text-vault-secondary font-medium">Back up</strong> first,
-              or copy a backup there from another device.
+              {onAndroid ? (
+                <>
+                  No backups this app can open. Android only lets an app read files in
+                  your downloads folder that it created itself, so a backup made before
+                  the app was reinstalled — or copied here from elsewhere — is invisible
+                  to it, even though you can see the file.
+                  <span className="block mt-2 text-vault-secondary">
+                    To get that vault back: restore it on a computer running OmniVault,
+                    then pair this device and let it sync across.
+                  </span>
+                </>
+              ) : (
+                <>
+                  No backups found in your downloads folder. Use{" "}
+                  <strong className="text-vault-secondary font-medium">Back up</strong> first,
+                  or copy a backup there from another device.
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">

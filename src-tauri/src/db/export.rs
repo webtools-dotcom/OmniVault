@@ -349,7 +349,10 @@ pub fn export_vault(
     })
 }
 
-/// `omnivault-backup-2026-09-18-1432.zip`
+/// `omnivault-backup-2026-09-18-1432.zip`, stamped in the clock the person is
+/// reading. A UTC name on a device showing 10:17 local came out as 0447, which
+/// makes the newest backup hard to pick out of a list.
 pub fn export_filename(now: DateTime<Utc>) -> String {
-    format!("omnivault-backup-{}.zip", now.format("%Y-%m-%d-%H%M"))
+    let local = now.with_timezone(&chrono::Local);
+    format!("omnivault-backup-{}.zip", local.format("%Y-%m-%d-%H%M"))
 }
