@@ -155,11 +155,18 @@ if (fs.existsSync(releaseExe)) {
 
 // 9. Verify P6-T02 V1 Release & Documentation Preparation
 const readmeContent = fs.readFileSync(path.resolve(process.cwd(), "README.md"), "utf-8");
+// These assert on substance rather than on heading strings. The original
+// version matched literal titles ("Architecture", "Quick Start", "Local REST
+// API Reference"), which pinned the document's marketing-era wording: renaming
+// a heading to plain English broke the build while removing nothing. What has
+// to stay true is that the README still explains the shape of the thing, how
+// to build it, how to check it, what the API is, and which keys do what.
 assert.ok(readmeContent.includes("OmniVault"), "README.md missing OmniVault title");
-assert.ok(readmeContent.includes("Architecture"), "README.md missing Architecture section");
-assert.ok(readmeContent.includes("Quick Start"), "README.md missing Quick Start section");
-assert.ok(readmeContent.includes("Local REST API Reference"), "README.md missing REST API reference");
-assert.ok(readmeContent.includes("Keyboard Shortcuts"), "README.md missing Keyboard Shortcuts table");
+assert.ok(/SQLite/.test(readmeContent) && /42420/.test(readmeContent), "README.md no longer explains how the app is put together");
+assert.ok(/npm install/.test(readmeContent), "README.md no longer says how to build it");
+assert.ok(/npm test/.test(readmeContent), "README.md no longer says how to verify it");
+assert.ok(/\/api\/health/.test(readmeContent), "README.md no longer documents the local HTTP API");
+assert.ok(/Ctrl \+ Enter/.test(readmeContent), "README.md no longer documents the keyboard shortcuts");
 
 const licenseContent = fs.readFileSync(path.resolve(process.cwd(), "LICENSE"), "utf-8");
 assert.ok(licenseContent.includes("MIT License"), "LICENSE missing MIT License header");
@@ -459,3 +466,51 @@ assert.ok(
 );
 
 console.log("✅ Version and signing-key guards passed!");
+
+// 19. Regression guard: the README may not promise what the code does not do.
+//
+// It shipped claiming sync ran "over encrypted TCP streams" while the only
+// occurrence of "encrypt" in the Rust tree was a comment saying the backup is
+// not encrypted — and while its own threat model, 246 lines further down, said
+// plainly there is no TLS. A privacy tool that overstates its privacy in the
+// paragraph most people read is worse than one that says nothing. It also
+// listed iPhone and iPad among supported devices, named mDNS for what is UDP
+// multicast, and sent people to a releases page that does not exist. See D-080.
+const readme = fs.readFileSync(path.resolve(process.cwd(), "README.md"), "utf-8");
+const overclaims = [
+  [/encrypted\s+(?:TCP|tcp|streams?|transport|sync|channel|connection)/i, "claims the transport is encrypted; there is no TLS"],
+  [/end-to-end\s+encrypt/i, "claims end-to-end encryption"],
+  [/\bmDNS\b/i, "says mDNS; discovery is UDP multicast on 239.255.42.99"],
+];
+const promises = [];
+for (const [pattern, why] of overclaims) {
+  if (pattern.test(readme)) promises.push(why);
+}
+
+// Apple platforms need a claim, not a mention: "there is no iOS build" is
+// the honest sentence this guard exists to protect, so banning the token
+// outright would forbid the truth along with the lie. Flag the word only in
+// a sentence that is not denying it.
+for (const sentence of readme.split(/(?<=[.!])\s|\r?\n/)) {
+  if (!/\b(?:iPhone|iPad|iOS|macOS)\b/.test(sentence)) continue;
+  if (/\b(?:no|not|never|without|lacks?)\b/i.test(sentence)) continue;
+  promises.push("claims an Apple platform; there is no iOS or macOS build");
+  break;
+}
+if (EMOJI.test(readme)) promises.push("emoji are back in the README");
+
+// Do not send people to a download page that does not exist. The update check
+// is wired to RELEASES_REPO and stays deliberately empty until publication;
+// while it is empty, the README must not link to releases either.
+const releasesRepo = (updatesSrc.match(/RELEASES_REPO = "([^"]*)"/) || [])[1];
+if (!releasesRepo && /github\.com\/[^\s)]+\/releases/i.test(readme)) {
+  promises.push("links to a releases page while RELEASES_REPO is empty");
+}
+
+assert.strictEqual(
+  promises.length,
+  0,
+  "the README promises what the code does not do: " + promises.join(" | ")
+);
+
+console.log("✅ README honesty guard passed!");

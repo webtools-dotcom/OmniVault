@@ -1,247 +1,149 @@
-# 🛡️ OmniVault
+# OmniVault
 
-> **Private, Local-First, Cross-Device Knowledge Vault & Workspace**  
-> *Infinite nested folders, instant multi-format capture, and asynchronous store-and-forward mesh synchronization over local Wi-Fi.*
+A private notebook that syncs across your own devices. No account, no cloud, no company in the middle.
 
----
+Notes, links, screenshots and tickers, kept in folders you control. Every device holds its own complete copy in an ordinary SQLite database. When two of your devices are awake on the same Wi-Fi, they find each other and exchange what changed.
 
-## ⚡ Overview
+**What it will not do:** there is no server in between. A note written on your phone reaches your laptop the next time both are open on the same network — not before. If that is not a trade you want, this is the wrong tool, and it is better to know now than to discover it and think the app is broken.
 
-**OmniVault** is a completely decentralized, private personal workspace built for researchers, traders, developers, and creators who work across multiple devices (Windows PC, laptop, iPhone, iPad, Android). 
-
-Capture fleeting thoughts, stock charts, research notes, and web links instantly on any device — even completely offline. When your devices connect to the same local Wi-Fi network or mobile hotspot, they silently discover each other via mDNS and sync delta revisions in milliseconds over encrypted TCP streams.
-
-### 🌟 Why OmniVault?
-
-| Tool | The Problem | How OmniVault Solves It |
-| :--- | :--- | :--- |
-| **Messaging Apps** *(WhatsApp / Telegram "Saved Messages")* | Unsearchable chronological junk drawer, zero folder hierarchy, zero privacy from cloud operators. | **Deep folder nesting**, 📥 **Quick Inbox triage**, and **100% private local SQLite database**. |
-| **Cloud Note Apps** *(Notion, Evernote, OneNote)* | Heavy bloat, cloud login barriers, slow capture speeds, and data hosted on third-party servers. | **Sub-second cold start**, **zero external cloud accounts**, and **pure local filesystem storage**. |
-| **File Transfer Tools** *(LocalSend, AirDrop)* | Ephemeral and point-to-point only: if your laptop is asleep when you capture on your phone, transfer fails. | **Asynchronous Store-and-Forward Mesh**: captures queue locally and catch up automatically when online. |
+Windows and Android today. There is no iOS or macOS build. A phone or tablet can also reach the app through its own browser over your LAN, without installing anything.
 
 ---
 
-## 🏛️ Architecture
+## Why this instead of what you use now
 
-OmniVault follows a strict **Pure Local Core** architecture:
+**A messaging app's saved-messages folder** is where most people actually keep this stuff. It works until you need to find something: one chronological list, no folders, no way to file a thing under the project it belongs to — and it sits on someone else's server.
+
+**Cloud note apps** solve the filing and lose the privacy, plus an account, a login and a sync service between you and your own writing.
+
+**File transfer tools** like AirDrop or LocalSend move a file to a device that is awake right now. Capture something on a walk with your laptop shut and there is nothing to transfer to. OmniVault queues it locally and catches up when both ends are next online together.
+
+The honest counterpoint: those tools work from anywhere on the internet. This one works when your devices are on the same network. That is the whole trade.
+
+---
+
+## How it is put together
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Universal React Frontend                        │
-│             (Vite + React 18 + Tailwind CSS + Lucide Icons)            │
-│         Compiles to static assets: Desktop WebView & Mobile Web        │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │
-                 ┌───────────────────┴───────────────────┐
-                 ▼                                       ▼
-    ┌──────────────────────────┐            ┌──────────────────────────┐
-    │     Desktop Tauri 2      │            │   Local HTTP / API       │
-    │     IPC Invocation       │            │   Server (Port 42420)    │
-    └────────────┬─────────────┘            └────────────┬─────────────┘
-                 │                                       │
-                 └───────────────────┬───────────────────┘
-                                     ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                         Pure Rust Backend Core                         │
-│                                                                        │
-│   ┌───────────────────────┐  ┌───────────────────┐  ┌──────────────┐  │
-│   │     SQLite Engine     │  │  Media Processor  │  │ Local Server │  │
-│   │  - Nested Folders     │  │  - WebP Conversion│  │ - Static SPA │  │
-│   │  - Vault Items & Reus │  │  - Content Hashing│  │ - REST API   │  │
-│   └───────────────────────┘  └───────────────────┘  └──────────────┘  │
-│                                                                        │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                     Local Mesh Sync Engine                      │  │
-│   │  - mDNS / UDP Peer Discovery      - 6-Digit PIN Pairing         │  │
-│   │  - Bidirectional TCP Delta Sync   - LWW Conflict Resolution     │  │
-│   │  - Chunked Media Blob Streaming   - SHA-256 Tamper Detection    │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+React 18 + Vite + Tailwind  ──  one frontend, served two ways
+        │                        (desktop WebView, and over LAN to a browser)
+        ▼
+Rust core (Tauri 2)
+  ├── SQLite               nested folders, items, append-only revision log
+  ├── Media                images converted to WebP, named by content hash,
+  │                        stored as files — never as blobs in a table row
+  ├── HTTP/1.1 server      hand-written, no framework, on 0.0.0.0:42420
+  └── Mesh sync
+        ├── discovery      UDP multicast on 239.255.42.99
+        ├── pairing        6-digit PIN, read off the other device's screen
+        ├── delta sync     revision log exchanged over plain HTTP
+        └── conflicts      Last-Write-Wins, compared on each row's own clock
 ```
 
-1. **Pure Rust Core for Data & Networking:**
-   - Transactional SQLite persistence (`rusqlite`) with infinite hierarchical folder nesting and revision logging.
-   - Zero-dependency mDNS / UDP broadcast engine for decentralized peer discovery.
-   - Asynchronous store-and-forward TCP delta sync with Last-Write-Wins (LWW) conflict resolution.
-   - Chunked TCP media blob streaming with SHA-256 verification and session token authentication.
-   - Embedded non-blocking HTTP/1.1 server running on `0.0.0.0:42420` for LAN browser and mobile PWA access.
-2. **Single Universal Frontend (React + Tailwind):**
-   - Single codebase running identically in Tauri desktop WebView and over mobile/tablet Safari and Chrome.
-3. **Local Disk Blob Storage:**
-   - Media attachments and screenshots are automatically converted into compressed WebP files and stored on the local disk. Never stored as binary blobs in SQLite rows.
-4. **Zero External Cloud & Zero Telemetry:**
-   - No external API requests, no tracking scripts, and no telemetry.
+A few consequences of that shape worth knowing:
+
+- **The sync engine has no network dependencies.** The HTTP client and server are written by hand rather than pulled from crates, because cross-compiling a TLS stack to Android was a bigger problem than writing HTTP/1.1.
+- **Sync traffic is not encrypted.** See the threat model below before using this on a network you do not control.
+- **Nothing phones home.** The only outbound request the app can make is the update check, and only when you press the button.
 
 ---
 
-## ✨ Core Features
+## What it does
 
-### 📁 Hierarchical Folder System
-- Infinite nesting hierarchy (`Parent / Child / Subfolder`).
-- Visual tree explorer with expand/collapse, item counts, and active selection states.
-- Breadcrumb navigation for instantaneous workspace jumping.
-- Modal operations for creating, renaming, moving (with ancestry cycle protection), and deleting folders.
+**Folders, nested as deep as you like.** Create, rename, move and delete, with cycle protection so a folder cannot be moved inside itself.
 
-### 📥 1-Tap Quick Inbox
-- Instant multi-format capture bar supporting **Notes**, **Tickers**, and **Web Links**.
-- Fast `Ctrl+Enter` persistence.
-- High-contrast pinned items sorting and quick item deletion.
+**A capture bar that takes four things** — a note, a stock or crypto ticker, a link, or an image — into a Quick Inbox you triage later. Or never; leaving it in the inbox is a legitimate way to use it.
 
-### 📝 Note & Idea Editor
-- Split-pane Markdown editor with real-time formatting preview.
-- Markdown toolbar for Bold, Italic, Code, Blockquotes, Bullets, and Checklists.
-- 600ms debounced auto-save directly to local storage.
-- Auto-detection and live highlight of financial symbols (`$NVDA`, `BTC`).
+**A Markdown editor** with a formatting toolbar, live preview and debounced autosave. Ticker symbols and URLs found in your text become one-tap links out to TradingView, Yahoo Finance, or the site itself.
 
-### 📈 Smart Ticker & Link Detector
-- Scans unfiled thoughts and notes for stock and cryptocurrency symbols (`$NVDA`, `AAPL`, `BTC`, `ETH`).
-- Generates interactive **Smart Market Launcher** pills with 1-click execution to both:
-  - **TradingView** (`https://www.tradingview.com/symbols/...`)
-  - **Yahoo Finance** (`https://finance.yahoo.com/quote/...`)
-- Auto-detects URLs with clean domain indicator chips.
+**Images.** Paste a screenshot with `Ctrl+V` on the desktop, or share one into the app from anywhere on Android. Stored as WebP, viewable in a zoomable lightbox.
 
-### 🖼️ Rich Media & Lightbox
-- Global clipboard listener (`Ctrl+V`): paste screenshots directly from trading platforms or browsers.
-- Local file picker with image aspect thumbnail preview.
-- Dedicated high-resolution **Image Lightbox** with smooth 50%–400% zoom, drag panning, WebP download, and keyboard shortcuts (`+`, `-`, `0`, `Esc`).
+**Drag and drop** from the inbox onto a folder, with subfolders opening as you hover.
 
-### 🗂️ Drag-and-Drop & 1-Click Triage
-- Native HTML5 drag-and-drop: drag inbox cards directly onto folder tree items.
-- Auto-expand subfolders on 500ms drag hover.
-- Enhanced 1-click triage modal with full hierarchical paths (`Research / Equities / AI`) and instant filing buttons.
+**Backup and restore.** One zip holding your notes as plain Markdown, your images, and the database. Restore merges rather than overwrites — see below.
 
-### 📱 Local Zero-Install Web App & Mobile PWA
-- Embedded HTTP server exposes the universal frontend over your local network (`http://<LAN-IP>:42420`).
-- **QR Code Connection Modal:** Scan with your phone or tablet camera to connect immediately with zero app store installation.
-- **W3C Standalone PWA:** Install to your mobile home screen with offline shell caching via Service Worker (`sw.js`).
-- **Mobile Web Share Target:** Share links or text from Safari / Chrome directly into Quick Inbox via the system share sheet.
-- **Touch Gestures:** Edge-swipe right to open the folder drawer; swipe left to close.
+**Reachable from a browser.** A tablet or phone on the same LAN can open the app at `http://<your-lan-ip>:42420` and install it as a PWA, with no APK. This is off per device until you turn it on.
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard shortcuts
 
-| Shortcut | Action | Scope |
+| Shortcut | Action | Where |
 | :--- | :--- | :--- |
-| `Ctrl + Shift + I` | Navigate to Quick Inbox | Global |
-| `Ctrl + Enter` | Save note / capture item | Capture Bar & Editor |
-| `Ctrl + B` | Format **Bold** text | Note Editor |
-| `Ctrl + I` | Format *Italic* text | Note Editor |
-| `Ctrl + K` | Insert Markdown Link `[title](url)` | Note Editor |
-| `Ctrl + V` | Paste screenshot / clipboard image | Global (outside editor) |
-| `+` / `=` | Zoom In | Image Lightbox |
-| `-` | Zoom Out | Image Lightbox |
-| `0` | Reset Zoom to 100% | Image Lightbox |
-| `Esc` | Dismiss modal / lightbox / editor | Any Modal |
+| `Ctrl + Enter` | Save the note or capture | Capture bar, editor |
+| `Ctrl + B` / `Ctrl + I` | Bold / italic | Editor |
+| `Ctrl + K` | Insert a Markdown link | Editor |
+| `Ctrl + V` | Paste a screenshot | Anywhere outside the editor |
+| `+` `-` `0` | Zoom in, out, reset | Image lightbox |
+| `Esc` | Close whatever is open | Any modal |
 
 ---
 
-## 🚀 Quick Start
+## Getting it
 
-### Windows Desktop (Standalone Release)
+There is no published release yet. The app has an update check built in, and it will tell you so plainly — it is wired to a repository that does not exist until this one is published, and it says "no update channel is set up yet" rather than pretending you are up to date.
 
-1. Download the latest release from [GitHub Releases](https://github.com/omnivault/omnivault/releases):
-   - `omnivault-v0.1.0-windows-x64.zip` (Portable package, ~2.8 MB)
-   - Or standalone `omnivault.exe` (~6.1 MB)
-2. Extract and double-click `omnivault.exe`.
-3. **No installer, no background services, and no cloud accounts required.**
+Until then, build it yourself with the steps below.
 
-### Native Android Application (Standalone Sideloading)
+Two things to expect when releases do exist, because both look alarming and neither is a fault:
 
-1. Download `omnivault-v0.1.0-android.apk` (~9.2 MB) from [GitHub Releases](https://github.com/omnivault/omnivault/releases).
-2. On your Android phone or tablet, tap the downloaded APK to install. (If prompted, allow *"Install unknown apps"* for your browser or file manager).
-3. **100% Offline Outdoor Capture:** Capture notes, links, ideas, and photos anywhere in the world with zero internet.
-4. **Native Android Share Sheet (`ACTION_SEND`):** Highlight text or tap "Share" on any photo/link in Twitter, Reddit, Camera, Chrome, or Gallery, and select **OmniVault** to dump directly into your Quick Inbox.
-5. **Automatic Store-and-Forward Mesh Sync:** When you return home and connect to your local Wi-Fi (or turn on a mobile hotspot), your phone and desktop discover each other automatically and silently sync all deltas in milliseconds!
-
-### Connecting Mobile / Tablet via Local Browser (Zero-Install PWA)
-
-1. Launch OmniVault on your Windows PC.
-2. Click **"Connect Mobile"** in the top navigation bar or sidebar.
-3. Scan the displayed **QR Code** using your phone or tablet camera (or open `http://<your-lan-ip>:42420` in your mobile browser).
-4. Tap **"Add to Home Screen"** to install as a standalone PWA without installing any APK!
+- **Windows** will warn that the app is unrecognised, because the binary is not code-signed. Signing costs money per year; this project does not pay it.
+- **Android** will warn about installing outside the Play Store, and you will need to allow your browser or file manager to install unknown apps.
 
 ---
 
-## 🛠️ Development & Building
+## Building it
 
-### Prerequisites
+### You will need
 
-- [Node.js](https://nodejs.org/) (v18+) & `npm`
-- [Rust](https://www.rust-lang.org/) (1.80+ with Cargo)
-- Windows 10/11 with WebView2 (standard on modern Windows)
-- For Android: Android SDK `cmdline-tools`, NDK 26+, and JDK 17+
+- Node.js 18+ and npm
+- Rust 1.80+ with Cargo
+- Windows 10/11 with WebView2, for the desktop build
+- For Android: the Android SDK command-line tools, NDK 26+, and JDK 17+
 
-### 1. Install Dependencies
+### Run it
 
 ```bash
 npm install
+npm run dev          # frontend only, in a browser
+npm run tauri dev    # the real desktop app
 ```
 
-### 2. Run Development Server
-
-```bash
-# Frontend development server
-npm run dev
-
-# Full Tauri desktop development window
-npm run tauri dev
-```
-
-### 3. Run Automated Unified Verification
-
-OmniVault includes a 5-stage unified test harness that verifies the entire stack:
+### Check it
 
 ```bash
 npm test
 ```
 
-This automatically runs:
-1. Frontend TypeScript type checking & Vite production build (`tsc && vite build`).
-2. Rust core compilation, unit tests, and headless multi-device sync simulations (`cargo test`).
-3. Structural, WCAG AA contrast, and design token integrity assertions.
-4. Production bundle HTTP smoke test.
-5. Multi-platform release packaging and SHA-256 asset integrity check (Windows `.exe` + Android `.apk`).
+Five stages, and it is the only gate this project has: TypeScript and a production frontend build; Rust compilation, unit tests and headless two-device sync simulations; structural, contrast and design-token assertions; a bundle smoke test; and release packaging with a SHA-256 integrity check across both platforms. It also refuses to package an Android APK signed with the wrong key, for the reason in "Updating" below.
 
-### 4. Build Production Releases
+### Build releases
 
-#### Windows Standalone Release
 ```bash
-# Compile optimized release binary with LTO and stripped symbols
-npm run build:release
-
-# Package portable release bundle, verify < 15MB budget, and generate SHA-256 checksums
-npm run package:windows
+npm run build:release && npm run package:windows
+npm run build:android && npm run package:android
 ```
-The optimized standalone distribution is produced in `release/omnivault-v0.1.0-windows-x64/` (~6.13 MB).
 
-#### Android Standalone Release APK
-```bash
-# Compile optimized release APK with ProGuard/R8 shrinking and release keystore signing
-npm run build:android
-
-# Package standalone APK to release/ and generate SHA-256 checksums
-npm run package:android
-```
-The optimized standalone APK is staged in `release/omnivault-v0.1.0-android.apk` (~9.29 MB).
+Both land in `release/` with checksums. Sizes are in the low single-digit megabytes each; the exact figures are on the release itself rather than written here, because numbers in a README go stale silently.
 
 ---
 
-## 🌐 Local REST API Reference
+## Local HTTP API
 
-When OmniVault runs, its embedded Rust HTTP server exposes lightweight JSON endpoints on port `42420` for LAN clients:
+The embedded server exposes a small JSON API on port `42420`. Every route under `/api/` requires a pairing token except `/api/health`, `/api/lan-info` and `/api/pair`.
 
-| Method | Endpoint | Description |
+| Method | Endpoint | What it is |
 | :--- | :--- | :--- |
-| `GET` | `/api/health` | Server status and uptime health check |
-| `GET` | `/api/lan-info` | Active LAN IP address, port, and 6-digit peer PIN |
-| `GET` | `/api/folders` | Complete JSON list of all nested folders |
-| `GET` | `/api/items` | List of items (filter with `?folder_id=<uuid>` or unfiled) |
-| `GET` | `/media/<filename>` | Fast binary streaming of local WebP media files |
+| `GET` | `/api/health` | Liveness check. Public |
+| `GET` | `/api/lan-info` | LAN address, port and the current pairing PIN. Public |
+| `POST` | `/api/pair` | Exchanges a correct PIN for a device token. Public |
+| `GET` | `/api/folders` | Every folder |
+| `GET` | `/api/items` | Items, filtered with `?folder_id=<uuid>` |
+| `GET` | `/api/media/<hash>` | An image blob |
 
 ---
 
-## 🔒 Security & Privacy
+## Security and privacy
 
 ### What OmniVault does
 
@@ -290,6 +192,6 @@ This exists because a vault you cannot get out of is a trap. If the app stops be
 
 ---
 
-## 📄 License
+## License
 
 OmniVault is licensed under the [MIT License](LICENSE).
