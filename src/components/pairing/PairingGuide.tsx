@@ -10,7 +10,18 @@ import { cn } from "../../utils/cn";
  * empty — and none of them is something the app can detect and report. Somebody
  * who fails to pair once and is told nothing does not try again. See D-075.
  */
-export const PairingGuide: React.FC = () => {
+export interface PairingGuideProps {
+  /**
+   * Whether the device reading this is one that issues a PIN of its own.
+   *
+   * Only the desktop app does. A browser client is deliberately never issued
+   * one (D-051), so telling its reader to type "the PIN from this screen" sends
+   * them looking for something that is not there. See D-083.
+   */
+  showsOwnPin: boolean;
+}
+
+export const PairingGuide: React.FC<PairingGuideProps> = ({ showsOwnPin }) => {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -33,8 +44,20 @@ export const PairingGuide: React.FC = () => {
         <li className="flex gap-3 text-xs leading-relaxed text-vault-secondary">
           <span className="w-4 shrink-0 text-vault-subtle">3</span>
           <span>
-            Type the six-digit PIN from this screen into the other device. It is shown here and
-            never sent over the network, which is what makes it proof you are holding this machine.
+            {showsOwnPin ? (
+              <>
+                Type the six-digit PIN from this screen into the other device. It is shown here and
+                never sent over the network, which is what makes it proof you are holding this
+                machine.
+              </>
+            ) : (
+              <>
+                Read the six-digit PIN off the <span className="text-vault-primary">computer's</span>{" "}
+                screen and type it here. Only the app on the computer issues one — it is never sent
+                over the network, which is what makes typing it proof you are standing in front of
+                that machine.
+              </>
+            )}
           </span>
         </li>
       </ol>

@@ -43,7 +43,17 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [content, setContent] = useState("");
   const [folderId, setFolderId] = useState<string | null>(initialFolderId);
   const [itemType, setItemType] = useState<ItemType>("note");
-  const [viewMode, setViewMode] = useState<EditorViewMode>("split");
+  /**
+   * Side by side is the right default on a desktop and the wrong one on a
+   * phone, where it splits a 390px screen into two 190px columns and makes
+   * both of them unusable. The narrow case opens straight into the editor;
+   * the split control is hidden there rather than offered and regretted.
+   * See D-083.
+   */
+  const [viewMode, setViewMode] = useState<EditorViewMode>(() => {
+    if (typeof window === "undefined") return "split";
+    return window.innerWidth < 768 ? "edit" : "split";
+  });
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isPinned, setIsPinned] = useState(false);
 
@@ -364,13 +374,17 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         )}
 
         {/* Editor Footer */}
-        <div className="px-4 sm:px-6 py-3 border-t border-vault-border bg-vault-card flex items-center justify-between text-xs text-vault-secondary shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-[0.815rem]">{wordCount} words</span>
+        <div className="px-4 sm:px-6 py-3 border-t border-vault-border bg-vault-card flex items-center justify-between gap-3 text-xs text-vault-secondary shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-wrap">
+            <span className="text-[0.815rem] whitespace-nowrap">
+              {wordCount} {wordCount === 1 ? "word" : "words"}
+            </span>
             <span className="text-vault-muted">•</span>
-            <span className="text-[0.815rem]">{charCount} characters</span>
+            <span className="text-[0.815rem] whitespace-nowrap">
+              {charCount} {charCount === 1 ? "character" : "characters"}
+            </span>
             {item && onTogglePin && (
-              <>
+              <span className="flex items-center gap-3">
                 <span className="text-vault-muted">•</span>
                 <button
                   type="button"
@@ -388,7 +402,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   <Pin className={cn("w-3.5 h-3.5", isPinned && "fill-current")} />
                   <span>{isPinned ? "Pinned" : "Pin"}</span>
                 </button>
-              </>
+              </span>
             )}
           </div>
 

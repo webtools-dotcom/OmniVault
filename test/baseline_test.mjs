@@ -617,3 +617,47 @@ assert.ok(
 );
 
 console.log("✅ Viewport sizing guard passed!");
+
+// 22. Regression guards: things that only break on a phone.
+//
+// None of these show up on a developer's desktop, which is why all three
+// shipped. See D-083.
+const cardSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/inbox/QuickInboxItemCard.tsx"), "utf-8");
+const pairSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/pairing/QrConnectModal.tsx"), "utf-8");
+const guideSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/pairing/PairingGuide.tsx"), "utf-8");
+const editorSrc = fs.readFileSync(path.resolve(process.cwd(), "src/components/editor/NoteEditorModal.tsx"), "utf-8");
+
+// A control revealed only by hover does not exist on a touchscreen. Copy, pin,
+// move and delete were all unreachable on the device most captures are made on.
+const actionRow = (cardSrc.match(/^.*group-hover:opacity-100.*$/m) || [""])[0];
+assert.ok(
+  /\[@media\(hover:none\)\]:opacity-100/.test(actionRow),
+  "the card's actions are hover-only again, so they are invisible on a phone"
+);
+
+// Deleting is immediate and cannot be undone. On touch the actions are always
+// visible and Delete sits beside the action used most, so it asks twice.
+assert.ok(
+  /armedToDelete/.test(cardSrc) && /hover: none/.test(cardSrc),
+  "the two-tap delete for touch devices is gone; a mis-tap now loses a note with no undo"
+);
+
+// A browser client is never issued a PIN (D-051), so it must never print one.
+// A hardcoded placeholder was displayed as if it were real.
+const pinPlaceholder = pairSrc.match(/useState<string[^>]*>\((["'])(\d{3}\s?\d{3})\1\)/);
+assert.ok(
+  !pinPlaceholder,
+  `the pairing modal starts with a hardcoded PIN again (${pinPlaceholder && pinPlaceholder[2]}), which a browser would show as real`
+);
+assert.ok(
+  /showsOwnPin/.test(guideSrc) && /showsOwnPin=\{/.test(pairSrc),
+  "the pairing steps no longer distinguish a device that issues a PIN from one that does not"
+);
+
+// Side by side splits a phone screen into two unusable columns.
+assert.ok(
+  /innerWidth\s*<\s*768\s*\?\s*"edit"/.test(editorSrc),
+  "the editor defaults to the split view again, which is two ~190px columns on a phone"
+);
+
+console.log("✅ Touch and small-screen guards passed!");

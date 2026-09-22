@@ -175,7 +175,9 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
         <div
           className={cn(
             "flex items-center gap-0.5 transition-opacity",
-            menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            menuOpen
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           )}
           onClick={(e) => e.stopPropagation()}
         >

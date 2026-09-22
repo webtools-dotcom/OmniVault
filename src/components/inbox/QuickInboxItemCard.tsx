@@ -51,6 +51,43 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [armedToDelete, setArmedToDelete] = useState(false);
+
+  /**
+   * Whether this device has no pointer that can hover.
+   *
+   * Asked of the browser rather than guessed from the width, because a narrow
+   * window on a laptop still has a mouse and a tablet in landscape still does
+   * not. See D-083.
+   */
+  const isTouch =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: none)").matches;
+
+  /**
+   * Deleting takes two taps on a touchscreen.
+   *
+   * Nothing confirms a delete and nothing can undo one. On a desktop the row of
+   * actions is hidden until the pointer is over the card, so reaching Delete is
+   * deliberate. On a phone the same row is permanently visible, four small
+   * targets a few pixels apart, with Delete next to the action used most — so
+   * the arrangement that is safe with a mouse is a way to lose a note with a
+   * thumb. The first tap arms, the second deletes, and it disarms itself.
+   */
+  const handleDelete = () => {
+    if (!isTouch) {
+      onDeleteItem(item.id);
+      return;
+    }
+    if (!armedToDelete) {
+      setArmedToDelete(true);
+      setTimeout(() => setArmedToDelete(false), 3000);
+      return;
+    }
+    setArmedToDelete(false);
+    onDeleteItem(item.id);
+  };
 
   /**
    * Puts the note on the clipboard.
@@ -175,13 +212,17 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         <span className="shrink-0 text-vault-subtle">{formatRelativeTime(item.updated_at)}</span>
       </div>
 
-      {/* Actions stay out of the way until the item is actually under the cursor. */}
+      {/* Actions stay out of the way until the item is under the cursor — but a
+          phone has no cursor. `(hover: none)` keeps them permanently visible
+          there, because a control revealed only by hovering does not exist on a
+          touchscreen: copy, pin, move and delete were all unreachable on the
+          device most captures are made on. See D-083. */}
       <div
-        className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary cursor-grab active:cursor-grabbing"
+          className="w-6.5 h-6.5 [@media(hover:none)]:hidden flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary cursor-grab active:cursor-grabbing"
           title="Drag to a folder"
         >
           <GripVertical className="w-3.5 h-3.5" />
@@ -192,7 +233,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           title={copied ? "Copied" : "Copy the text"}
           aria-label={copied ? "Copied" : "Copy the text"}
           className={cn(
-            "w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
+            "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
             copied ? "text-vault-success" : "text-vault-secondary hover:text-vault-primary"
           )}
         >
@@ -203,7 +244,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           onClick={() => onTogglePin(item.id)}
           title={item.is_pinned ? "Unpin" : "Pin to the top"}
           className={cn(
-            "w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
+            "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
             item.is_pinned ? "text-vault-primary" : "text-vault-secondary hover:text-vault-primary"
           )}
         >
@@ -213,15 +254,21 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           type="button"
           onClick={() => onOpenMove(item)}
           title="Move to a folder"
-          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
+          className="w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer"
         >
           <FolderInput className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
-          onClick={() => onDeleteItem(item.id)}
-          title="Delete"
-          className="w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay text-vault-secondary hover:text-vault-error transition-colors cursor-pointer"
+          onClick={handleDelete}
+          title={armedToDelete ? "Tap again to delete" : "Delete"}
+          aria-label={armedToDelete ? "Tap again to delete" : "Delete"}
+          className={cn(
+            "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+            armedToDelete
+              ? "bg-vault-error text-vault-ink"
+              : "bg-vault-overlay text-vault-secondary hover:text-vault-error"
+          )}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

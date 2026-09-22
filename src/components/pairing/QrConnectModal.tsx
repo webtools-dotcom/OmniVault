@@ -18,7 +18,7 @@ import {
 import { Button } from "../common/Button";
 import { PairingGuide } from "./PairingGuide";
 import { generateQrMatrix, generateQrPath } from "../../utils/qrCode";
-import { StorageService } from "../../services/storageService";
+import { StorageService, isTauriEnvironment } from "../../services/storageService";
 import { PeerInfo, MeshSyncState } from "../../types";
 import { cn } from "../../utils/cn";
 
@@ -58,7 +58,17 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
   });
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
-  const [pairingPin, setPairingPin] = useState<string>("749 201");
+  /**
+   * This device's pairing PIN, or null when it does not have one.
+   *
+   * It used to start at a hardcoded "749 201". On the desktop that flashed a
+   * fabricated PIN until the real one arrived; in a browser it never arrived at
+   * all, because a browser client is deliberately never issued one (D-051) — so
+   * a phone showed an invented six-digit number under the words "Valid for
+   * Wi-Fi peers" and told the reader to type it into another device. It could
+   * not work, and nothing said so. See D-083.
+   */
+  const [pairingPin, setPairingPin] = useState<string | null>(null);
 
   // Mesh peer state
   const [meshState, setMeshState] = useState<MeshSyncState>({
@@ -151,6 +161,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
   };
 
   const handleCopyPin = async () => {
+    if (!pairingPin) return;
     try {
       await navigator.clipboard.writeText(pairingPin.replace(/\s+/g, ""));
       setCopiedPin(true);
@@ -331,7 +342,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {activeTab === "mesh" ? (
             <>
-              <PairingGuide />
+              <PairingGuide showsOwnPin={isTauriEnvironment()} />
 
               {/* Mesh Header & Sync All Action */}
               <div className="flex items-center justify-between p-3.5 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl">
@@ -590,35 +601,48 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       This device's PIN
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyPin}
-                    className="text-[0.815rem] font-mono text-vault-secondary hover:text-vault-primary flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedPin ? (
-                      <>
-                        <Check className="w-3 h-3 text-vault-success" />
-                        <span className="text-vault-success font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Copy PIN</span>
-                      </>
-                    )}
-                  </button>
+                  {pairingPin && (
+                    <button
+                      type="button"
+                      onClick={handleCopyPin}
+                      className="text-[0.815rem] font-mono text-vault-secondary hover:text-vault-primary flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedPin ? (
+                        <>
+                          <Check className="w-3 h-3 text-vault-success" />
+                          <span className="text-vault-success font-semibold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy PIN</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center justify-between p-2.5 bg-vault-bg/80 border border-white/[0.06] rounded-xl">
-                  <span className="text-base font-mono font-bold text-vault-primary tracking-widest pl-1">
-                    {pairingPin}
-                  </span>
-                  <span className="text-[0.741rem] text-vault-muted">
-                    Valid for Wi-Fi peers
-                  </span>
-                </div>
-                <p className="text-[0.815rem] text-vault-muted leading-relaxed">
-                  When pairing from another phone or tablet, enter this 6-digit PIN on that device to authorize peer sync.
-                </p>
+                {pairingPin ? (
+                  <>
+                    <div className="flex items-center justify-between p-2.5 bg-vault-bg/80 border border-white/[0.06] rounded-xl">
+                      <span className="text-base font-mono font-bold text-vault-primary tracking-widest pl-1">
+                        {pairingPin}
+                      </span>
+                      <span className="text-[0.741rem] text-vault-muted">
+                        Valid for Wi-Fi peers
+                      </span>
+                    </div>
+                    <p className="text-[0.815rem] text-vault-muted leading-relaxed">
+                      When pairing from another phone or tablet, enter this 6-digit PIN on that device to authorize peer sync.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[0.815rem] text-vault-muted leading-relaxed">
+                    This device does not issue a PIN. A PIN is only ever shown by the app running
+                    on the computer, and is read off that screen — which is what makes typing it
+                    proof you are standing in front of the machine. To pair something new, open
+                    OmniVault on the computer and use the PIN it shows.
+                  </p>
+                )}
               </div>
             </>
           ) : (
