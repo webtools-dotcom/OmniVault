@@ -396,6 +396,7 @@ export const StorageService = {
           peer_count: number;
           peers: PeerInfo[];
           paired_device_ids?: string[];
+          present_device_ids?: string[];
         }>("get_mesh_sync_status_cmd");
         return {
           status: raw.is_syncing ? "syncing" : raw.peer_count > 0 ? "synced" : "standby",
@@ -403,6 +404,7 @@ export const StorageService = {
           lastSyncTimestamp: raw.last_sync_at || undefined,
           peers: raw.peers,
           pairedDeviceIds: raw.paired_device_ids || [],
+          presentDeviceIds: raw.present_device_ids || [],
         };
       } catch {
         return { status: "standby", peerCount: 0 };
@@ -412,14 +414,22 @@ export const StorageService = {
         status: string;
         paired_devices_count: number;
         paired_device_ids?: string[];
+        present_device_ids?: string[];
+        present_count?: number;
       }>("/api/sync/status");
       const peersRes = await apiFetch<{ peers: PeerInfo[]; count: number }>("/api/sync/peers");
       const peers = peersRes?.peers || [];
+      // `paired_devices_count` counts every pairing this vault has ever made.
+      // Falling back to it when no peer was visible reported weeks of test
+      // pairings as devices in the room — the "Synced (5)" on a tablet whose
+      // desktop was simultaneously saying "No devices yet". See D-082.
+      const present = res?.present_device_ids ?? [];
       return {
-        status: peers.length > 0 ? "synced" : "standby",
-        peerCount: peers.length || (res?.paired_devices_count ?? 0),
+        status: present.length > 0 ? "synced" : "standby",
+        peerCount: res?.present_count ?? present.length,
         peers,
         pairedDeviceIds: res?.paired_device_ids || [],
+        presentDeviceIds: present,
       };
     }
   },

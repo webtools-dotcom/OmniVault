@@ -205,11 +205,6 @@ fn address_rank(ip: std::net::Ipv4Addr) -> u8 {
     }
 }
 
-/// True for the address ranges a home network actually hands out.
-fn is_private_v4(ip: std::net::Ipv4Addr) -> bool {
-    ip.is_private() || ip.is_link_local()
-}
-
 /// Returns this machine's address on the network it is currently attached to,
 /// or `None` when it is not on one.
 ///
@@ -278,6 +273,42 @@ pub fn find_local_lan_ip() -> Option<String> {
 /// keeps the old loopback answer for the places that just need a string.
 pub fn get_local_lan_ip() -> String {
     find_local_lan_ip().unwrap_or_else(|| "127.0.0.1".to_string())
+}
+
+/// How long a paired device counts as present after it was last heard from.
+///
+/// Mesh peers expire from discovery on their own; a browser client is only
+/// visible while it is making requests, and a person reading a note makes none.
+/// Ninety seconds is long enough to survive that quiet and short enough that a
+/// device carried out of the house stops being reported as here.
+pub const DEVICE_PRESENCE_WINDOW_MS: i64 = 90_000;
+
+/// The devices that are actually present: mesh peers discovered over UDP, plus
+/// paired devices that have made a request recently, counted once each.
+///
+/// This exists because the two surfaces used to answer the question from two
+/// different sources and disagree on screen. The sidebar read live mesh peers
+/// and said "No devices yet"; the browser fell back to the number of rows in
+/// `paired_devices` and said "Synced (5)", which was five pairings accumulated
+/// over weeks of testing rather than five devices in the room. See D-082.
+pub fn present_device_ids(
+    conn: &Connection,
+    mesh_peers: &[crate::sync::discovery::PeerInfo],
+) -> Vec<String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut ids: Vec<String> = mesh_peers.iter().map(|p| p.device_id.clone()).collect();
+    if let Ok(paired) = crate::sync::pairing::list_paired_devices(conn) {
+        for device in paired {
+            let recent = device
+                .last_sync_at
+                .map(|seen| now.saturating_sub(seen) < DEVICE_PRESENCE_WINDOW_MS)
+                .unwrap_or(false);
+            if recent && !ids.contains(&device.device_id) {
+                ids.push(device.device_id);
+            }
+        }
+    }
+    ids
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -814,7 +845,19 @@ fn handle_connection(
             let authorized = match (caller_id.as_deref(), caller_token.as_deref()) {
                 (Some(id), Some(tok)) => {
                     let conn = lock_recover(&db);
-                    crate::sync::pairing::validate_peer_auth_token(&conn, id, tok).unwrap_or(false)
+                    let ok = crate::sync::pairing::validate_peer_auth_token(&conn, id, tok)
+                        .unwrap_or(false);
+                    // A paired device talking to this server is a device that
+                    // is here now. Without recording that, a tablet using the
+                    // vault through a browser left no trace at all and the
+                    // desktop kept saying "No devices yet" while it was plainly
+                    // in use. Mesh peers announce themselves over UDP; browser
+                    // clients only ever arrive as HTTP requests, so this is the
+                    // only place their presence can be observed. See D-082.
+                    if ok {
+                        let _ = crate::sync::pairing::update_peer_last_sync(&conn, id);
+                    }
+                    ok
                 }
                 _ => false,
             };
@@ -1352,12 +1395,23 @@ let conn = lock_recover(&db);
         let conn = lock_recover(&db);
         let paired = crate::sync::pairing::list_paired_devices(&conn).unwrap_or_default();
         let paired_ids: Vec<String> = paired.iter().map(|p| p.device_id.clone()).collect();
+        let mesh_peers = peer_registry
+            .as_ref()
+            .map(|reg| reg.try_get_active_peers())
+            .unwrap_or_default();
+        // `paired_devices_count` is every pairing this vault has ever made and
+        // says nothing about who is here now. Clients used to fall back to it
+        // when no mesh peer was visible, which reported weeks of accumulated
+        // test pairings as connected devices. See D-082.
+        let present = present_device_ids(&conn, &mesh_peers);
         let resp = serde_json::json!({
             "status": "ready",
             "device_id": device_id,
             "paired_devices_count": paired.len(),
             "paired_devices": paired,
             "paired_device_ids": paired_ids,
+            "present_device_ids": present,
+            "present_count": present.len(),
         });
         let json = serde_json::to_vec(&resp).unwrap_or_default();
         send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;
@@ -1931,15 +1985,64 @@ mod tests {
         );
     }
 
+    /// "Connected" must mean present, not ever-paired.
+    ///
+    /// The desktop sidebar said "No devices yet" while the tablet browsing the
+    /// same vault said "Synced (5)". Both read the truth and asked different
+    /// questions: one counted live mesh peers, the other fell back to the
+    /// number of rows in `paired_devices`, which was weeks of accumulated test
+    /// pairings. See D-082.
     #[test]
-    fn private_addresses_are_recognised() {
+    fn presence_counts_who_is_here_not_who_ever_paired() {
+        use crate::db::schema::initialize_schema;
+        use crate::sync::pairing::{store_paired_device, update_peer_last_sync};
+
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+
+        // Three devices paired at some point in the past.
+        for (id, name) in [("dev-a", "Tablet"), ("dev-b", "Phone"), ("dev-c", "Old laptop")] {
+            store_paired_device(&conn, id, name, "token").unwrap();
+        }
+
+        // None has spoken since pairing, so none is present.
+        let present = present_device_ids(&conn, &[]);
+        assert!(
+            present.is_empty(),
+            "pairing history is not presence, got {present:?}"
+        );
+
+        // One of them makes a request now.
+        update_peer_last_sync(&conn, "dev-a").unwrap();
+        let present = present_device_ids(&conn, &[]);
+        assert_eq!(present, vec!["dev-a".to_string()], "the device in use should be the only one present");
+
+        // A device heard from longer ago than the window has gone.
+        let stale = chrono::Utc::now().timestamp_millis() - DEVICE_PRESENCE_WINDOW_MS - 1;
+        conn.execute(
+            "UPDATE paired_devices SET last_sync_at = ?1 WHERE device_id = 'dev-a'",
+            rusqlite::params![stale],
+        )
+        .unwrap();
+        assert!(
+            present_device_ids(&conn, &[]).is_empty(),
+            "a device silent past the window must stop counting as present"
+        );
+    }
+
+    #[test]
+    fn private_addresses_outrank_everything_else() {
         use std::net::Ipv4Addr;
-        assert!(is_private_v4(Ipv4Addr::new(192, 168, 1, 5)));
-        assert!(is_private_v4(Ipv4Addr::new(10, 0, 0, 2)));
-        assert!(is_private_v4(Ipv4Addr::new(172, 16, 4, 9)));
-        assert!(is_private_v4(Ipv4Addr::new(169, 254, 3, 3)), "link-local counts");
-        assert!(!is_private_v4(Ipv4Addr::new(8, 8, 8, 8)));
-        assert!(!is_private_v4(Ipv4Addr::new(172, 32, 0, 1)), "outside 172.16/12");
+        for ip in [
+            Ipv4Addr::new(192, 168, 1, 5),
+            Ipv4Addr::new(10, 0, 0, 2),
+            Ipv4Addr::new(172, 16, 4, 9),
+        ] {
+            assert_eq!(address_rank(ip), 2, "{ip} is a LAN address");
+        }
+        assert_eq!(address_rank(Ipv4Addr::new(169, 254, 3, 3)), 1, "link-local is a fallback");
+        assert_eq!(address_rank(Ipv4Addr::new(8, 8, 8, 8)), 0);
+        assert_eq!(address_rank(Ipv4Addr::new(172, 32, 0, 1)), 0, "outside 172.16/12");
     }
 
     #[test]

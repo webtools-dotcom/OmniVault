@@ -584,7 +584,7 @@ export function App() {
           onStreamFilterChange={setStreamFilter}
           headerActions={
             <div className="flex items-center gap-2">
-              {meshState.pairedDeviceIds && meshState.pairedDeviceIds.length > 0 ? (
+              {meshState.peerCount > 0 ? (
                 <button
                   type="button"
                   onClick={() => setIsQrModalOpen(true)}

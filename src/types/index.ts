@@ -73,6 +73,12 @@ export interface MeshSyncState {
   lastSyncTimestamp?: number;
   errorMessage?: string;
   peers?: PeerInfo[];
+  /** Every device this vault has ever paired with. Not who is here now. */
   pairedDeviceIds?: string[];
+  /**
+   * Devices present right now: mesh peers plus paired devices that have made a
+   * request recently. This is what the interface should count. See D-082.
+   */
+  presentDeviceIds?: string[];
 }
 

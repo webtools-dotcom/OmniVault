@@ -587,3 +587,33 @@ assert.strictEqual(copyableText("Only a title", ""), "Only a title");
 assert.strictEqual(copyableText("", "Only a body"), "Only a body");
 
 console.log("✅ QR code and copy-out guards passed!");
+
+// 21. Regression guard: the shell is sized to the visible window.
+//
+// `100vh` on a mobile browser is the height the page would have with the
+// address bar hidden. A shell sized to it puts its own last row under the
+// browser chrome, and because the shell is overflow-hidden there is no way to
+// scroll to it — which hid the entire device panel (device name, Back up,
+// version, update check) on a tablet reading the vault through a browser.
+// See D-082.
+const appLayout = fs.readFileSync(path.resolve(process.cwd(), "src/components/layout/AppLayout.tsx"), "utf-8");
+const appCss = fs.readFileSync(path.resolve(process.cwd(), "src/index.css"), "utf-8");
+const shellLine = (appLayout.match(/^.*app-viewport.*$/m) || [""])[0];
+assert.ok(
+  shellLine,
+  "the app shell no longer uses .app-viewport, so its height is back to the browser's guess"
+);
+assert.ok(
+  !/\bh-screen\b/.test(shellLine),
+  "the app shell is sized with h-screen again, which is 100vh and hides its last row on a phone"
+);
+assert.ok(
+  /\.app-viewport\s*\{[^}]*100dvh/.test(appCss),
+  ".app-viewport must resolve to 100dvh so it follows the space actually on screen"
+);
+assert.ok(
+  /\.app-viewport\s*\{[^}]*100vh/.test(appCss),
+  ".app-viewport must keep a 100vh line first, as the fallback for browsers without dvh"
+);
+
+console.log("✅ Viewport sizing guard passed!");

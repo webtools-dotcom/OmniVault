@@ -106,7 +106,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
   return (
     <div
       className={cn(
-        "flex h-screen w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans",
+        "app-viewport flex w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans",
         isAndroid && "pt-6"
       )}
     >

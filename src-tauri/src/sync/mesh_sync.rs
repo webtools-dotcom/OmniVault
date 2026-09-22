@@ -89,10 +89,14 @@ fn collect_missing_media_hashes(
 pub struct MeshSyncStatus {
     pub is_syncing: bool,
     pub last_sync_at: Option<i64>,
+    /// Devices present right now: mesh peers plus paired devices heard from
+    /// recently. Not the number of pairings this vault has ever made.
     pub peer_count: usize,
     pub peers: Vec<PeerInfo>,
     #[serde(default)]
     pub paired_device_ids: Vec<String>,
+    #[serde(default)]
+    pub present_device_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

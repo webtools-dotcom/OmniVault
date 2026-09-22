@@ -34,6 +34,21 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* The app fills the window that exists, not the theoretical one.
+   `100vh` on a mobile browser is the height the page would have if the address
+   bar were hidden, so a shell sized to it pushes its own last row underneath
+   the browser chrome — and because that shell is `overflow-hidden`, there is no
+   way to scroll down and find it. On a tablet reading the vault through a
+   browser this hid the whole device panel: the name of the device, Back up,
+   the version and the update check were simply not on screen.
+   `100dvh` follows the space actually visible. Browsers without it keep the
+   first declaration, so this degrades to today's behaviour rather than to
+   nothing. See D-082. */
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* Browser surfaces are part of the palette, not the browser's to choose. */
 ::selection {
   background-color: #2E3039;

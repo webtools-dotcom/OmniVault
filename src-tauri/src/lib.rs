@@ -66,10 +66,18 @@ async fn get_mesh_sync_status_cmd(state: State<'_, AppState>) -> Result<sync::me
             .collect();
         (last, paired)
     };
+    // What the sidebar shows has to be the same question the browser answers,
+    // asked the same way: mesh peers plus paired devices that have spoken to
+    // this server recently. See D-082.
+    let present = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        http_server::present_device_ids(&conn, &peers)
+    };
     Ok(sync::mesh_sync::MeshSyncStatus {
         is_syncing: false,
         last_sync_at,
-        peer_count: peers.len(),
+        peer_count: present.len(),
+        present_device_ids: present,
         peers,
         paired_device_ids,
     })
