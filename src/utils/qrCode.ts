@@ -64,16 +64,31 @@ function computeReedSolomon(data: number[], ecCount: number): number[] {
 interface QrConfig {
   version: number;
   size: number;
+  /** Data codewords for this version at EC level M, from the spec's table. */
   dataCapacity: number;
   ecCount: number;
-  alignmentPattern?: number[];
+  /**
+   * Centre of this version's single alignment pattern, as (row, col).
+   *
+   * Versions 2 to 4 have exactly one, and the spec gives its position through a
+   * coordinate list — [6, 18] for version 2 — whose entries are combined
+   * pairwise, with the combinations that collide with a finder dropped. For
+   * these versions that leaves only the last coordinate paired with itself, so
+   * version 2's pattern belongs at (18, 18). Reading the list itself as a
+   * coordinate put it at (6, 18) instead: on the timing row, in the data area,
+   * and absent from where every decoder looks for it. See D-081.
+   */
+  alignmentCentre?: number;
 }
 
+// Data and EC codeword counts are the spec's values for error correction level
+// M. They were each two codewords short, which left the bitstream too small to
+// fill the matrix and made every code undecodable.
 const QR_CONFIGS: QrConfig[] = [
-  { version: 1, size: 21, dataCapacity: 14, ecCount: 10 },
-  { version: 2, size: 25, dataCapacity: 26, ecCount: 16, alignmentPattern: [6, 18] },
-  { version: 3, size: 29, dataCapacity: 42, ecCount: 26, alignmentPattern: [6, 22] },
-  { version: 4, size: 33, dataCapacity: 62, ecCount: 36, alignmentPattern: [6, 26] },
+  { version: 1, size: 21, dataCapacity: 16, ecCount: 10 },
+  { version: 2, size: 25, dataCapacity: 28, ecCount: 16, alignmentCentre: 18 },
+  { version: 3, size: 29, dataCapacity: 44, ecCount: 26, alignmentCentre: 22 },
+  { version: 4, size: 33, dataCapacity: 64, ecCount: 36, alignmentCentre: 26 },
 ];
 
 /**
@@ -118,8 +133,9 @@ export function generateQrMatrix(text: string): boolean[][] {
   addFinder(size - 7, 0);
 
   // 2. Alignment Pattern (if version >= 2)
-  if (config.alignmentPattern) {
-    const [ar, ac] = config.alignmentPattern;
+  if (config.alignmentCentre !== undefined) {
+    const ar = config.alignmentCentre;
+    const ac = config.alignmentCentre;
     for (let r = -2; r <= 2; r++) {
       for (let c = -2; c <= 2; c++) {
         const mr = ar + r;
@@ -246,9 +262,13 @@ export function generateQrMatrix(text: string): boolean[][] {
   matrix[7][8] = formatBits[8] === 1;
   for (let i = 9; i < 15; i++) matrix[14 - i][8] = formatBits[i] === 1;
 
-  // Around top-right and bottom-left finders
-  for (let i = 0; i < 8; i++) matrix[8][size - 1 - i] = formatBits[i] === 1;
-  for (let i = 0; i < 7; i++) matrix[size - 7 + i][8] = formatBits[8 + i] === 1;
+  // Around top-right and bottom-left finders. The second copy runs the other
+  // way round from the first: bits 0-7 go UP column 8 from the bottom, and bits
+  // 8-14 go along row 8 to the right edge. These two were swapped, which left a
+  // decoder unable to read the mask and error-correction level and so unable to
+  // read anything at all. See D-081.
+  for (let i = 0; i < 8; i++) matrix[size - 1 - i][8] = formatBits[i] === 1;
+  for (let i = 8; i < 15; i++) matrix[8][size - 15 + i] = formatBits[i] === 1;
 
   // Convert matrix nulls to false
   return matrix.map((row) => row.map((cell) => cell === true));

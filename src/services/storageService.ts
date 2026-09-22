@@ -1024,10 +1024,18 @@ export const StorageService = {
     }
   },
 
-  async getLanConnectionInfo(): Promise<{ ip: string; port: number; url: string }> {
+  async getLanConnectionInfo(): Promise<{
+    ip: string;
+    port: number;
+    url: string;
+    /** False when this machine is not on a network another device can reach. */
+    reachable: boolean;
+  }> {
     if (isTauriEnvironment()) {
       try {
-        return await invoke<{ ip: string; port: number; url: string }>("get_lan_connection_info_cmd");
+        return await invoke<{ ip: string; port: number; url: string; reachable: boolean }>(
+          "get_lan_connection_info_cmd"
+        );
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to window host:", err);
       }
@@ -1040,6 +1048,9 @@ export const StorageService = {
       ip,
       port,
       url: typeof window !== "undefined" && window.location.origin ? window.location.origin : `http://${ip}:${port}`,
+      // Reached over the network already, since this branch only runs in a
+      // browser that loaded the page from somewhere.
+      reachable: ip !== "127.0.0.1",
     };
   },
 

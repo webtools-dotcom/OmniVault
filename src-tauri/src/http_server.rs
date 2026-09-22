@@ -188,19 +188,96 @@ fn extract_caller_credentials(
     (device_id, token)
 }
 
-/// Returns the preferred local non-loopback IPv4 address on the active LAN/Wi-Fi interface.
-pub fn get_local_lan_ip() -> String {
-    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
-        if socket.connect("8.8.8.8:80").is_ok() {
-            if let Ok(local_addr) = socket.local_addr() {
-                let ip = local_addr.ip();
-                if !ip.is_loopback() {
-                    return ip.to_string();
-                }
-            }
+/// How good an address is as something to hand to another device.
+///
+/// Link-local (169.254.x) is what Windows assigns an interface whose DHCP
+/// request went unanswered, and a machine can carry several at once — this
+/// developer's laptop has four alongside one real address. They are ranked
+/// below a genuine private address so a dead adapter never wins, but kept above
+/// nothing at all, because a direct cable between two machines uses them.
+fn address_rank(ip: std::net::Ipv4Addr) -> u8 {
+    if ip.is_private() {
+        2
+    } else if ip.is_link_local() {
+        1
+    } else {
+        0
+    }
+}
+
+/// True for the address ranges a home network actually hands out.
+fn is_private_v4(ip: std::net::Ipv4Addr) -> bool {
+    ip.is_private() || ip.is_link_local()
+}
+
+/// Returns this machine's address on the network it is currently attached to,
+/// or `None` when it is not on one.
+///
+/// This asks the routing table which local address would be used to reach a
+/// given destination, by opening a UDP socket and connecting it — which sends
+/// nothing, it only forces a route lookup.
+///
+/// It used to ask that question about `8.8.8.8` alone, so an app whose whole
+/// premise is that it needs no internet could only find its own address when it
+/// had one. On a phone hotspot with mobile data off, or any network without a
+/// default route, the lookup failed and the caller fell back to `127.0.0.1` —
+/// and a loopback address handed to a phone points the phone at itself, which
+/// is why the page "kept reloading" and never connected. The private ranges are
+/// tried too, so the answer comes from the network in the room rather than from
+/// the existence of an internet connection. See D-081.
+pub fn find_local_lan_ip() -> Option<String> {
+    // The internet route first: on an ordinary Wi-Fi network it gives the right
+    // interface immediately. The private ranges cover the case with no internet.
+    const PROBES: [&str; 4] = [
+        "8.8.8.8:80",
+        "192.168.0.1:9",
+        "10.0.0.1:9",
+        "172.16.0.1:9",
+    ];
+
+    let mut best: Option<(u8, String)> = None;
+
+    for probe in PROBES {
+        let socket = match UdpSocket::bind("0.0.0.0:0") {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        if socket.connect(probe).is_err() {
+            continue;
+        }
+        let ip = match socket.local_addr() {
+            Ok(a) => a.ip(),
+            Err(_) => continue,
+        };
+        if ip.is_loopback() || ip.is_unspecified() {
+            continue;
+        }
+        let rank = match ip {
+            std::net::IpAddr::V4(v4) => address_rank(v4),
+            // The mesh and this server are IPv4 throughout, so a v6 answer is
+            // no use to the device being handed the address.
+            std::net::IpAddr::V6(_) => continue,
+        };
+        // A real private address ends the search; anything weaker is held in
+        // case nothing better turns up.
+        if rank == 2 {
+            return Some(ip.to_string());
+        }
+        if best.as_ref().map(|(r, _)| rank > *r).unwrap_or(true) {
+            best = Some((rank, ip.to_string()));
         }
     }
-    "127.0.0.1".to_string()
+
+    best.map(|(_, ip)| ip)
+}
+
+/// Returns the preferred local non-loopback IPv4 address on the active LAN/Wi-Fi interface.
+///
+/// Callers that need to tell the difference between "this machine is at X" and
+/// "this machine is not on a network" should use [`find_local_lan_ip`]; this
+/// keeps the old loopback answer for the places that just need a string.
+pub fn get_local_lan_ip() -> String {
+    find_local_lan_ip().unwrap_or_else(|| "127.0.0.1".to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -208,12 +285,25 @@ pub struct LanConnectionInfo {
     pub ip: String,
     pub port: u16,
     pub url: String,
+    /// False when this machine is not on a network another device could reach.
+    /// The UI must not offer an address to scan in that case: a loopback URL
+    /// sends the phone to itself and looks like the app is broken.
+    pub reachable: bool,
 }
 
 pub fn get_lan_connection_info(port: u16) -> LanConnectionInfo {
-    let ip = get_local_lan_ip();
-    let url = format!("http://{}:{}", ip, port);
-    LanConnectionInfo { ip, port, url }
+    match find_local_lan_ip() {
+        Some(ip) => {
+            let url = format!("http://{}:{}", ip, port);
+            LanConnectionInfo { ip, port, url, reachable: true }
+        }
+        None => LanConnectionInfo {
+            ip: "127.0.0.1".to_string(),
+            port,
+            url: format!("http://127.0.0.1:{}", port),
+            reachable: false,
+        },
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -1777,6 +1867,79 @@ mod tests {
         let info = get_lan_connection_info(42420);
         assert_eq!(info.port, 42420);
         assert!(info.url.starts_with("http://"));
+    }
+
+    /// The address the UI hands out must be one another device can dial.
+    ///
+    /// Loopback is the specific wrong answer: handed to a phone it points the
+    /// phone at itself, which looks exactly like the app failing to respond.
+    #[test]
+    fn a_lan_address_is_never_offered_as_loopback() {
+        let info = get_lan_connection_info(42420);
+        if info.reachable {
+            assert!(
+                !info.ip.starts_with("127."),
+                "a reachable address must not be loopback, got {}",
+                info.ip
+            );
+            assert!(
+                info.url.contains(&info.ip) && info.url.ends_with(":42420"),
+                "url and ip disagree: {} vs {}",
+                info.url,
+                info.ip
+            );
+        } else {
+            // Not on a network is a legitimate answer, and must be reported as
+            // such rather than dressed up as an address.
+            assert_eq!(info.ip, "127.0.0.1");
+        }
+    }
+
+    /// Finding our own address must not depend on having an internet route,
+    /// because the whole app is built to work without one.
+    #[test]
+    fn the_private_ranges_are_probed_not_just_the_internet() {
+        let src = include_str!("http_server.rs");
+        let body = src
+            .split("pub fn find_local_lan_ip()")
+            .nth(1)
+            .expect("find_local_lan_ip must exist");
+        let head = &body[..body.len().min(1200)];
+        for probe in ["192.168", "10.0.0", "172.16"] {
+            assert!(
+                head.contains(probe),
+                "a private-range probe for {probe} is missing, so a network                  without internet would yield no address"
+            );
+        }
+    }
+
+    /// A dead adapter must never outrank a working one.
+    ///
+    /// Windows hands an interface a 169.254 address when its DHCP request goes
+    /// unanswered, and a laptop can hold several at once. Offering one of those
+    /// as the address to scan points the phone at a network nobody is on.
+    #[test]
+    fn a_real_private_address_beats_an_apipa_one() {
+        use std::net::Ipv4Addr;
+        assert!(
+            address_rank(Ipv4Addr::new(172, 17, 1, 145)) > address_rank(Ipv4Addr::new(169, 254, 87, 87)),
+            "a DHCP-assigned address must outrank a link-local one"
+        );
+        assert!(
+            address_rank(Ipv4Addr::new(169, 254, 87, 87)) > address_rank(Ipv4Addr::new(203, 0, 113, 5)),
+            "link-local is still better than a public address for a LAN handoff"
+        );
+    }
+
+    #[test]
+    fn private_addresses_are_recognised() {
+        use std::net::Ipv4Addr;
+        assert!(is_private_v4(Ipv4Addr::new(192, 168, 1, 5)));
+        assert!(is_private_v4(Ipv4Addr::new(10, 0, 0, 2)));
+        assert!(is_private_v4(Ipv4Addr::new(172, 16, 4, 9)));
+        assert!(is_private_v4(Ipv4Addr::new(169, 254, 3, 3)), "link-local counts");
+        assert!(!is_private_v4(Ipv4Addr::new(8, 8, 8, 8)));
+        assert!(!is_private_v4(Ipv4Addr::new(172, 32, 0, 1)), "outside 172.16/12");
     }
 
     #[test]

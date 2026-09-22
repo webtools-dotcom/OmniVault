@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from "react";
 import {
+  Check,
+  Copy,
   FolderInput,
   GripVertical,
   Maximize2,
@@ -8,6 +10,7 @@ import {
 } from "lucide-react";
 import { VaultItem } from "../../types";
 import { cn } from "../../utils/cn";
+import { copyableText } from "../../utils/copyText";
 import { extractTickers } from "../../utils/tickerDetector";
 import { extractLinks } from "../../utils/linkDetector";
 import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
@@ -47,6 +50,27 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   onViewImage,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  /**
+   * Puts the note on the clipboard.
+   *
+   * This exists because the round trip the app is for does not end at sync: a
+   * note captured on a phone is usually going somewhere else on the computer,
+   * and until now the only way to get the text out was to open the note, select
+   * it by hand and copy. `writeText` can reject when the document is not
+   * focused or the clipboard is blocked, so the tick is only shown once the
+   * write has actually resolved.
+   */
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(copyableText(item.title, item.content));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
   const isImage = item.item_type === "image";
 
   // Auto-detect any stock/crypto tickers and web links in the item
@@ -162,6 +186,18 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         >
           <GripVertical className="w-3.5 h-3.5" />
         </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          title={copied ? "Copied" : "Copy the text"}
+          aria-label={copied ? "Copied" : "Copy the text"}
+          className={cn(
+            "w-6.5 h-6.5 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
+            copied ? "text-vault-success" : "text-vault-secondary hover:text-vault-primary"
+          )}
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
         <button
           type="button"
           onClick={() => onTogglePin(item.id)}

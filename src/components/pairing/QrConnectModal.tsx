@@ -43,10 +43,18 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
     // Reflect what actually took effect rather than what was requested.
     setBrowserAccess(applied);
   };
-  const [lanInfo, setLanInfo] = useState<{ ip: string; port: number; url: string }>({
+  const [lanInfo, setLanInfo] = useState<{
+    ip: string;
+    port: number;
+    url: string;
+    reachable: boolean;
+  }>({
     ip: "127.0.0.1",
     port: 42420,
     url: "http://localhost:42420",
+    // Assume unreachable until the backend says otherwise, so a loopback
+    // address is never briefly offered as something to scan.
+    reachable: false,
   });
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
@@ -649,28 +657,50 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 </button>
               </div>
 
-              {!browserAccess && (
-                <p className="text-[0.741rem] text-vault-pending/90 bg-vault-pending/10 border border-vault-pending/25 rounded-xl px-3 py-2">
-                  Turn this on before scanning the code below, or the page will not load.
-                </p>
-              )}
-
               {/* Browser Access Tab */}
               <div className="flex flex-col items-center text-center space-y-5">
-                {/* High-Contrast Crisp QR Code Card */}
-                <div className="p-3.5 bg-vault-primary rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.06)] ring-4 ring-white/10">
-                  <svg
-                    viewBox={`-4 -4 ${viewBoxSize} ${viewBoxSize}`}
-                    className="w-44 h-44 shape-rendering-crispEdges block"
-                    aria-label={`QR code for ${lanInfo.url}`}
-                  >
-                    <rect x="-4" y="-4" width={viewBoxSize} height={viewBoxSize} fill="#FFFFFF" />
-                    <path d={qrPath} fill="#080B0F" />
-                  </svg>
-                </div>
+                {/* A code is only shown when scanning it can actually work.
+                    Both of these used to be displayed regardless, so the
+                    ordinary path was to scan a perfectly good code and land on
+                    a blank page, or on an address pointing at your own phone.
+                    A warning is weaker than not offering the broken thing. */}
+                {!browserAccess ? (
+                  <div className="w-full rounded-2xl border border-white/[0.08] bg-vault-bg/60 px-5 py-6 text-center">
+                    <p className="text-[0.815rem] leading-relaxed text-vault-secondary">
+                      Browser access is off, so there is nothing to scan yet. Other devices
+                      still sync — this only controls opening the vault in a browser.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleToggleBrowserAccess}
+                      className="mt-4 h-9 px-4 rounded-lg bg-vault-accent hover:bg-vault-accent-hover text-vault-ink text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Turn on browser access
+                    </button>
+                  </div>
+                ) : !lanInfo.reachable ? (
+                  <div className="w-full rounded-2xl border border-white/[0.08] bg-vault-bg/60 px-5 py-6 text-center">
+                    <p className="text-[0.815rem] leading-relaxed text-vault-secondary">
+                      This computer is not on a network another device can reach, so there is
+                      no address to hand out. Join a Wi-Fi network or a phone's hotspot, then
+                      reopen this panel.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-vault-primary rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.06)] ring-4 ring-white/10">
+                    <svg
+                      viewBox={`-4 -4 ${viewBoxSize} ${viewBoxSize}`}
+                      className="w-44 h-44 shape-rendering-crispEdges block"
+                      aria-label={`QR code for ${lanInfo.url}`}
+                    >
+                      <rect x="-4" y="-4" width={viewBoxSize} height={viewBoxSize} fill="#FFFFFF" />
+                      <path d={qrPath} fill="#080B0F" />
+                    </svg>
+                  </div>
+                )}
 
                 {/* Connection URL Pill with 1-Click Copy */}
-                <div className="w-full space-y-2">
+                <div className={cn("w-full space-y-2", (!browserAccess || !lanInfo.reachable) && "hidden")}>
                   <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 ">
                     <Wifi className="w-3.5 h-3.5 text-vault-success" />
                     <span>Address on this network</span>
@@ -712,7 +742,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       2
                     </span>
-                    <span className="leading-snug">Open camera and scan the QR code above.</span>
+                    <span className="leading-snug">Open the camera and scan the code above, or type the address into the browser.</span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
                     <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">

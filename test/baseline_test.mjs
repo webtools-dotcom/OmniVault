@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 console.log("Running OmniVault baseline test suite...");
 
@@ -514,3 +515,75 @@ assert.strictEqual(
 );
 
 console.log("✅ README honesty guard passed!");
+
+// 20. Regression guard: the QR code has to be a QR code.
+//
+// It shipped unscannable for three independent reasons, and nothing caught it
+// because a wrong QR still looks exactly like a QR. A phone camera found the
+// finder patterns and then decoded nothing, which reads to a person as the
+// scanner being broken rather than the code being wrong. See D-081.
+//
+// The golden hashes below were produced from matrices that OpenCV's decoder
+// read back correctly. If one changes, the encoder changed: re-verify against
+// a real decoder before updating it, do not simply paste the new hash in.
+const esbuild = await import("esbuild");
+const qrSource = fs.readFileSync(path.resolve(process.cwd(), "src/utils/qrCode.ts"), "utf-8");
+const qrJs = esbuild.transformSync(qrSource, { loader: "ts", format: "esm" }).code;
+const qrMod = await import(
+  "data:text/javascript;base64," + Buffer.from(qrJs, "utf-8").toString("base64")
+);
+
+const QR_GOLDEN = [
+  ["http://192.168.1.5:42420", 25, "d46ccc1b7a3cdc9b"],
+  ["http://10.0.0.2:42420", 25, "e1f405c444cf29da"],
+];
+
+for (const [url, expectedSize, expectedHash] of QR_GOLDEN) {
+  const m = qrMod.generateQrMatrix(url);
+  assert.strictEqual(m.length, expectedSize, `QR for ${url} changed size`);
+
+  // Finder patterns: a 7x7 ring in three corners.
+  for (const [r0, c0] of [[0, 0], [0, m.length - 7], [m.length - 7, 0]]) {
+    assert.ok(m[r0][c0] && m[r0 + 6][c0] && m[r0][c0 + 6], `finder pattern missing at ${r0},${c0}`);
+    assert.ok(m[r0 + 3][c0 + 3], `finder centre missing at ${r0},${c0}`);
+    assert.ok(!m[r0 + 1][c0 + 1], `finder ring not hollow at ${r0},${c0}`);
+  }
+
+  // The single alignment pattern for versions 2-4 sits at (c, c), not on the
+  // timing row. Reading the spec's coordinate list as a coordinate put it at
+  // (6, c), which is what made every code undecodable.
+  const centre = { 25: 18, 29: 22, 33: 26 }[m.length];
+  if (centre) {
+    assert.ok(m[centre][centre], `alignment centre missing at ${centre},${centre}`);
+    assert.ok(!m[centre - 1][centre], "alignment pattern is not a ring");
+    assert.ok(m[centre - 2][centre], "alignment pattern outer ring missing");
+  }
+
+  // Timing row must alternate all the way across, so nothing may be drawn on it.
+  for (let i = 8; i < m.length - 8; i++) {
+    assert.strictEqual(m[6][i], i % 2 === 0, `timing row broken at column ${i}`);
+    assert.strictEqual(m[i][6], i % 2 === 0, `timing column broken at row ${i}`);
+  }
+
+  const bits = m.map((row) => row.map((cell) => (cell ? "1" : "0")).join("")).join("");
+  const hash = crypto.createHash("sha256").update(bits).digest("hex").slice(0, 16);
+  assert.strictEqual(
+    hash,
+    expectedHash,
+    `the QR encoder changed for ${url}. Re-verify with a real decoder before updating this hash.`
+  );
+}
+
+// A note copied out of the vault must not repeat its own first line, which is
+// the ordinary shape of a quick capture.
+const copySource = fs.readFileSync(path.resolve(process.cwd(), "src/utils/copyText.ts"), "utf-8");
+const copyJs = esbuild.transformSync(copySource, { loader: "ts", format: "esm" }).code;
+const { copyableText } = await import(
+  "data:text/javascript;base64," + Buffer.from(copyJs, "utf-8").toString("base64")
+);
+assert.strictEqual(copyableText("Exited JAINREC.NS", "Exited JAINREC.NS at 294"), "Exited JAINREC.NS at 294");
+assert.strictEqual(copyableText("Trade log", "Exited at 294"), "Trade log\n\nExited at 294");
+assert.strictEqual(copyableText("Only a title", ""), "Only a title");
+assert.strictEqual(copyableText("", "Only a body"), "Only a body");
+
+console.log("✅ QR code and copy-out guards passed!");
