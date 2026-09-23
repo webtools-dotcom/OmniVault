@@ -1,25 +1,36 @@
 # OmniVault
 
-A private notebook that syncs across your own devices. No account, no cloud, no company in the middle.
+Send yourself a note from your phone and find it on your laptop, without opening a browser tab that takes forty seconds and a gigabyte of memory to show you a chat you already regret using as a filing cabinet.
 
-Notes, links, screenshots and tickers, kept in folders you control. Every device holds its own complete copy in an ordinary SQLite database. When two of your devices are awake on the same Wi-Fi, they find each other and exchange what changed.
+Notes, links, screenshots and tickers, kept in folders you choose. Every device holds its own complete copy in an ordinary SQLite database. When two of your devices are awake on the same Wi-Fi, they find each other and exchange what changed.
 
 **What it will not do:** there is no server in between. A note written on your phone reaches your laptop the next time both are open on the same network — not before. If that is not a trade you want, this is the wrong tool, and it is better to know now than to discover it and think the app is broken.
 
-Windows and Android today. There is no iOS or macOS build. A phone or tablet can also reach the app through its own browser over your LAN, without installing anything.
+Windows and Android. There is no iOS or macOS build. A phone or tablet can also reach the app through its own browser over your LAN, without installing anything.
 
 ---
 
-## Why this instead of what you use now
+## What it is actually for
 
-**A messaging app's saved-messages folder** is where most people actually keep this stuff. It works until you need to find something: one chronological list, no folders, no way to file a thing under the project it belongs to — and it sits on someone else's server.
+The problem it was built for is small and specific, and it happens several times a day.
 
-**Cloud note apps** solve the filing and lose the privacy, plus an account, a login and a sync service between you and your own writing.
+You are out. You do something worth writing down — you exit a position at a price, you read something you want to come back to, you photograph a page. It needs to reach the computer, in a form you can find again, with a few seconds of effort.
 
-**File transfer tools** like AirDrop or LocalSend move a file to a device that is awake right now. Capture something on a walk with your laptop shut and there is nothing to transfer to. OmniVault queues it locally and catches up when both ends are next online together.
+**The usual answer is to message yourself.** That works, and then it stops working. Opening a messaging app's web client on a laptop is a browser tab, a QR scan, a sync spinner and a large chunk of memory, and what arrives is one undifferentiated chronological stream. Five kinds of note — trades, links, ideas, receipts, things to look up — land in the same place and stay there. Finding one later means scrolling.
 
-The honest counterpoint: those tools work from anywhere on the internet. This one works when your devices are on the same network. That is the whole trade.
+**OmniVault is that round trip without the detour.** Capture on the phone in the folder it belongs in. Come home. It is already on the laptop. Copy it out in one tap and paste it wherever it was going.
 
+Privacy is a consequence of this design rather than the pitch for it: nothing leaves your network because nothing needs to. Read the threat model below before trusting that on a network you do not control.
+
+### Where it sits next to other things
+
+**Messaging yourself** wins on reach — it works from anywhere. It loses on structure, on speed to open, and on ever finding anything again.
+
+**Cloud note apps** solve the structure and add an account, a login and a sync service between you and your own writing.
+
+**File transfer tools** like AirDrop or LocalSend move a file to a device that is awake right now. Capture something on a walk with your laptop shut and there is nothing to transfer to. OmniVault keeps it locally and catches up when both ends are next online together.
+
+The honest counterpoint: all of those work from anywhere on the internet. This one works when your devices are on the same network. That is the whole trade.
 ---
 
 ## How it is put together
@@ -81,14 +92,19 @@ A few consequences of that shape worth knowing:
 
 ## Getting it
 
-There is no published release yet. The app has an update check built into the sidebar, and it will say so plainly — "No releases have been published yet" — rather than pretending you are up to date. It asks the releases page of this repository once, only when you press the button, and nothing about your vault goes with the request.
+Downloads are on the [releases page](https://github.com/webtools-dotcom/OmniVault/releases).
 
-Until a release exists, build it yourself with the steps below.
+**Windows** — take `omnivault-v0.1.0-windows-x64.zip`, extract it anywhere, run `omnivault.exe`. There is no installer and nothing to add to your system. Windows will say the app is unrecognised, because the binary is not code-signed; the dialog hides "Run anyway" behind **More info**.
 
-Two things to expect when releases do exist, because both look alarming and neither is a fault:
+**Android** — take `omnivault-v0.1.0-android.apk` and open it on the device. Android will ask you to allow installs from whichever app you downloaded it with. One APK covers phones and tablets.
 
-- **Windows** will warn that the app is unrecognised, because the binary is not code-signed. Signing costs money per year; this project does not pay it.
-- **Android** will warn about installing outside the Play Store, and you will need to allow your browser or file manager to install unknown apps.
+Neither is signed by a paid certificate authority, so both warn. That is the cost of not paying one, not a sign that something is wrong. If you would rather not trust a binary from the internet, the build steps below produce the same thing from source.
+
+The app checks for newer releases only when you press **Check for updates** in the sidebar. It asks this repository's releases page once and nothing about your vault goes with the request.
+
+### Or use it from a browser, with nothing installed
+
+A phone or tablet on the same network can open the vault in its browser instead. On the computer, open **Connect device → Open in a browser**, turn on browser access, and scan the code. This is genuinely install-free, but it is a browser tab rather than an app — for daily capture the Android build is the better answer.
 
 ---
 

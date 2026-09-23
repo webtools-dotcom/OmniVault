@@ -514,6 +514,37 @@ assert.strictEqual(
   "the README promises what the code does not do: " + promises.join(" | ")
 );
 
+// The same claims used to live on in the release-notes template, which
+// regenerates them on every package. Fixing the README alone left that door
+// open. See D-084.
+const packagerSrc = fs.readFileSync(path.resolve(process.cwd(), "scripts/package_windows.mjs"), "utf-8");
+const notesStart = packagerSrc.indexOf("const releaseNotesContent");
+assert.ok(notesStart > -1, "the release-notes template is gone from the packager");
+// Bounded to the template literal itself: a fixed-length slice ran past it
+// into the script's own console.log lines, whose tick marks tripped the emoji
+// check on a clean tree.
+const notesEnd = packagerSrc.indexOf(String.fromCharCode(10) + "`;", notesStart);
+assert.ok(notesEnd > notesStart, "could not find the end of the release-notes template");
+const notesTemplate = packagerSrc.slice(notesStart, notesEnd);
+const shipped = [];
+for (const [pattern, why] of overclaims) {
+  if (pattern.test(notesTemplate)) shipped.push(why);
+}
+// Claim, not mention: "there is no iOS or macOS build" is the honest sentence
+// this exists to protect, and a blunt token ban forbids the truth with the lie.
+for (const sentence of notesTemplate.split(/(?<=[.!])\s|\r?\n/)) {
+  if (!/\b(?:iPhone|iPad|iOS|macOS)\b/.test(sentence)) continue;
+  if (/\b(?:no|not|never|without|lacks?|only)\b/i.test(sentence)) continue;
+  shipped.push("release notes claim an Apple platform");
+  break;
+}
+if (EMOJI.test(notesTemplate)) shipped.push("emoji are back in the release notes");
+assert.strictEqual(
+  shipped.length,
+  0,
+  "the release notes promise what the code does not do: " + shipped.join(" | ")
+);
+
 console.log("✅ README honesty guard passed!");
 
 // 20. Regression guard: the QR code has to be a QR code.

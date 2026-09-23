@@ -36,6 +36,15 @@ if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
 console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ PASS`);
 
 // 3. Create release directory & copy standalone binary and web dist assets
+//
+// The staging directory is emptied first. Vite names its output by content
+// hash, so copying a fresh dist/ into a directory that already held earlier
+// ones only ever adds: the package had accumulated 74 asset files and 16 MB
+// where a single build produces four. Every stale bundle was shipped to
+// whoever downloaded the release. See D-084.
+const staleAssets = path.resolve(releaseDistDir, "dist");
+fs.rmSync(staleAssets, { recursive: true, force: true });
+fs.rmSync(path.resolve(rootDir, "release/dist"), { recursive: true, force: true });
 fs.mkdirSync(releaseDistDir, { recursive: true });
 try {
   fs.copyFileSync(releaseExePath, targetExePath);
@@ -117,24 +126,49 @@ if (fs.existsSync(zipPath)) {
 
 fs.writeFileSync(shaSumsPath, checksumLines, "utf-8");
 
-const releaseNotesContent = `# OmniVault v0.1.0 - Initial Release 🚀
+// The notes that go out with a release say what the app is, in the same voice
+// and with the same restraint as the README. This template previously claimed
+// support for iPhones and iPads that does not exist, named mDNS for what is
+// UDP multicast, and quoted a binary size that had drifted — the same untruths
+// removed from the README in D-080, living on in a script that regenerates
+// them. See D-084.
+const releaseNotesContent = `# OmniVault v0.1.0
 
-OmniVault is a private, local-first cross-device personal workspace with nested folders, instant capture, and asynchronous store-and-forward mesh synchronization over local Wi-Fi.
+Send yourself a note from your phone and find it on your laptop, without
+opening a browser tab that takes forty seconds and a gigabyte of memory.
 
-## ✨ Highlights
-- **100% Offline & Decentralized:** Pure local SQLite storage; zero third-party cloud servers or account signups.
-- **Ultra-Compact Binary:** Standalone Windows executable (~6.1 MB) with zero external runtime requirements.
-- **Cross-Device Zero-Install Web App (PWA):** Embedded Rust HTTP server (port 42420) and instant QR code connection modal for iPhones, iPads, and Android devices.
-- **Deep Hierarchical Folders:** Infinite nesting, tree explorer sidebar, drag-and-drop filing, and 1-click triage modal.
-- **Fast 1-Tap Quick Inbox:** Instant capture bar for notes, tickers, and links with Ctrl+Enter persistence.
-- **Smart Market Launcher:** Auto-detects cashtag and ticker symbols with 1-click TradingView and Yahoo Finance launchers.
-- **Rich Media & Lightbox:** Global clipboard screenshot interceptor (Ctrl+V), local WebP conversion, and pan-and-zoom lightbox.
-- **Store-and-Forward Mesh Sync:** mDNS zero-configuration discovery, 6-digit PIN pairing, and bidirectional TCP delta sync with LWW conflict resolution.
+Notes, links, screenshots and tickers, kept in folders you choose. Every
+device holds its own complete copy. When two of them are awake on the same
+Wi-Fi they find each other and exchange what changed.
 
-## 📦 Assets
-- omnivault-v0.1.0-windows-x64.zip (Portable release archive)
-- omnivault.exe (Standalone executable)
-- SHA256SUMS.txt (Cryptographic verification checksums)
+## What it will not do
+
+There is no server in between. A note written on your phone reaches your
+laptop the next time both are open on the same network — not before. Sync
+traffic is not encrypted; this is built for a network you control. See the
+threat model in the README before using it on shared Wi-Fi.
+
+## Installing
+
+**Windows** — download the zip, extract it, run \`omnivault.exe\`. No installer
+and no runtime to install. Windows will warn that the app is unrecognised,
+because the binary is not code-signed.
+
+**Android** — download the APK and open it. Android will ask you to allow
+installs from your browser or file manager. One APK covers phones and tablets.
+
+Both are unsigned by a paid authority, so both warn. That is the cost of not
+paying a certificate authority, not a sign that something is wrong.
+
+## Verifying what you downloaded
+
+\`SHA256SUMS.txt\` lists the checksum of each file.
+
+## Known limits
+
+- Windows and Android only. There is no iOS or macOS build.
+- Devices sync only while both are open on the same network.
+- Deleting a note is immediate and cannot be undone.
 `;
 
 fs.writeFileSync(releaseNotesPath, releaseNotesContent, "utf-8");

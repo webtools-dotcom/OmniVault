@@ -44,13 +44,72 @@ console.log(`[1/4] Found Android APK: ${sourceApkPath}`);
 console.log(`      Build type: ${isReleaseBuild ? "Optimized Release (Signed)" : "Debug"}`);
 console.log(`      APK size: ${stats.size.toLocaleString()} bytes (${sizeMB} MB)`);
 
-// 2. Size budget check (< 15MB budget)
-const MAX_BUDGET_MB = 15;
-if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
-  console.error(`❌ APK size exceeds ${MAX_BUDGET_MB} MB budget! Actual: ${sizeMB} MB`);
+// 2. Size budget check.
+//
+// The budget exists to catch this project's own code growing, and a flat
+// ceiling on the whole APK stopped measuring that the moment the build went
+// universal: one APK carrying arm64, armeabi-v7a and x86_64 holds three copies
+// of the same library, so the file tripled while the code did not change at
+// all. Judging the package by its total would have meant either failing a
+// build that got no heavier, or raising a number until it stopped complaining
+// — which is how a budget quietly stops being one.
+//
+// So the code is measured per ABI, against the original 15 MB, and the package
+// as a whole gets a separate and looser ceiling that still catches assets or
+// ABIs piling up unnoticed. See D-084.
+const MAX_CODE_MB = 15;
+const MAX_PACKAGE_MB = 32;
+
+const abiSizes = new Map();
+
+// Read the APK's central directory to size each ABI's payload.
+const apkBuf = fs.readFileSync(sourceApkPath);
+{
+  const eocd = apkBuf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd > -1) {
+    let count = apkBuf.readUInt16LE(eocd + 10);
+    let pos = apkBuf.readUInt32LE(eocd + 16);
+    for (let i = 0; i < count && pos + 46 <= apkBuf.length; i++) {
+      if (apkBuf.readUInt32LE(pos) !== 0x02014b50) break;
+      const compressed = apkBuf.readUInt32LE(pos + 20);
+      const uncompressed = apkBuf.readUInt32LE(pos + 24);
+      const nameLen = apkBuf.readUInt16LE(pos + 28);
+      const extraLen = apkBuf.readUInt16LE(pos + 30);
+      const commentLen = apkBuf.readUInt16LE(pos + 32);
+      const name = apkBuf.subarray(pos + 46, pos + 46 + nameLen).toString("utf-8");
+      const m = name.match(/^lib\/([^/]+)\//);
+      if (m) {
+        abiSizes.set(m[1], (abiSizes.get(m[1]) || 0) + Math.max(compressed, uncompressed));
+      }
+      pos += 46 + nameLen + extraLen + commentLen;
+    }
+  }
+}
+
+if (abiSizes.size === 0) {
+  console.error("❌ No native libraries found in the APK — it would not run on any device.");
   process.exit(1);
 }
-console.log(`[2/4] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ PASS`);
+
+const abiReport = [...abiSizes.entries()]
+  .map(([abi, bytes]) => `${abi} ${(bytes / (1024 * 1024)).toFixed(2)} MB`)
+  .join(", ");
+console.log(`      ABIs: ${abiReport}`);
+
+const largestAbi = Math.max(...abiSizes.values());
+if (largestAbi > MAX_CODE_MB * 1024 * 1024) {
+  console.error(
+    `❌ Native code for one ABI exceeds ${MAX_CODE_MB} MB! Actual: ${(largestAbi / (1024 * 1024)).toFixed(2)} MB`
+  );
+  process.exit(1);
+}
+if (stats.size > MAX_PACKAGE_MB * 1024 * 1024) {
+  console.error(`❌ APK exceeds the ${MAX_PACKAGE_MB} MB package ceiling! Actual: ${sizeMB} MB`);
+  process.exit(1);
+}
+console.log(
+  `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ✅ PASS`
+);
 
 // 3. Stage APK to release directory
 fs.mkdirSync(targetApkDir, { recursive: true });
