@@ -46,9 +46,9 @@ export const PairingGuide: React.FC<PairingGuideProps> = ({ showsOwnPin }) => {
           <span>
             {showsOwnPin ? (
               <>
-                Type the six-digit PIN from this screen into the other device. It is shown here and
-                never sent over the network, which is what makes it proof you are holding this
-                machine.
+                Tap <span className="text-vault-primary">Connect</span> next to it, then press{" "}
+                <span className="text-vault-primary">Allow</span> on the other device. Only
+                someone holding that device can let yours in.
               </>
             ) : (
               <>

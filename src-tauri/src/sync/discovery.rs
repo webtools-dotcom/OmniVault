@@ -14,6 +14,20 @@ pub const PROTOCOL_IDENTIFIER: &str = "omnivault-v1";
 pub const PEER_EXPIRY_SECONDS: i64 = 15;
 const MAX_TRACKED_PEERS: usize = 64;
 const MAX_PEER_NAME_CHARS: usize = 64;
+/// At the 5 s beacon interval, a full sweep every 30 s.
+const SWEEP_EVERY_TICKS: u64 = 6;
+
+/// Every host address in `ip`'s /24 and its neighbouring /24 — that is, its
+/// /23 — which covers home routers, phone hotspots and most shared Wi-Fi.
+// ponytail: assumes the LAN is at most a /23; read the real netmask if a
+// larger campus network needs it.
+pub fn sweep_targets(ip: Ipv4Addr) -> Vec<Ipv4Addr> {
+    let [a, b, c, _] = ip.octets();
+    [c & !1, c | 1]
+        .into_iter()
+        .flat_map(|c| (1..=254).map(move |d| Ipv4Addr::new(a, b, c, d)))
+        .collect()
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveryBeacon {
@@ -149,11 +163,23 @@ impl DiscoveryService {
         }
     }
 
+    /// Announces this device every `interval_secs`.
+    ///
+    /// Multicast and broadcast alone are not enough: large shared Wi-Fi (a
+    /// hostel, a campus, an office) commonly drops both between clients while
+    /// passing ordinary unicast, and there the two apps never heard of each
+    /// other and the only way to connect was typing an IP address. So every
+    /// tick also goes directly to each peer already known, which keeps it from
+    /// expiring, and every `SWEEP_EVERY_TICKS` the beacon goes directly to
+    /// every address on the local network. A device that hears from someone new
+    /// answers directly (see `run_listener`), so one sweep introduces both
+    /// sides. See D-090.
     pub async fn run_broadcaster(
         device_id: String,
         device_name: String,
         sync_port: u16,
         interval_secs: u64,
+        registry: PeerRegistry,
         stop_rx: tokio::sync::watch::Receiver<bool>,
     ) -> std::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
@@ -164,6 +190,7 @@ impl DiscoveryService {
 
         let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
         let mut stop = stop_rx;
+        let mut tick: u64 = 0;
 
         while !*stop.borrow() {
             tokio::select! {
@@ -181,7 +208,24 @@ impl DiscoveryService {
                         let _ = socket.send_to(&bytes, multicast_target).await;
                         // Also send over standard LAN broadcast for networks with multicast filtering
                         let _ = socket.send_to(&bytes, broadcast_target).await;
+
+                        for peer in registry.get_active_peers().await {
+                            let _ = socket.send_to(&bytes, SocketAddr::new(peer.addr, DISCOVERY_PORT)).await;
+                        }
+
+                        if tick % SWEEP_EVERY_TICKS == 0 {
+                            let own_ip = crate::http_server::find_local_lan_ip()
+                                .and_then(|ip| ip.parse::<Ipv4Addr>().ok());
+                            if let Some(ip) = own_ip {
+                                for target in sweep_targets(ip) {
+                                    let _ = socket
+                                        .send_to(&bytes, SocketAddr::V4(SocketAddrV4::new(target, DISCOVERY_PORT)))
+                                        .await;
+                                }
+                            }
+                        }
                     }
+                    tick += 1;
                 }
                 _ = stop.changed() => {
                     if *stop.borrow() {
@@ -194,11 +238,17 @@ impl DiscoveryService {
         Ok(())
     }
 
+    /// Records every device whose beacon arrives, and answers a device heard
+    /// from for the first time directly, so a sweep that reaches us introduces
+    /// us back even where broadcasts are dropped. Only a first contact is
+    /// answered, so two devices cannot keep replying to each other.
     pub async fn run_listener(
-        my_device_id: String,
+        my_beacon: DiscoveryBeacon,
         registry: PeerRegistry,
         stop_rx: tokio::sync::watch::Receiver<bool>,
     ) -> std::io::Result<()> {
+        let my_device_id = my_beacon.device_id.clone();
+        let reply = serde_json::to_vec(&my_beacon).unwrap_or_default();
         let std_socket = create_multicast_socket(DISCOVERY_PORT)?;
         let socket = UdpSocket::from_std(std_socket)?;
         let mut buf = vec![0u8; 4096];
@@ -210,6 +260,9 @@ impl DiscoveryService {
                     if let Ok((len, src_addr)) = recv_res {
                         if let Ok(beacon) = serde_json::from_slice::<DiscoveryBeacon>(&buf[..len]) {
                             if beacon.protocol == PROTOCOL_IDENTIFIER && beacon.device_id != my_device_id {
+                                if registry.get_peer(&beacon.device_id).await.is_none() {
+                                    let _ = socket.send_to(&reply, SocketAddr::new(src_addr.ip(), DISCOVERY_PORT)).await;
+                                }
                                 let peer = PeerInfo {
                                     device_id: beacon.device_id,
                                     device_name: beacon.device_name,
@@ -237,6 +290,20 @@ impl DiscoveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_sweep_covers_both_halves_of_the_slash_23_and_nothing_else() {
+        // The hostel network this was found on: laptop .1.145, tablet .1.233,
+        // and the /23 also holds 172.17.0.x.
+        let targets = sweep_targets(Ipv4Addr::new(172, 17, 1, 145));
+        assert_eq!(targets.len(), 508);
+        assert!(targets.contains(&Ipv4Addr::new(172, 17, 1, 233)));
+        assert!(targets.contains(&Ipv4Addr::new(172, 17, 0, 7)));
+        assert!(!targets.contains(&Ipv4Addr::new(172, 17, 2, 7)));
+        assert!(!targets.iter().any(|t| t.octets()[3] == 0 || t.octets()[3] == 255));
+        // An even third octet sweeps the same pair from the other side.
+        assert_eq!(sweep_targets(Ipv4Addr::new(172, 17, 0, 9)), targets);
+    }
 
     #[test]
     fn test_beacon_serialization() {

@@ -111,6 +111,38 @@ async fn pair_with_peer_cmd(
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn request_pair_approval_cmd(
+    state: State<'_, AppState>,
+    peer_ip: String,
+    peer_port: u16,
+    peer_name: Option<String>,
+) -> Result<sync::pairing::PairedDevice, String> {
+    let db = state.db.clone();
+    let dev_id = state.device_id.clone();
+    #[cfg(target_os = "android")]
+    let dev_name = format!("OmniVault Mobile ({})", &dev_id[..6.min(dev_id.len())]);
+    #[cfg(not(target_os = "android"))]
+    let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
+
+    tokio::task::spawn_blocking(move || {
+        sync::mesh_sync::request_pairing_approval(db, &dev_id, &dev_name, &peer_ip, peer_port, peer_name.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn get_pending_pair_request_cmd() -> Option<http_server::PendingPairRequest> {
+    http_server::pending_pair_request()
+}
+
+#[tauri::command]
+fn answer_pair_request_cmd(state: State<AppState>, request_id: String, allow: bool) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    http_server::answer_pair_request(&conn, &request_id, allow)
+}
+
 // ---------------------------------------------------------------------------
 // Folder Commands
 // ---------------------------------------------------------------------------
@@ -777,6 +809,7 @@ pub fn run() {
     let peer_registry = sync::discovery::PeerRegistry::new();
     let peer_reg_clone = peer_registry.clone();
     let peer_reg_sync = peer_registry.clone();
+    let peer_reg_broadcaster = peer_registry.clone();
 
     // Start embedded HTTP server on background thread (default port 42420)
     let mut pairing_session_handle = Arc::new(Mutex::new(None));
@@ -825,19 +858,26 @@ pub fn run() {
             let stop_rx3 = stop_rx1.clone();
 
             let b_dev_name = dev_name.clone();
+            let my_beacon = sync::discovery::DiscoveryService::new(
+                dev_id_listener,
+                dev_name.clone(),
+                server_port,
+            )
+            .build_beacon();
             tokio::spawn(async move {
                 let _ = sync::discovery::DiscoveryService::run_broadcaster(
                     dev_id_broadcaster,
                     b_dev_name,
                     server_port,
                     5,
+                    peer_reg_broadcaster,
                     stop_rx1,
                 ).await;
             });
 
             tokio::spawn(async move {
                 let _ = sync::discovery::DiscoveryService::run_listener(
-                    dev_id_listener,
+                    my_beacon,
                     peer_reg_clone,
                     stop_rx2,
                 ).await;
@@ -875,6 +915,9 @@ pub fn run() {
             trigger_mesh_sync_cmd,
             get_mesh_sync_status_cmd,
             pair_with_peer_cmd,
+            request_pair_approval_cmd,
+            get_pending_pair_request_cmd,
+            answer_pair_request_cmd,
             list_folders_cmd,
             create_folder_cmd,
             rename_folder_cmd,

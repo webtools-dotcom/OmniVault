@@ -16,6 +16,7 @@ import { NoteEditorModal } from "./components/editor/NoteEditorModal";
 import { ImageLightbox } from "./components/media/ImageLightbox";
 import { QrConnectModal } from "./components/pairing/QrConnectModal";
 import { PeerPinModal } from "./components/pairing/PeerPinModal";
+import { PairRequestPrompt } from "./components/pairing/PairRequestPrompt";
 import { useClipboardPaste } from "./hooks/useClipboardPaste";
 
 export function App() {
@@ -721,6 +722,13 @@ export function App() {
             onClose={() => setLightboxImage(null)}
             imageUrl={lightboxImage?.url || ""}
             title={lightboxImage?.title}
+          />
+
+          <PairRequestPrompt
+            onPaired={() => {
+              refreshFolders();
+              refreshInboxItems();
+            }}
           />
 
           {/* QR Code Mobile & Tablet Connection Modal */}

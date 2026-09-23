@@ -82,7 +82,6 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
 
   // Inline pairing form state per peer device_id
   const [pairingPeerId, setPairingPeerId] = useState<string | null>(null);
-  const [peerPinInput, setPeerPinInput] = useState<string>("");
   const [isPairingSubmit, setIsPairingSubmit] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [pairSuccess, setPairSuccess] = useState<string | null>(null);
@@ -187,30 +186,25 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
     }
   };
 
+  /** Asks the other device, and waits for someone there to press Allow. See D-090. */
   const handlePairPeer = async (peer: PeerInfo) => {
-    const pin = peerPinInput.trim();
-    if (!pin) {
-      setPairError("Please enter the 6-digit PIN shown on the remote device");
-      return;
-    }
-
+    setPairingPeerId(peer.device_id);
     setIsPairingSubmit(true);
     setPairError(null);
     setPairSuccess(null);
 
-    const res = await StorageService.pairWithPeer(peer.addr, peer.sync_port, pin);
+    const res = await StorageService.requestPairApproval(peer.addr, peer.sync_port, peer.device_name);
     setIsPairingSubmit(false);
+    setPairingPeerId(null);
 
     if (res.success) {
-      setPairSuccess(`Paired with ${peer.device_name}!`);
-      setPairingPeerId(null);
-      setPeerPinInput("");
+      setPairSuccess(`Connected to ${peer.device_name}`);
       await StorageService.triggerMeshSync();
       await fetchMeshStatus();
       onSyncTriggered?.();
       setTimeout(() => setPairSuccess(null), 3500);
     } else {
-      setPairError(res.error || "Pairing failed. Check the PIN and try again.");
+      setPairError(res.error || "Could not connect. Try again.");
     }
   };
 
@@ -415,7 +409,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                       Nothing found yet
                     </h3>
                     <p className="text-[0.815rem] text-vault-muted max-w-xs mx-auto leading-relaxed">
-                      Put both devices on the same Wi-Fi or hotspot and they will find each other.
+                      Open OmniVault on the other device, on the same Wi-Fi or hotspot. It shows up here within about 30 seconds.
                     </p>
                   </div>
                 ) : (
@@ -464,54 +458,21 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                                 <Button
                                   variant="primary"
                                   size="sm"
-                                  onClick={() => {
-                                    setPairingPeerId(isPairingThis ? null : peer.device_id);
-                                    setPeerPinInput("");
-                                    setPairError(null);
-                                  }}
-                                  className="h-7 px-2.5 text-xs font-semibold rounded-lg"
+                                  onClick={() => handlePairPeer(peer)}
+                                  disabled={isPairingSubmit}
+                                  className="h-8 px-3 text-xs font-semibold rounded-lg gap-1"
                                 >
-                                  {isPairingThis ? "Cancel" : "Pair Device"}
+                                  <span>Connect</span>
+                                  <ArrowRight className="w-3 h-3" />
                                 </Button>
                               )}
                             </div>
                           </div>
 
-                          {/* Inline PIN Entry for Unpaired Device */}
-                          {isPairingThis && !isPaired && (
-                            <div className="pt-2 border-t border-white/[0.06] space-y-2 animate-in fade-in">
-                              <label className="text-[0.741rem] font-mono text-vault-muted block">
-                                ENTER PIN SHOWN ON {peer.device_name.toUpperCase()}
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  placeholder="e.g. 749 201"
-                                  value={peerPinInput}
-                                  onChange={(e) => setPeerPinInput(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handlePairPeer(peer);
-                                  }}
-                                  className="flex-1 h-8 px-3 text-xs font-mono font-semibold bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted focus:outline-hidden focus:border-vault-border-active/50"
-                                />
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={() => handlePairPeer(peer)}
-                                  disabled={isPairingSubmit || !peerPinInput.trim()}
-                                  className="h-8 px-3 text-xs font-semibold rounded-lg gap-1 shrink-0"
-                                >
-                                  {isPairingSubmit ? (
-                                    "Pairing..."
-                                  ) : (
-                                    <>
-                                      <span>Authorize</span>
-                                      <ArrowRight className="w-3 h-3" />
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
+                          {isPairingThis && (
+                            <div className="pt-2 border-t border-white/[0.06] flex items-center gap-2 text-[0.815rem] text-vault-secondary">
+                              <Radio className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                              <span>Press <strong className="text-vault-primary">Allow</strong> on {peer.device_name} to finish.</span>
                             </div>
                           )}
                         </div>
@@ -521,6 +482,13 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 )}
               </div>
 
+              {/* The address and PIN are the fallback now, not the way in. D-090. */}
+              <details className="group">
+                <summary className="cursor-pointer list-none text-[0.815rem] text-vault-muted hover:text-vault-secondary py-1 select-none">
+                  <span className="group-open:hidden">Not showing up? Connect by address and PIN</span>
+                  <span className="hidden group-open:inline">Hide address and PIN</span>
+                </summary>
+                <div className="space-y-4 pt-3">
               {/* Direct IP & PIN Connection Card */}
               <div className="p-4 bg-vault-primary/[0.03] hover:bg-vault-primary/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
                 <div className="flex items-center justify-between">
@@ -644,6 +612,8 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   </p>
                 )}
               </div>
+                </div>
+              </details>
             </>
           ) : (
             <>

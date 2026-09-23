@@ -103,6 +103,58 @@ fn clear_pair_attempts(ip: std::net::IpAddr) {
     pair_attempts().remove(&ip);
 }
 
+/// A device asking to pair without a PIN, waiting for someone at this one to
+/// press Allow. The person approving is the authorisation, exactly as typing
+/// the PIN they can see is. One request at a time: a second device asking
+/// while one waits is told the device is busy, so nobody on the network can
+/// queue up prompts. See D-090.
+#[derive(Clone, Serialize)]
+pub struct PendingPairRequest {
+    pub request_id: String,
+    pub device_id: String,
+    pub device_name: String,
+    #[serde(skip)]
+    expires_at: i64,
+    /// `None` while waiting; `Some(None)` denied; `Some(Some(token))` allowed.
+    #[serde(skip)]
+    decision: Option<Option<String>>,
+}
+
+static PENDING_PAIR: Mutex<Option<PendingPairRequest>> = Mutex::new(None);
+const PAIR_REQUEST_TTL_MS: i64 = 60_000;
+
+/// The request waiting for an answer on this device, if there is one.
+pub fn pending_pair_request() -> Option<PendingPairRequest> {
+    let now = chrono::Utc::now().timestamp_millis();
+    lock_recover(&PENDING_PAIR)
+        .clone()
+        .filter(|p| p.decision.is_none() && now <= p.expires_at)
+}
+
+/// Allows or denies the waiting request. Allowing stores the pairing here
+/// straight away; the requester collects the same token on its next poll.
+pub fn answer_pair_request(conn: &Connection, request_id: &str, allow: bool) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut slot = lock_recover(&PENDING_PAIR);
+    let pending = match slot.as_mut() {
+        Some(p) if p.request_id == request_id && p.decision.is_none() && now <= p.expires_at => p,
+        _ => return Err("That request has already expired.".into()),
+    };
+    if !allow {
+        pending.decision = Some(None);
+        return Ok(());
+    }
+    let auth_token = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT OR REPLACE INTO paired_devices (device_id, device_name, auth_token, paired_at, last_sync_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![pending.device_id, pending.device_name, auth_token, now, None::<i64>],
+    )
+    .map_err(|e| e.to_string())?;
+    pending.decision = Some(Some(auth_token));
+    Ok(())
+}
+
 /// Locks a mutex, recovering from poisoning rather than aborting the process.
 ///
 /// The release profile sets `panic = "abort"` (D-030), so a panic on any
@@ -156,7 +208,7 @@ fn allowed_cors_origin(origin: Option<&str>, host: Option<&str>) -> Option<Strin
 /// Routes reachable without a token. `/api/pair` is the handshake that issues
 /// tokens, so requiring one would make pairing impossible; the other two return
 /// nothing the caller does not already know.
-const PUBLIC_API_ROUTES: [&str; 3] = ["/api/health", "/api/lan-info", "/api/pair"];
+const PUBLIC_API_ROUTES: [&str; 4] = ["/api/health", "/api/lan-info", "/api/pair", "/api/pair/request"];
 
 /// Pulls the caller's device id and token from either the `x-device-id` /
 /// `x-auth-token` headers or the `device_id` / `auth_token` query parameters.
@@ -957,7 +1009,7 @@ fn handle_connection(
         let resp = HealthResponse {
             status: "ok",
             app: "OmniVault",
-            version: "0.1.0",
+            version: env!("CARGO_PKG_VERSION"),
             device_id: device_id.to_string(),
         };
         let json = serde_json::to_vec(&resp).unwrap_or_default();
@@ -1241,6 +1293,83 @@ fn handle_connection(
                 send_response(&mut stream, 400, "Bad Request", "application/json", &err_json.to_string().into_bytes(), &[])?;
             }
         }
+        return Ok(());
+    }
+
+    // Pairing by approval: POST asks, GET ?id= collects the answer. The id is
+    // random and only ever returned to the asker, so it is what entitles the
+    // caller to the token. See D-090.
+    if path == "/api/pair/request" && (method == "POST" || method == "GET") {
+        let now = chrono::Utc::now().timestamp_millis();
+        let reply = |stream: &mut TcpStream, code: u16, text: &str, json: serde_json::Value| {
+            send_response(stream, code, text, "application/json", &json.to_string().into_bytes(), &[])
+        };
+
+        if method == "POST" {
+            #[derive(Deserialize)]
+            struct AskRequest {
+                device_id: String,
+                device_name: String,
+            }
+            let ask = match serde_json::from_slice::<AskRequest>(&body) {
+                Ok(a) if !a.device_id.trim().is_empty() => a,
+                _ => {
+                    reply(&mut stream, 400, "Bad Request", serde_json::json!({ "error": "device_id and device_name are required" }))?;
+                    return Ok(());
+                }
+            };
+            // Each ask counts against the same budget as a wrong PIN, so one
+            // address cannot keep a prompt on screen indefinitely.
+            if let Ok(a) = stream.peer_addr() {
+                if pair_attempts_exhausted(a.ip(), now) {
+                    reply(&mut stream, 429, "Too Many Requests", serde_json::json!({ "error": "Too many requests. Wait a minute and try again." }))?;
+                    return Ok(());
+                }
+                record_failed_pair_attempt(a.ip(), now);
+            }
+            let mut slot = lock_recover(&PENDING_PAIR);
+            let busy = matches!(slot.as_ref(), Some(p) if p.decision.is_none() && now <= p.expires_at && p.device_id != ask.device_id);
+            if busy {
+                drop(slot);
+                reply(&mut stream, 409, "Conflict", serde_json::json!({ "error": "Another device is waiting for approval. Try again in a minute." }))?;
+                return Ok(());
+            }
+            let request_id = uuid::Uuid::new_v4().to_string();
+            *slot = Some(PendingPairRequest {
+                request_id: request_id.clone(),
+                device_id: ask.device_id,
+                device_name: ask.device_name.chars().take(64).collect(),
+                expires_at: now + PAIR_REQUEST_TTL_MS,
+                decision: None,
+            });
+            drop(slot);
+            reply(&mut stream, 202, "Accepted", serde_json::json!({ "request_id": request_id, "expires_in_ms": PAIR_REQUEST_TTL_MS }))?;
+            return Ok(());
+        }
+
+        let wanted = query
+            .and_then(|q| q.split('&').find_map(|kv| kv.strip_prefix("id=")))
+            .unwrap_or("");
+        let mut slot = lock_recover(&PENDING_PAIR);
+        let answer = match slot.as_ref() {
+            Some(p) if !wanted.is_empty() && p.request_id == wanted => match &p.decision {
+                None if now <= p.expires_at => serde_json::json!({ "status": "pending" }),
+                None => serde_json::json!({ "status": "expired" }),
+                Some(None) => serde_json::json!({ "status": "denied" }),
+                Some(Some(token)) => serde_json::json!({
+                    "status": "authorized",
+                    "auth_token": token,
+                    "server_device_id": device_id,
+                }),
+            },
+            _ => serde_json::json!({ "status": "expired" }),
+        };
+        // An answer is handed over once; the slot is then free for the next device.
+        if answer["status"] != "pending" && slot.as_ref().map(|p| p.request_id == wanted).unwrap_or(false) {
+            *slot = None;
+        }
+        drop(slot);
+        reply(&mut stream, 200, "OK", answer)?;
         return Ok(());
     }
 
@@ -2076,6 +2205,46 @@ mod tests {
         assert_eq!(address_rank(Ipv4Addr::new(169, 254, 3, 3)), 1, "link-local is a fallback");
         assert_eq!(address_rank(Ipv4Addr::new(8, 8, 8, 8)), 0);
         assert_eq!(address_rank(Ipv4Addr::new(172, 32, 0, 1)), 0, "outside 172.16/12");
+    }
+
+    #[test]
+    fn a_device_pairs_by_approval_and_a_second_one_must_wait() {
+        let (db, device_id) = setup_test_db();
+        let handle = start_http_server(db.clone(), device_id.clone(), 0).expect("failed to start server");
+        let port = handle.port;
+        let (phone_db, _) = setup_test_db();
+        let asker = std::thread::spawn(move || {
+            crate::sync::mesh_sync::request_pairing_approval(phone_db, "phone-1", "Test Phone", "127.0.0.1", port, None)
+        });
+
+        let pending = (0..50)
+            .find_map(|_| {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                pending_pair_request()
+            })
+            .expect("the request should be waiting for an answer");
+        assert_eq!(pending.device_name, "Test Phone");
+
+        // Nobody else can queue a prompt behind it.
+        let body = r#"{"device_id":"phone-2","device_name":"Someone else"}"#;
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(format!("POST /api/pair/request HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).as_bytes())
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("409 Conflict"), "{resp}");
+
+        answer_pair_request(&lock_recover(&db), &pending.request_id, true).unwrap();
+        let paired = asker.join().unwrap().expect("pairing should succeed once allowed");
+        assert_eq!(paired.device_id, device_id);
+
+        // Both ends hold the same token, as the PIN route leaves them.
+        let stored: String = lock_recover(&db)
+            .query_row("SELECT auth_token FROM paired_devices WHERE device_id = 'phone-1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(stored, paired.auth_token);
+        assert!(pending_pair_request().is_none(), "the slot is free once the answer is collected");
     }
 
     #[test]

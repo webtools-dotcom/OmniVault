@@ -451,6 +451,82 @@ pub fn pair_with_remote_peer(
     Ok(paired)
 }
 
+/// Pairs with a peer by asking it, and waiting up to a minute for someone at
+/// that device to press Allow. Ends with the same stored pairing as the PIN
+/// route. See D-090.
+pub fn request_pairing_approval(
+    db: Arc<Mutex<Connection>>,
+    self_device_id: &str,
+    self_device_name: &str,
+    peer_addr_str: &str,
+    peer_port: u16,
+    peer_name: Option<&str>,
+) -> Result<PairedDevice, String> {
+    let clean_ip: IpAddr = peer_addr_str
+        .trim()
+        .parse()
+        .map_err(|e| format!("Invalid IP address '{}': {}", peer_addr_str, e))?;
+    let target_addr = SocketAddr::new(clean_ip, peer_port);
+    let error_of = |body: &[u8]| {
+        serde_json::from_slice::<serde_json::Value>(body)
+            .ok()
+            .and_then(|v| v["error"].as_str().map(str::to_string))
+            .unwrap_or_else(|| "The other device refused the request.".to_string())
+    };
+
+    let ask = serde_json::json!({ "device_id": self_device_id, "device_name": self_device_name });
+    let resp = send_http_request(
+        target_addr,
+        "POST",
+        "/api/pair/request",
+        &[("Content-Type", "application/json")],
+        Some(ask.to_string().as_bytes()),
+        Duration::from_secs(6),
+    )
+    .map_err(|e| format!("Could not reach {}: {}", target_addr, e))?;
+    if resp.status != 202 {
+        return Err(error_of(&resp.body));
+    }
+    let request_id = serde_json::from_slice::<serde_json::Value>(&resp.body)
+        .ok()
+        .and_then(|v| v["request_id"].as_str().map(str::to_string))
+        .ok_or_else(|| "The other device sent an unreadable reply.".to_string())?;
+
+    for _ in 0..65 {
+        std::thread::sleep(Duration::from_secs(1));
+        let poll = match send_http_request(
+            target_addr,
+            "GET",
+            &format!("/api/pair/request?id={}", request_id),
+            &[],
+            None,
+            Duration::from_secs(6),
+        ) {
+            Ok(p) => p,
+            // One dropped poll on Wi-Fi is not an answer.
+            Err(_) => continue,
+        };
+        let answer: serde_json::Value = serde_json::from_slice(&poll.body).unwrap_or_default();
+        match answer["status"].as_str() {
+            Some("pending") => continue,
+            Some("authorized") => {
+                let token = answer["auth_token"].as_str().unwrap_or_default();
+                let peer_id = answer["server_device_id"].as_str().unwrap_or_default();
+                if token.is_empty() || peer_id.is_empty() {
+                    return Err("The other device sent an incomplete approval.".into());
+                }
+                let fallback = format!("OmniVault Peer ({})", &peer_id[..6.min(peer_id.len())]);
+                let conn = db.lock().map_err(|e| e.to_string())?;
+                return store_paired_device(&conn, peer_id, peer_name.unwrap_or(&fallback), token)
+                    .map_err(|e| format!("Failed to store paired device: {}", e));
+            }
+            Some("denied") => return Err("The request was declined on the other device.".into()),
+            _ => break,
+        }
+    }
+    Err("Nobody allowed the request in time. Try again, and press Allow on the other device.".into())
+}
+
 /// Runs the continuous mesh synchronization loop on a background Tokio runtime.
 /// Every 5 seconds, queries active peers discovered on local Wi-Fi and triggers store-and-forward catchup.
 pub async fn run_mesh_sync_loop(

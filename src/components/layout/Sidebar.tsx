@@ -111,7 +111,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         "flex flex-col bg-vault-sidebar h-full transition-transform duration-200 select-none",
         isMobile
           ? cn(
-              "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl",
+              // The drawer is fixed to the screen edges, so the body's
+              // safe-area padding never reaches it: without its own, the
+              // header sat under the status bar and the device panel under
+              // the navigation buttons.
+              "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
               isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
             )
           : "w-56 shrink-0"

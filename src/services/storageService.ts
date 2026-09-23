@@ -459,6 +459,30 @@ export const StorageService = {
     }
   },
 
+  /** Pairs by asking the other device, which shows Allow / Deny. Native apps only. */
+  async requestPairApproval(ip: string, port: number, peerName?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await invoke("request_pair_approval_cmd", { peerIp: ip, peerPort: port, peerName: peerName ?? null });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+
+  /** A device waiting for someone here to allow it, if any. */
+  async getPendingPairRequest(): Promise<{ request_id: string; device_id: string; device_name: string } | null> {
+    if (!isTauriEnvironment()) return null;
+    try {
+      return await invoke("get_pending_pair_request_cmd");
+    } catch {
+      return null;
+    }
+  },
+
+  async answerPairRequest(requestId: string, allow: boolean): Promise<void> {
+    await invoke("answer_pair_request_cmd", { requestId, allow });
+  },
+
   // -------------------------------------------------------------------------
   // Folders
   // -------------------------------------------------------------------------
