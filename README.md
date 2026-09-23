@@ -94,9 +94,9 @@ A few consequences of that shape worth knowing:
 
 Downloads are on the [releases page](https://github.com/webtools-dotcom/OmniVault/releases).
 
-**Windows** — take `omnivault-v0.1.1-windows-x64.zip`, extract it anywhere, run `omnivault.exe`. There is no installer and nothing to add to your system. Windows will say the app is unrecognised, because the binary is not code-signed; the dialog hides "Run anyway" behind **More info**.
+**Windows** — take `omnivault-v0.1.0-windows-x64.zip`, extract it anywhere, run `omnivault.exe`. There is no installer and nothing to add to your system. Windows will say the app is unrecognised, because the binary is not code-signed; the dialog hides "Run anyway" behind **More info**.
 
-**Android** — take `omnivault-v0.1.1-android.apk` and open it on the device. Android will ask you to allow installs from whichever app you downloaded it with. One APK covers phones and tablets.
+**Android** — take `omnivault-v0.1.0-android.apk` and open it on the device. Android will ask you to allow installs from whichever app you downloaded it with. One APK covers phones and tablets.
 
 Neither is signed by a paid certificate authority, so both warn. That is the cost of not paying one, not a sign that something is wrong. If you would rather not trust a binary from the internet, the build steps below produce the same thing from source.
 
