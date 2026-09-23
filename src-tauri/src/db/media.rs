@@ -61,10 +61,6 @@ pub fn save_image_media<P: AsRef<Path>>(
     raw_bytes: &[u8],
     device_id: &str,
 ) -> Result<MediaFile, MediaError> {
-    let now = crate::db::storage::next_write_timestamp(conn);
-    let media_dir = storage_dir.as_ref().join("media");
-    fs::create_dir_all(&media_dir)?;
-
     // Attempt to parse and compress as WebP
     let (final_bytes, mime_type, width, height) = match image::load_from_memory(raw_bytes) {
         Ok(img) => {
@@ -92,15 +88,63 @@ pub fn save_image_media<P: AsRef<Path>>(
         }
     };
 
-    let file_hash = compute_sha256(&final_bytes);
-    let filename = format!("{}.webp", file_hash);
+    store_media(conn, storage_dir, item_id, &final_bytes, "webp", &mime_type, width, height, device_id)
+}
+
+/// A document kept exactly as it arrived: no transcoding, named
+/// `<hash>.<ext>` so the extension survives sync, backup and download.
+pub fn save_file_media<P: AsRef<Path>>(
+    conn: &mut Connection,
+    storage_dir: P,
+    item_id: &str,
+    raw_bytes: &[u8],
+    file_name: &str,
+    device_id: &str,
+) -> Result<MediaFile, MediaError> {
+    let ext = file_extension(file_name);
+    let mime = crate::http_server::mime_for_extension(&ext);
+    store_media(conn, storage_dir, item_id, raw_bytes, &ext, mime, None, None, device_id)
+}
+
+/// The lowercase extension of a file name, or `bin` when it has none that is
+/// safe to put in a path and a URL.
+pub fn file_extension(file_name: &str) -> String {
+    match file_name.rsplit_once('.') {
+        Some((_, ext))
+            if !ext.is_empty() && ext.len() <= 8 && ext.chars().all(|c| c.is_ascii_alphanumeric()) =>
+        {
+            ext.to_ascii_lowercase()
+        }
+        _ => "bin".to_string(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn store_media<P: AsRef<Path>>(
+    conn: &mut Connection,
+    storage_dir: P,
+    item_id: &str,
+    final_bytes: &[u8],
+    ext: &str,
+    mime_type: &str,
+    width: Option<u32>,
+    height: Option<u32>,
+    device_id: &str,
+) -> Result<MediaFile, MediaError> {
+    let now = crate::db::storage::next_write_timestamp(conn);
+    let media_dir = storage_dir.as_ref().join("media");
+    fs::create_dir_all(&media_dir)?;
+    let mime_type = mime_type.to_string();
+
+    let file_hash = compute_sha256(final_bytes);
+    let filename = format!("{}.{}", file_hash, ext);
     let full_path = media_dir.join(&filename);
     let relative_path = format!("media/{}", filename);
 
     // Save to disk if not already present (content-addressed deduplication)
     if !full_path.exists() {
         let mut file = File::create(&full_path)?;
-        file.write_all(&final_bytes)?;
+        file.write_all(final_bytes)?;
         file.flush()?;
     }
 
@@ -267,6 +311,29 @@ mod tests {
         let mut bytes = Vec::new();
         img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png).unwrap();
         bytes
+    }
+
+    #[test]
+    fn documents_are_stored_verbatim_under_their_own_extension() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+        let item = create_item(&mut conn, None, "file", "Budget", "", None, "dev").unwrap();
+        let temp_dir = std::env::temp_dir().join(format!("omnivault_test_{}", Uuid::new_v4()));
+
+        let bytes = b"PK\x03\x04 not really a spreadsheet".to_vec();
+        let media = save_file_media(&mut conn, &temp_dir, &item.id, &bytes, "Q3 Budget.XLSX", "dev").unwrap();
+
+        assert_eq!(media.relative_path, format!("media/{}.xlsx", media.file_hash));
+        assert_eq!(read_media_bytes(&temp_dir, &media.relative_path).unwrap(), bytes);
+        assert_eq!(compute_sha256(&bytes), media.file_hash);
+
+        // Nothing unsafe for a path or URL survives as an extension.
+        assert_eq!(file_extension("report.pdf"), "pdf");
+        assert_eq!(file_extension("no-extension"), "bin");
+        assert_eq!(file_extension("evil./..\\x"), "bin");
+        assert_eq!(file_extension("trailing."), "bin");
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

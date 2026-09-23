@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Check,
   Copy,
+  Download,
   FolderInput,
   GripVertical,
   Maximize2,
@@ -14,7 +15,7 @@ import { copyableText } from "../../utils/copyText";
 import { extractTickers } from "../../utils/tickerDetector";
 import { extractLinks } from "../../utils/linkDetector";
 import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
-import { resolveMediaUrl } from "../../services/storageService";
+import { StorageService, resolveMediaUrl } from "../../services/storageService";
 
 export interface QuickInboxItemCardProps {
   item: VaultItem;
@@ -109,6 +110,26 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
     }
   };
   const isImage = item.item_type === "image";
+  const isFile = item.item_type === "file";
+  const [fileStatus, setFileStatus] = useState<string | null>(null);
+
+  const fileMeta = useMemo((): { fileName?: string; byteSize?: number } => {
+    if (!isFile) return {};
+    try {
+      return JSON.parse(item.metadata || "{}");
+    } catch {
+      return {};
+    }
+  }, [isFile, item.metadata]);
+
+  /** A document is opened by saving it where the rest of the computer can reach it. */
+  const handleSaveFile = async () => {
+    setFileStatus("Saving…");
+    const res = await StorageService.saveMediaToDownloads(item.content, fileMeta.fileName || item.title);
+    if (res.success && res.filePath) StorageService.openFileInFolder(res.filePath);
+    setFileStatus(res.success ? "Saved to Downloads" : res.error || "Could not save it");
+    setTimeout(() => setFileStatus(null), 2500);
+  };
 
   // Auto-detect any stock/crypto tickers and web links in the item
   const detectedTickers = useMemo(() => {
@@ -135,7 +156,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={() => onSelectItem?.(item)}
+      onClick={() => (isFile ? handleSaveFile() : onSelectItem?.(item))}
       className={cn(
         "group relative rounded-xl transition-colors duration-150 cursor-pointer flex flex-col",
         // A photo needs no panel: the picture is the item. Text sits one step
@@ -180,7 +201,21 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             )}
           </div>
 
-          {item.content && (
+          {isFile && (
+            <div className="mt-2 flex items-center gap-2 text-[0.8125rem] text-vault-secondary">
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="min-w-0 truncate">{fileStatus || fileMeta.fileName || "File"}</span>
+              {!fileStatus && fileMeta.byteSize != null && (
+                <span className="shrink-0 text-vault-muted">
+                  {fileMeta.byteSize < 1024 * 1024
+                    ? `${Math.max(1, Math.round(fileMeta.byteSize / 1024))} KB`
+                    : `${(fileMeta.byteSize / (1024 * 1024)).toFixed(1)} MB`}
+                </span>
+              )}
+            </div>
+          )}
+
+          {item.content && !isFile && (
             <p className="mt-2 text-[0.8125rem] text-vault-secondary leading-relaxed line-clamp-3">
               {item.content}
             </p>

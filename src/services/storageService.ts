@@ -663,8 +663,11 @@ export const StorageService = {
       itemId?: string;
       folderId?: string | null;
       title?: string;
+      /** Set for a document: stored as-is under this name's extension, not transcoded. */
+      fileName?: string;
     }
   ): Promise<{ url: string; file_hash: string; item?: VaultItem } | null> {
+    const what = options?.fileName ? "store this file" : "store this image";
     try {
       let b64Data: string;
 
@@ -683,6 +686,7 @@ export const StorageService = {
         item_id: options?.itemId,
         folder_id: options?.folderId,
         title: options?.title || (data instanceof File ? data.name.replace(/\.[^/.]+$/, "") : undefined),
+        file_name: options?.fileName,
         data: b64Data,
       };
 
@@ -703,13 +707,14 @@ export const StorageService = {
         // fallback; a device with somewhere to put the file does not.
         console.warn(`Failed to upload media, status: ${res.status}`);
         if (isTauriEnvironment() || StorageService.isPaired()) {
-          throw new VaultWriteError("store this image");
+          throw new VaultWriteError(what);
         }
         return null;
       }
 
       const result = await res.json();
-      if (result && result.url) {
+      // A document is never shown inline, so holding its bytes in memory buys nothing.
+      if (result && result.url && !options?.fileName) {
         cacheLocalMedia(result.url, b64Data);
         if (result.file_hash) {
           cacheLocalMedia(result.file_hash, b64Data);
@@ -725,7 +730,7 @@ export const StorageService = {
       if (err instanceof VaultWriteError) throw err;
       console.warn("Upload media error:", err);
       if (isTauriEnvironment() || StorageService.isPaired()) {
-        throw new VaultWriteError("store this image");
+        throw new VaultWriteError(what);
       }
       return null;
     }
@@ -1090,7 +1095,9 @@ export const StorageService = {
       const a = document.createElement("a");
       a.href = blobUrl;
       const base = (suggestedFilename || "omnivault_image").replace(/[/\\?%*:|"<>]/g, "_").trim();
-      a.download = base.toLowerCase().endsWith(".webp") ? base : `${base}.webp`;
+      // A photo is `.webp`; a document keeps the extension it was stored with.
+      const ext = `.${mediaUrlOrHash.split("?")[0].match(/\.([a-z0-9]{1,8})$/i)?.[1] ?? "webp"}`;
+      a.download = base.toLowerCase().endsWith(ext.toLowerCase()) ? base : `${base}${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

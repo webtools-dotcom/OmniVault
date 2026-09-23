@@ -16,7 +16,7 @@ export interface FolderTreeNode {
   depth: number;
 }
 
-export type ItemType = 'note' | 'image' | 'link' | 'ticker';
+export type ItemType = 'note' | 'image' | 'link' | 'ticker' | 'file';
 
 export interface VaultItem {
   id: string;

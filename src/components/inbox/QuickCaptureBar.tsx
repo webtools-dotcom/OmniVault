@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Check, Loader2, Sparkles, CornerDownLeft } from "lucide-react";
+import { Check, Loader2, Sparkles, CornerDownLeft, FileText } from "lucide-react";
 import { ItemType, VaultItem } from "../../types";
 import { cn } from "../../utils/cn";
 import { StorageService, cacheLocalMedia } from "../../services/storageService";
@@ -20,13 +20,18 @@ const CAPTURE_TYPES: { value: ItemType; label: string }[] = [
   { value: "ticker", label: "Ticker" },
   { value: "link", label: "Link" },
   { value: "image", label: "Photo" },
+  { value: "file", label: "File" },
 ];
+
+/** Uploads travel as base64 inside a 50 MB request, so this leaves headroom. */
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, folderId: _folderId = null }) => {
   const [itemType, setItemType] = useState<ItemType>("note");
   const [title, setTitle] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageInfo, setImageInfo] = useState<{ name: string; sizeStr: string } | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [justSynced, setJustSynced] = useState(false);
@@ -34,6 +39,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -46,7 +52,11 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
     if (isSubmittingRef.current) return;
 
     const cleanTitle = title.trim();
-    if (!cleanTitle && !imagePreview) return;
+    if (!cleanTitle && !imagePreview && !pendingFile) return;
+    if (itemType === "file" && !pendingFile) {
+      docInputRef.current?.click();
+      return;
+    }
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
@@ -56,6 +66,23 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       let metadata: string | null = null;
       let finalTitle = cleanTitle;
       let finalContent = cleanTitle;
+
+      if (itemType === "file" && pendingFile) {
+        const uploadRes = await StorageService.uploadMedia(pendingFile, {
+          title: cleanTitle || pendingFile.name,
+          folderId: _folderId,
+          fileName: pendingFile.name,
+        });
+        if (!uploadRes?.item) {
+          throw new Error("Files need the desktop app, or a browser paired with it.");
+        }
+        setTitle("");
+        setPendingFile(null);
+        setJustSynced(true);
+        setTimeout(() => setJustSynced(false), 2000);
+        await onCapture("file", uploadRes.item.title, uploadRes.item.content, uploadRes.item.metadata || undefined, uploadRes.item);
+        return;
+      }
 
       if (itemType === "ticker") {
         const tickerSymbol = cleanTitle.replace(/^\$/, "").toUpperCase();
@@ -158,6 +185,19 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
     e.target.value = "";
   };
 
+  const handleDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      setCaptureError(`${file.name} is ${formatFileSize(file.size)}. Files up to 25 MB can be stored.`);
+      return;
+    }
+    setCaptureError(null);
+    setPendingFile(file);
+    setItemType("file");
+  };
+
   return (
     <div className={cn(
         "bg-vault-card transition-shadow",
@@ -174,6 +214,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         onChange={handleFileChange}
         className="hidden"
       />
+      <input ref={docInputRef} type="file" onChange={handleDocChange} className="hidden" />
 
       <form onSubmit={handleCapture} className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-2.5">
         <Sparkles className="hidden sm:block w-3.5 h-3.5 text-vault-muted select-none shrink-0" />
@@ -188,8 +229,11 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               aria-pressed={itemType === t.value}
               onClick={() => {
                 setItemType(t.value);
+                if (t.value !== "file") setPendingFile(null);
                 if (t.value === "image") {
                   fileInputRef.current?.click();
+                } else if (t.value === "file") {
+                  docInputRef.current?.click();
                 }
               }}
               className={cn(
@@ -216,6 +260,8 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
               ? "Paste a link…"
               : itemType === "image"
               ? "Choose a photo, or paste one…"
+              : itemType === "file"
+              ? pendingFile ? "Name it, or leave it as the file name…" : "Choose a PDF, spreadsheet, any file…"
               : "Capture a thought, a link, a ticker…"
           }
           className="order-3 sm:order-none basis-full sm:basis-auto flex-1 min-w-0 h-8 sm:h-auto bg-vault-elevated sm:bg-transparent rounded-lg sm:rounded-none px-2.5 sm:px-0 text-[0.8125rem] text-vault-primary placeholder:text-vault-subtle focus:outline-none"
@@ -245,10 +291,26 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
           </div>
         )}
 
+        {pendingFile && (
+          <div className="order-1 sm:order-none flex items-center gap-1.5 px-2 py-1 rounded-lg bg-vault-elevated text-vault-primary text-xs shrink-0">
+            <FileText className="w-3.5 h-3.5 text-vault-secondary" />
+            <span className="max-w-[140px] truncate">{pendingFile.name}</span>
+            <span className="text-vault-muted">{formatFileSize(pendingFile.size)}</span>
+            <button
+              type="button"
+              onClick={() => setPendingFile(null)}
+              className="text-vault-secondary hover:text-vault-primary ml-1 cursor-pointer text-xs"
+              title="Remove file"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Capture button */}
         <button
           type="submit"
-          disabled={isSubmitting || (!title.trim() && !imagePreview)}
+          disabled={isSubmitting || (!title.trim() && !imagePreview && !pendingFile)}
           className="order-2 sm:order-none ml-auto sm:ml-0 h-8 sm:h-7 px-3 bg-vault-accent hover:bg-vault-accent-hover disabled:opacity-30 text-vault-ink rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
         >
           {isSubmitting ? (

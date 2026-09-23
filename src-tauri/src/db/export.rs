@@ -227,6 +227,12 @@ fn note_markdown(item: &VaultItem, folder: Option<&Folder>, depth: usize) -> Str
             let up = "../".repeat(depth);
             out.push_str(&format!("![{}]({}media/{})\n", item.title, up, hash));
         }
+    } else if item.item_type == "file" {
+        if let Some(name) = item.content.rsplit('/').next() {
+            let name = name.split('?').next().unwrap_or(name);
+            let up = "../".repeat(depth);
+            out.push_str(&format!("[{}]({}media/{})\n", item.title, up, name));
+        }
     } else {
         out.push_str(&item.content);
         out.push('\n');

@@ -409,6 +409,8 @@ pub struct MediaUploadRequest {
     pub item_id: Option<String>,
     pub folder_id: Option<String>,
     pub title: Option<String>,
+    /// Present for a document: its original name. Absent for a photo.
+    pub file_name: Option<String>,
     pub data: Option<String>,
     pub base64: Option<String>,
 }
@@ -471,18 +473,21 @@ pub fn get_storage_base_dir() -> PathBuf {
     crate::resolve_app_base_dir()
 }
 
-pub fn find_media_file(clean_hash: &str, dist_dir: Option<&Path>) -> Option<PathBuf> {
-    // Path traversal defense: clean_hash must strictly be non-empty ASCII alphanumeric, hyphen, or underscore
+/// `name` is `<hash>` (an image, stored as `.webp`) or `<hash>.<ext>`.
+pub fn find_media_file(name: &str, dist_dir: Option<&Path>) -> Option<PathBuf> {
+    let (clean_hash, ext) = name.split_once('.').unwrap_or((name, "webp"));
+    // Path traversal defense: both halves must be plain ASCII alphanumeric
+    // (plus hyphen or underscore in the hash), so no separator or `..` survives.
     if clean_hash.is_empty()
-        || clean_hash.contains("..")
-        || clean_hash.contains('/')
-        || clean_hash.contains('\\')
         || !clean_hash.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        || ext.is_empty()
+        || ext.len() > 8
+        || !ext.chars().all(|c| c.is_ascii_alphanumeric())
     {
         return None;
     }
 
-    let filename = format!("{}.webp", clean_hash);
+    let filename = format!("{}.{}", clean_hash, ext);
     let mut candidates = Vec::new();
 
     let base_dir = get_storage_base_dir();
@@ -561,7 +566,11 @@ pub fn find_dist_dir() -> Option<PathBuf> {
 
 /// Determines the Content-Type header based on file extension.
 fn get_mime_type(path: &Path) -> &'static str {
-    match path.extension().and_then(|ext| ext.to_str()).unwrap_or("") {
+    mime_for_extension(path.extension().and_then(|ext| ext.to_str()).unwrap_or(""))
+}
+
+pub fn mime_for_extension(ext: &str) -> &'static str {
+    match ext {
         "html" => "text/html; charset=utf-8",
         "js" | "mjs" => "application/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
@@ -574,6 +583,9 @@ fn get_mime_type(path: &Path) -> &'static str {
         "woff2" => "font/woff2",
         "woff" => "font/woff",
         "ttf" => "font/ttf",
+        "pdf" => "application/pdf",
+        "txt" => "text/plain; charset=utf-8",
+        "csv" => "text/csv; charset=utf-8",
         _ => "application/octet-stream",
     }
 }
@@ -1469,6 +1481,7 @@ let conn = lock_recover(&db);
         let upload_item_id: Option<String>;
         let upload_folder_id: Option<String>;
         let upload_title: Option<String>;
+        let mut upload_file_name: Option<String> = None;
         let raw_bytes: Vec<u8>;
 
         let is_json = headers
@@ -1482,6 +1495,7 @@ let conn = lock_recover(&db);
                 upload_item_id = req.item_id;
                 upload_folder_id = req.folder_id;
                 upload_title = req.title;
+                upload_file_name = req.file_name.filter(|n| !n.trim().is_empty());
                 let b64_str = req.data.or(req.base64).unwrap_or_default();
                 match decode_base64(&b64_str) {
                     Ok(b) => raw_bytes = b,
@@ -1562,14 +1576,14 @@ let conn = lock_recover(&db);
             if let Some(reused_id) = recent_item_id {
                 reused_id
             } else {
-                let item_title = upload_title.unwrap_or_else(|| {
+                let item_title = upload_title.or_else(|| upload_file_name.clone()).unwrap_or_else(|| {
                     let now = chrono::Local::now();
                     format!("Screenshot ({})", now.format("%H:%M"))
                 });
                 match storage::create_item(
                     &mut conn,
                     upload_folder_id.as_deref(),
-                    "image",
+                    if upload_file_name.is_some() { "file" } else { "image" },
                     &item_title,
                     "",
                     None,
@@ -1585,17 +1599,30 @@ let conn = lock_recover(&db);
             }
         };
 
-        match media::save_image_media(&mut conn, &base_dir, &target_item_id, &raw_bytes, device_id) {
+        let saved = match &upload_file_name {
+            Some(name) => media::save_file_media(&mut conn, &base_dir, &target_item_id, &raw_bytes, name, device_id),
+            None => media::save_image_media(&mut conn, &base_dir, &target_item_id, &raw_bytes, device_id),
+        };
+        match saved {
             Ok(media_file) => {
-                let media_url = format!("/api/media/{}.webp", media_file.file_hash);
-                let meta = serde_json::json!({
-                    "isImage": true,
-                    "mimeType": "image/webp",
-                    "fileHash": media_file.file_hash,
-                    "byteSize": media_file.byte_size,
-                    "width": media_file.width,
-                    "height": media_file.height,
-                });
+                let stored_name = media_file.relative_path.trim_start_matches("media/");
+                let media_url = format!("/api/media/{}", stored_name);
+                let meta = match &upload_file_name {
+                    Some(name) => serde_json::json!({
+                        "fileName": name,
+                        "mimeType": media_file.mime_type,
+                        "fileHash": media_file.file_hash,
+                        "byteSize": media_file.byte_size,
+                    }),
+                    None => serde_json::json!({
+                        "isImage": true,
+                        "mimeType": "image/webp",
+                        "fileHash": media_file.file_hash,
+                        "byteSize": media_file.byte_size,
+                        "width": media_file.width,
+                        "height": media_file.height,
+                    }),
+                };
 
                 let current_title: String = conn
                     .query_row("SELECT title FROM vault_items WHERE id = ?1", [&target_item_id], |row| row.get(0))
@@ -1661,8 +1688,8 @@ let conn = lock_recover(&db);
         };
 
         if media_hash != "upload" && !media_hash.is_empty() {
-            let clean_hash = media_hash.trim_end_matches(".webp");
-            if let Some(media_file_path) = find_media_file(clean_hash, dist_dir) {
+            let media_name = media_hash.trim_end_matches(".webp");
+            if let Some(media_file_path) = find_media_file(media_name, dist_dir) {
                 if let Ok(bytes) = fs::read(&media_file_path) {
                     let mime = if bytes.starts_with(b"RIFF") {
                         "image/webp"
@@ -1671,15 +1698,21 @@ let conn = lock_recover(&db);
                     } else if bytes.starts_with(b"\xFF\xD8\xFF") {
                         "image/jpeg"
                     } else {
-                        "image/webp"
+                        get_mime_type(&media_file_path)
                     };
                     let is_download = query.map(|q| q.contains("download")).unwrap_or(false);
                     let disposition_val;
+                    // Documents are whatever the person chose to store, so one
+                    // opened in a tab must not run as this origin and reach
+                    // the auth token in its storage.
                     let mut extra_headers: Vec<(&str, &str)> = vec![
                         ("Cache-Control", "public, max-age=31536000, immutable"),
+                        ("Content-Security-Policy", "sandbox"),
+                        ("X-Content-Type-Options", "nosniff"),
                     ];
                     if is_download {
-                        disposition_val = format!("attachment; filename=\"{}.webp\"", clean_hash);
+                        let stored_name = media_file_path.file_name().and_then(|n| n.to_str()).unwrap_or("download");
+                        disposition_val = format!("attachment; filename=\"{}\"", stored_name);
                         extra_headers.push(("Content-Disposition", &disposition_val));
                     }
                     send_response(
@@ -2159,6 +2192,38 @@ mod tests {
         assert!(resp.contains("201 Created"));
         assert!(resp.contains(r#""status":"ok""#));
         assert!(resp.contains("/api/media/"));
+
+        // 8b. A document is kept byte-for-byte under its own extension, and is
+        // served sandboxed so it can never run as this origin.
+        let doc_payload = r#"{"title":"Budget","file_name":"Budget.pdf","data":"JVBERi0xLjQgaGk="}"#;
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        let req = format!(
+            "POST /api/media/upload HTTP/1.1\r\nHost: localhost\r\nOrigin: http://tauri.localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            doc_payload.len(),
+            doc_payload
+        );
+        stream.write_all(req.as_bytes()).unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("201 Created"), "{resp}");
+        assert!(resp.contains(r#""item_type":"file""#), "{resp}");
+        let doc_url = resp
+            .split(r#""url":""#)
+            .nth(1)
+            .and_then(|r| r.split('"').next())
+            .unwrap()
+            .to_string();
+        assert!(doc_url.ends_with(".pdf"), "{doc_url}");
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(format!("GET {doc_url} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n").as_bytes())
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.contains("200 OK"), "{resp}");
+        assert!(resp.contains("application/pdf"), "{resp}");
+        assert!(resp.contains("Content-Security-Policy: sandbox"), "{resp}");
+        assert!(resp.ends_with("%PDF-1.4 hi"), "{resp}");
 
         // 9. Test Path Traversal Protection (must be 403 Forbidden)
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();

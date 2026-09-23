@@ -388,12 +388,18 @@ fn save_media_to_downloads_cmd(
             format!("omnivault_{}", short)
         });
 
-    let mut dest_path = downloads_dir.join(format!("{}.webp", base_name));
+    // A photo is `.webp`; a document keeps the extension it was stored with.
+    let ext = src_path.extension().and_then(|e| e.to_str()).unwrap_or("webp");
+    let dot_ext = format!(".{}", ext);
+    let stem = if base_name.to_ascii_lowercase().ends_with(&dot_ext) {
+        &base_name[..base_name.len() - dot_ext.len()]
+    } else {
+        base_name.as_str()
+    };
+    let mut dest_path = downloads_dir.join(format!("{}{}", stem, dot_ext));
     let mut counter = 1;
-    let clean_name = format!("{}.webp", base_name);
-    let stem = clean_name.trim_end_matches(".webp");
     while dest_path.exists() {
-        dest_path = downloads_dir.join(format!("{} ({}).webp", stem, counter));
+        dest_path = downloads_dir.join(format!("{} ({}){}", stem, counter, dot_ext));
         counter += 1;
     }
 

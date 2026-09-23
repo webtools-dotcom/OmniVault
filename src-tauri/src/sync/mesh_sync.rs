@@ -28,21 +28,29 @@ const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_RESPONSE_HEADERS: usize = 100;
 const MAX_HEADER_LINE: u64 = 8 * 1024;
 
-/// Pull the `<hash>` out of a `/api/media/<hash>.webp` reference.
-fn extract_media_hash(content: &str) -> Option<String> {
+/// Pull the stored file name `<hash>.<ext>` out of a `/api/media/<hash>.<ext>`
+/// reference. The extension is `webp` for photos and the original one for
+/// documents.
+fn extract_media_name(content: &str) -> Option<String> {
     let start = content.rfind("/api/media/")? + "/api/media/".len();
-    let hash = content[start..].split(".webp").next()?;
-    if hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
-        Some(hash.to_string())
+    let name = content[start..].split(['?', '#']).next()?;
+    let (hash, ext) = name.split_once('.')?;
+    if hash.len() == 64
+        && hash.chars().all(|c| c.is_ascii_hexdigit())
+        && !ext.is_empty()
+        && ext.len() <= 8
+        && ext.chars().all(|c| c.is_ascii_alphanumeric())
+    {
+        Some(name.to_string())
     } else {
         None
     }
 }
 
-/// Every media hash this vault references but has no file on disk for.
-/// Reading from local state (rather than the current delta batch) makes media
-/// sync self-healing: a blob missed on an earlier pass is retried every cycle
-/// until it lands.
+/// Every media file (`<hash>.<ext>`) this vault references but has none on
+/// disk for. Reading from local state (rather than the current delta batch)
+/// makes media sync self-healing: a blob missed on an earlier pass is retried
+/// every cycle until it lands.
 fn collect_missing_media_hashes(
     conn: &Connection,
     media_dir: &Path,
@@ -55,13 +63,15 @@ fn collect_missing_media_hashes(
     // the startup sweep then removed again, so a deleted photo was re-downloaded
     // from the peer on every sync and deleted on every launch, forever.
     if let Ok(mut stmt) = conn.prepare(
-        "SELECT m.file_hash FROM media_files m
+        "SELECT m.relative_path FROM media_files m
          JOIN vault_items i ON i.id = m.item_id
          WHERE i.is_deleted = 0",
     ) {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for hash in rows.flatten() {
-                hashes.insert(hash);
+            for path in rows.flatten() {
+                if let Some(name) = extract_media_name(&format!("/api/media/{}", path.trim_start_matches("media/"))) {
+                    hashes.insert(name);
+                }
             }
         }
     }
@@ -71,8 +81,8 @@ fn collect_missing_media_hashes(
     ) {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for content in rows.flatten() {
-                if let Some(hash) = extract_media_hash(&content) {
-                    hashes.insert(hash);
+                if let Some(name) = extract_media_name(&content) {
+                    hashes.insert(name);
                 }
             }
         }
@@ -80,7 +90,7 @@ fn collect_missing_media_hashes(
 
     hashes
         .into_iter()
-        .filter(|hash| !media_dir.join(format!("{}.webp", hash)).exists())
+        .filter(|name| !media_dir.join(name).exists())
         .take(limit)
         .collect()
 }
@@ -293,9 +303,10 @@ pub fn sync_with_peer(
         collect_missing_media_hashes(&conn, &media_dir, MAX_MEDIA_FETCH_PER_SYNC)
     };
 
-    for hash in missing_hashes {
-        let local_path = media_dir.join(format!("{}.webp", hash));
-        let media_path = format!("/api/media/{}.webp", hash);
+    for name in missing_hashes {
+        let hash = name.split('.').next().unwrap_or(&name).to_string();
+        let local_path = media_dir.join(&name);
+        let media_path = format!("/api/media/{}", name);
         match send_http_request(
             peer_addr,
             "GET",
@@ -484,11 +495,17 @@ mod tests {
     fn extracts_hash_only_from_real_media_references() {
         let hash = "a".repeat(64);
         assert_eq!(
-            extract_media_hash(&format!("/api/media/{}.webp", hash)),
-            Some(hash.clone())
+            extract_media_name(&format!("/api/media/{}.webp", hash)),
+            Some(format!("{hash}.webp"))
         );
-        assert_eq!(extract_media_hash("just a plain note"), None);
-        assert_eq!(extract_media_hash("/api/media/not-a-hash.webp"), None);
+        // A document keeps its own extension, so the peer is asked for it.
+        assert_eq!(
+            extract_media_name(&format!("/api/media/{}.xlsx?download", hash)),
+            Some(format!("{hash}.xlsx"))
+        );
+        assert_eq!(extract_media_name("just a plain note"), None);
+        assert_eq!(extract_media_name("/api/media/not-a-hash.webp"), None);
+        assert_eq!(extract_media_name(&format!("/api/media/{}.x/../y", hash)), None);
     }
 
     #[test]
@@ -515,7 +532,7 @@ mod tests {
         }
 
         let missing = collect_missing_media_hashes(&conn, &dir, 25);
-        assert_eq!(missing, vec![absent.clone()], "only the blob absent from disk is refetched");
+        assert_eq!(missing, vec![format!("{absent}.webp")], "only the blob absent from disk is refetched");
 
         // Once it lands it must drop out of the repair set.
         std::fs::write(dir.join(format!("{}.webp", absent)), b"blob").unwrap();
