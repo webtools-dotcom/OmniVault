@@ -458,6 +458,17 @@ assert.strictEqual(
   `APP_VERSION says ${appVersion} and package.json says ${pkgVersion} — the update check would be wrong`
 );
 
+// Cargo.toml is the fourth place a version lives, and it was missed in the
+// 0.1.1 bump — found only because a build log happened to print "omnivault
+// v0.1.0" while everything else said 0.1.1. See D-085.
+const cargoToml = fs.readFileSync(path.resolve(process.cwd(), "src-tauri/Cargo.toml"), "utf-8");
+const cargoVersion = (cargoToml.match(/^version\s*=\s*"([^"]+)"/m) || [])[1];
+assert.strictEqual(
+  cargoVersion,
+  pkgVersion,
+  `src-tauri/Cargo.toml says ${cargoVersion} and package.json says ${pkgVersion}`
+);
+
 // The signing key note must keep recording a fingerprint, because the harness
 // reads it from there to check what the APK was actually signed with.
 const signingNote = fs.readFileSync(path.resolve(process.cwd(), "SIGNING-KEY.md"), "utf-8");
@@ -465,6 +476,32 @@ assert.ok(
   /\b[0-9a-f]{64}\b/.test(signingNote),
   "SIGNING-KEY.md no longer records a certificate fingerprint, so nothing checks the APK"
 );
+
+
+// The packaging scripts must not carry a version of their own. They used to
+// spell it into artifact filenames ten times over three files, so releasing
+// meant hand-editing each one and this guard — which only reads three files —
+// would have passed while the packages went out misnamed. See D-085.
+for (const script of [
+  "scripts/package_android.mjs",
+  "scripts/package_windows.mjs",
+  "scripts/check_signing_key.mjs",
+]) {
+  const src = fs.readFileSync(path.resolve(process.cwd(), script), "utf-8");
+  // Matched where a version is actually spelled — artifact names and headings —
+  // rather than any dotted triple, since "0.0.0.0" is the bind address and not
+  // a version at all.
+  const hardcoded = src.match(/(?:omnivault-v|OmniVault v)\d+\.\d+\.\d+/g) || [];
+  assert.strictEqual(
+    hardcoded.length,
+    0,
+    `${script} hardcodes a version (${hardcoded.join(", ")}); it must read package.json instead`
+  );
+  assert.ok(
+    /VERSION\s*=\s*JSON\.parse/.test(src),
+    `${script} no longer derives the version from package.json`
+  );
+}
 
 console.log("✅ Version and signing-key guards passed!");
 

@@ -19,7 +19,7 @@ export const RELEASES_REPO = "webtools-dotcom/OmniVault";
  * a version number that drifts makes the update check quietly wrong in the one
  * direction that matters: it would stop offering an update that exists.
  */
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 
 export type UpdateStatus = "unconfigured" | "current" | "available" | "failed";
 

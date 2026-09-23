@@ -4,10 +4,16 @@ import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 
 const rootDir = process.cwd();
+// The version comes from package.json and nowhere else. It used to be typed
+// into artifact filenames in three scripts, so a release meant editing ten
+// hardcoded strings by hand and the version guard only ever checked three
+// files. See D-085.
+const VERSION = JSON.parse(fs.readFileSync(path.resolve(rootDir, "package.json"), "utf-8")).version;
+
 const releaseExePath = path.resolve(rootDir, "src-tauri/target/release/omnivault.exe");
-const releaseDistDir = path.resolve(rootDir, "release/omnivault-v0.1.0-windows-x64");
+const releaseDistDir = path.resolve(rootDir, `release/omnivault-v${VERSION}-windows-x64`);
 const targetExePath = path.resolve(releaseDistDir, "omnivault.exe");
-const zipPath = path.resolve(rootDir, "release/omnivault-v0.1.0-windows-x64.zip");
+const zipPath = path.resolve(rootDir, `release/omnivault-v${VERSION}-windows-x64.zip`);
 const shaSumsPath = path.resolve(rootDir, "release/SHA256SUMS.txt");
 const releaseNotesPath = path.resolve(rootDir, "release/RELEASE_NOTES.md");
 
@@ -74,7 +80,7 @@ if (fs.existsSync(sourceDistDir)) {
   console.log("      Copied web PWA static assets (dist/) to release packages.");
 }
 
-const readmeContent = `OmniVault v0.1.0 - Windows Release (x86_64)
+const readmeContent = `OmniVault v${VERSION} - Windows Release (x86_64)
 ==============================================
 
 OmniVault is a private, local-first cross-device personal workspace and knowledge vault
@@ -121,7 +127,7 @@ let checksumLines = `${exeHash}  omnivault.exe\n`;
 if (fs.existsSync(zipPath)) {
   const zipBuffer = fs.readFileSync(zipPath);
   const zipHash = crypto.createHash("sha256").update(zipBuffer).digest("hex");
-  checksumLines += `${zipHash}  omnivault-v0.1.0-windows-x64.zip\n`;
+  checksumLines += `${zipHash}  omnivault-v${VERSION}-windows-x64.zip\n`;
 }
 
 fs.writeFileSync(shaSumsPath, checksumLines, "utf-8");
@@ -132,7 +138,7 @@ fs.writeFileSync(shaSumsPath, checksumLines, "utf-8");
 // UDP multicast, and quoted a binary size that had drifted — the same untruths
 // removed from the README in D-080, living on in a script that regenerates
 // them. See D-084.
-const releaseNotesContent = `# OmniVault v0.1.0
+const releaseNotesContent = `# OmniVault v${VERSION}
 
 Send yourself a note from your phone and find it on your laptop, without
 opening a browser tab that takes forty seconds and a gigabyte of memory.

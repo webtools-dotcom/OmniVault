@@ -15,7 +15,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const APK = path.join(root, "release", "omnivault-v0.1.0-android.apk");
+const VERSION = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")).version;
+const APK = path.join(root, "release", `omnivault-v${VERSION}-android.apk`);
 const NOTE = path.join(root, "SIGNING-KEY.md");
 
 function expectedFingerprint() {

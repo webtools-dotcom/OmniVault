@@ -164,7 +164,14 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         </div>
       ) : (
         <div className="px-4 pt-3.5 pb-3">
-          <div className="flex items-start gap-2">
+          {/* The action row is absolutely positioned in the top-right corner.
+              On a pointer device it only appears while hovering, so a title
+              running under it is momentary and harmless. On a touchscreen the
+              row is always there, and at four 36px targets it covered the first
+              line of every title permanently. Four 36px targets, three 4px gaps
+              and an 8px offset come to 164px, so the heading reserves 172px.
+              See D-085. */}
+          <div className="flex items-start gap-2 [@media(hover:none)]:pr-[10.75rem]">
             <h3 className="flex-1 min-w-0 text-sm font-semibold text-vault-primary leading-snug line-clamp-2">
               {item.title || "Untitled"}
             </h3>

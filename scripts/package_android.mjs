@@ -1,8 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 const rootDir = process.cwd();
+// The version comes from package.json and nowhere else. It used to be typed
+// into artifact filenames in three scripts, so a release meant editing ten
+// hardcoded strings by hand and the version guard only ever checked three
+// files. See D-085.
+const VERSION = JSON.parse(fs.readFileSync(path.resolve(rootDir, "package.json"), "utf-8")).version;
+
 const releaseApkPath = path.resolve(
   rootDir,
   "src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
@@ -13,8 +20,8 @@ const debugApkPath = path.resolve(
 );
 
 const targetApkDir = path.resolve(rootDir, "release");
-const targetApkPath = path.resolve(targetApkDir, "omnivault-v0.1.0-android.apk");
-const apkShaPath = path.resolve(targetApkDir, "omnivault-v0.1.0-android.apk.sha256");
+const targetApkPath = path.resolve(targetApkDir, `omnivault-v${VERSION}-android.apk`);
+const apkShaPath = path.resolve(targetApkDir, `omnivault-v${VERSION}-android.apk.sha256`);
 const shaSumsPath = path.resolve(targetApkDir, "SHA256SUMS.txt");
 
 console.log("\n=======================================================");
@@ -111,6 +118,59 @@ console.log(
   `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ✅ PASS`
 );
 
+
+/**
+ * The APK must declare the version this repository says it is.
+ *
+ * Gradle does not track `tauri.properties` as an input to its resource task,
+ * so a version bump followed by an incremental build produces an APK whose
+ * manifest still carries the previous versionName — a package that says 0.1.0
+ * while the release around it says 0.1.1. Nothing caught that: the existing
+ * version guard compares package.json, tauri.conf.json and updates.ts to each
+ * other, and never asks the artifact. See D-085.
+ */
+function findAapt2() {
+  const sdk =
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(process.env.LOCALAPPDATA || "", "Android", "Sdk");
+  const dir = path.join(sdk, "build-tools");
+  if (!fs.existsSync(dir)) return null;
+  const versions = fs
+    .readdirSync(dir)
+    .filter((v) => /^\d/.test(v))
+    .sort()
+    .reverse();
+  for (const v of versions) {
+    for (const name of ["aapt2.exe", "aapt2"]) {
+      const bin = path.join(dir, v, name);
+      if (fs.existsSync(bin)) return bin;
+    }
+  }
+  return null;
+}
+
+const aapt2 = findAapt2();
+if (!aapt2) {
+  // Skipping loudly beats failing on a machine with no Android SDK, but it
+  // must be visible that the check did not run.
+  console.log("      ⚠️  aapt2 not found — APK version NOT verified against package.json.");
+} else {
+  const badging = execFileSync(aapt2, ["dump", "badging", sourceApkPath], {
+    encoding: "utf-8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  const declared = (badging.match(/versionName='([^']*)'/) || [])[1];
+  if (declared !== VERSION) {
+    console.error(
+      `❌ The APK declares versionName='${declared}' but this repository is ${VERSION}.`
+    );
+    console.error("   Gradle reused a stale manifest. Delete src-tauri/gen/android/app/build and rebuild.");
+    process.exit(1);
+  }
+  console.log(`      APK declares versionName=${declared}: ✅ matches package.json`);
+}
+
 // 3. Stage APK to release directory
 fs.mkdirSync(targetApkDir, { recursive: true });
 fs.copyFileSync(sourceApkPath, targetApkPath);
@@ -120,9 +180,9 @@ console.log(`[3/4] Staged release APK to: ${targetApkPath}`);
 const apkBuffer = fs.readFileSync(targetApkPath);
 const apkHash = crypto.createHash("sha256").update(apkBuffer).digest("hex");
 
-fs.writeFileSync(apkShaPath, `${apkHash}  omnivault-v0.1.0-android.apk\n`, "utf-8");
+fs.writeFileSync(apkShaPath, `${apkHash}  omnivault-v${VERSION}-android.apk\n`, "utf-8");
 console.log(`[4/4] Generated SHA-256 checksum:`);
-console.log(`      ${apkHash}  omnivault-v0.1.0-android.apk`);
+console.log(`      ${apkHash}  omnivault-v${VERSION}-android.apk`);
 console.log(`      Saved to: ${apkShaPath}`);
 
 // Append or update in master SHA256SUMS.txt
@@ -130,12 +190,12 @@ if (fs.existsSync(shaSumsPath)) {
   let lines = fs
     .readFileSync(shaSumsPath, "utf-8")
     .split("\n")
-    .filter((l) => l.trim().length > 0 && !l.includes("omnivault-v0.1.0-android.apk"));
-  lines.push(`${apkHash}  omnivault-v0.1.0-android.apk`);
+    .filter((l) => l.trim().length > 0 && !l.includes(`omnivault-v${VERSION}-android.apk`));
+  lines.push(`${apkHash}  omnivault-v${VERSION}-android.apk`);
   fs.writeFileSync(shaSumsPath, lines.join("\n") + "\n", "utf-8");
   console.log(`      Updated master checksum file: ${shaSumsPath}`);
 } else {
-  fs.writeFileSync(shaSumsPath, `${apkHash}  omnivault-v0.1.0-android.apk\n`, "utf-8");
+  fs.writeFileSync(shaSumsPath, `${apkHash}  omnivault-v${VERSION}-android.apk\n`, "utf-8");
 }
 
 console.log("\n-------------------------------------------------------");
