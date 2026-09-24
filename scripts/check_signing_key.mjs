@@ -1,13 +1,7 @@
 /**
- * Fails the build if the packaged APK is signed with anything other than the
- * key recorded in SIGNING-KEY.md.
- *
- * This is the guard for the one mistake in the project with no recovery: an APK
- * signed with a different key cannot be installed over an existing copy, so the
- * person on the other end has to uninstall — and uninstalling takes their vault
- * with it. The mistake is silent at build time and permanent at install time,
- * which is exactly the shape of thing a machine should be checking rather than
- * a person remembering. See P12-T03 and D-074.
+ * Fails if the packaged APK is not signed with the release key recorded in
+ * docs/ANDROID_SIGNING.md. A differently signed APK cannot be installed over
+ * an existing copy, and uninstalling deletes the user's vault.
  */
 
 import { execFileSync } from "node:child_process";
@@ -17,21 +11,20 @@ import path from "node:path";
 const root = process.cwd();
 const VERSION = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")).version;
 const APK = path.join(root, "release", `omnivault-v${VERSION}-android.apk`);
-const NOTE = path.join(root, "SIGNING-KEY.md");
+const NOTE = path.join(root, "docs", "ANDROID_SIGNING.md");
 
 function expectedFingerprint() {
   const doc = fs.readFileSync(NOTE, "utf-8");
   const match = doc.match(/\b([0-9a-f]{64})\b/);
   if (!match) {
-    throw new Error("SIGNING-KEY.md no longer records a SHA-256 fingerprint.");
+    throw new Error("docs/ANDROID_SIGNING.md no longer records a SHA-256 fingerprint.");
   }
   return match[1];
 }
 
 /**
- * apksigner ships with the build tools. The jar is invoked directly rather
- * than the .bat wrapper, which Node cannot spawn without a shell — and a shell
- * would mean quoting a path with spaces in it correctly on every platform.
+ * Locates apksigner.jar in the Android build tools. The jar is run directly
+ * because Node cannot spawn the .bat wrapper without a shell.
  */
 function findApksignerJar() {
   const sdk =
@@ -75,7 +68,7 @@ if (!apksignerJar || !javaHome) {
   // never look like the check passed.
   console.log(
     "  › NOT CHECKED: the Android build tools or a JDK are missing on this machine, " +
-      "so the APK's signing key was not verified. Do not publish this build from here."
+      "so the APK's signing key was not verified. Do not publish this build from here.",
   );
   process.exit(0);
 }
@@ -108,7 +101,7 @@ if (found !== expected) {
   console.error("");
   console.error("    Shipping this build would mean nobody can install it over the copy");
   console.error("    they already have. They would have to uninstall first, and that");
-  console.error("    destroys their vault. See SIGNING-KEY.md.");
+  console.error("    destroys their vault. See docs/ANDROID_SIGNING.md.");
   console.error("");
   process.exit(1);
 }
