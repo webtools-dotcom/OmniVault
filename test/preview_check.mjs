@@ -16,7 +16,9 @@ try {
   const html = await response.text();
   assert.ok(html.includes("OmniVault"), "HTML does not contain OmniVault title");
   assert.ok(html.includes("/assets/index-"), "HTML does not include compiled bundle asset");
-  console.log(`✅ Preview server verified! Status: ${response.status}, HTML length: ${html.length} bytes`);
+  console.log(
+    `✅ Preview server verified! Status: ${response.status}, HTML length: ${html.length} bytes`,
+  );
 } finally {
   previewProcess.kill();
   // On windows child process might linger; make sure port is freed
