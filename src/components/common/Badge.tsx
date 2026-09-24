@@ -13,7 +13,8 @@ export function Badge({
   children,
   ...props
 }: BadgeProps) {
-  const baseStyles = "inline-flex items-center justify-center font-medium rounded border select-none leading-none";
+  const baseStyles =
+    "inline-flex items-center justify-center font-medium rounded border select-none leading-none";
 
   const variantStyles = {
     default: "bg-vault-elevated text-vault-secondary border-vault-border",
@@ -30,7 +31,10 @@ export function Badge({
   };
 
   return (
-    <span className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)} {...props}>
+    <span
+      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)}
+      {...props}
+    >
       {children}
     </span>
   );

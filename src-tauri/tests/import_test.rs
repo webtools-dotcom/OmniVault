@@ -1,18 +1,18 @@
-//! Holds the restore rules of P12-T02 to account.
-//!
-//! The one that matters most is rule 3: a restore must never overwrite work
-//! done after the backup was taken. Everything else in a backup feature is
-//! convenience; that one is the difference between a safety net and a way to
-//! lose an afternoon.
+//! Restore tests. Above all, a restore must never overwrite work done after the
+//! backup was taken.
 
 use std::fs;
 use std::path::PathBuf;
 
 use omnivault_lib::db::export::export_vault;
-use omnivault_lib::db::import::{import_vault, import_vault_bytes, list_backups, MAX_ARCHIVE_BYTES, MIN_ARCHIVE_BYTES};
+use omnivault_lib::db::import::{
+    import_vault, import_vault_bytes, list_backups, MAX_ARCHIVE_BYTES, MIN_ARCHIVE_BYTES,
+};
 use omnivault_lib::db::media::save_image_media;
 use omnivault_lib::db::schema::initialize_schema;
-use omnivault_lib::db::storage::{create_folder, create_item, delete_item, list_inbox_items, update_item};
+use omnivault_lib::db::storage::{
+    create_folder, create_item, delete_item, list_inbox_items, update_item,
+};
 use rusqlite::Connection;
 
 struct Vault {
@@ -38,8 +38,10 @@ fn png(size: u32) -> Vec<u8> {
 }
 
 fn title_of(conn: &Connection, id: &str) -> Option<String> {
-    conn.query_row("SELECT title FROM vault_items WHERE id = ?1", [id], |r| r.get(0))
-        .ok()
+    conn.query_row("SELECT title FROM vault_items WHERE id = ?1", [id], |r| {
+        r.get(0)
+    })
+    .ok()
 }
 
 #[test]
@@ -56,7 +58,16 @@ fn a_backup_restores_onto_an_empty_vault() {
         "dev",
     )
     .unwrap();
-    create_item(&mut source.conn, None, "note", "Unfiled", "Inbox note.", None, "dev").unwrap();
+    create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Unfiled",
+        "Inbox note.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     let archive = source.dir.join("omnivault-backup-test.zip");
     export_vault(&mut source.conn, &source.dir, &archive).unwrap();
@@ -65,7 +76,10 @@ fn a_backup_restores_onto_an_empty_vault() {
     let summary = import_vault(&mut fresh.conn, &fresh.dir, &archive).unwrap();
 
     assert_eq!(summary.notes_in_backup, 2);
-    assert!(summary.applied >= 3, "folder and both notes should have landed");
+    assert!(
+        summary.applied >= 3,
+        "folder and both notes should have landed"
+    );
 
     let inbox = list_inbox_items(&fresh.conn).unwrap();
     assert_eq!(inbox.len(), 1);
@@ -73,7 +87,11 @@ fn a_backup_restores_onto_an_empty_vault() {
 
     let folders: i64 = fresh
         .conn
-        .query_row("SELECT COUNT(*) FROM folders WHERE is_deleted = 0", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM folders WHERE is_deleted = 0",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(folders, 1, "the folder tree did not come back");
 }
@@ -84,20 +102,40 @@ fn a_restore_never_overwrites_newer_work() {
     // words must survive, because otherwise a backup is a way to lose an
     // afternoon rather than a way to keep one.
     let mut v = vault("newer");
-    let item = create_item(&mut v.conn, None, "note", "Plan", "First draft.", None, "dev").unwrap();
+    let item = create_item(
+        &mut v.conn,
+        None,
+        "note",
+        "Plan",
+        "First draft.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     let archive = v.dir.join("omnivault-backup-old.zip");
     export_vault(&mut v.conn, &v.dir, &archive).unwrap();
 
     std::thread::sleep(std::time::Duration::from_millis(5));
-    update_item(&mut v.conn, &item.id, "Plan", "Second draft, written after the backup.", None, "dev")
-        .unwrap();
+    update_item(
+        &mut v.conn,
+        &item.id,
+        "Plan",
+        "Second draft, written after the backup.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     import_vault(&mut v.conn, &v.dir, &archive).unwrap();
 
     let content: String = v
         .conn
-        .query_row("SELECT content FROM vault_items WHERE id = ?1", [&item.id], |r| r.get(0))
+        .query_row(
+            "SELECT content FROM vault_items WHERE id = ?1",
+            [&item.id],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(
         content, "Second draft, written after the backup.",
@@ -109,13 +147,30 @@ fn a_restore_never_overwrites_newer_work() {
 fn a_restore_adds_without_removing() {
     // Rule 1: a merge, never a mirror.
     let mut source = vault("merge-src");
-    create_item(&mut source.conn, None, "note", "From the backup", "b", None, "dev").unwrap();
+    create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "From the backup",
+        "b",
+        None,
+        "dev",
+    )
+    .unwrap();
     let archive = source.dir.join("omnivault-backup-merge.zip");
     export_vault(&mut source.conn, &source.dir, &archive).unwrap();
 
     let mut target = vault("merge-dst");
-    let local = create_item(&mut target.conn, None, "note", "Only on this device", "l", None, "dev")
-        .unwrap();
+    let local = create_item(
+        &mut target.conn,
+        None,
+        "note",
+        "Only on this device",
+        "l",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     import_vault(&mut target.conn, &target.dir, &archive).unwrap();
 
@@ -124,7 +179,10 @@ fn a_restore_adds_without_removing() {
         .into_iter()
         .map(|i| i.title)
         .collect();
-    assert!(titles.contains(&"From the backup".to_string()), "{titles:?}");
+    assert!(
+        titles.contains(&"From the backup".to_string()),
+        "{titles:?}"
+    );
     assert!(
         titles.contains(&"Only on this device".to_string()),
         "the restore deleted a note it had never seen: {titles:?}"
@@ -136,8 +194,16 @@ fn a_restore_adds_without_removing() {
 fn a_deletion_in_the_backup_is_a_fact_with_a_timestamp() {
     // Rule 4, both directions.
     let mut source = vault("del-src");
-    let kept = create_item(&mut source.conn, None, "note", "Deleted in backup", "x", None, "dev")
-        .unwrap();
+    let kept = create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Deleted in backup",
+        "x",
+        None,
+        "dev",
+    )
+    .unwrap();
     delete_item(&mut source.conn, &kept.id, "dev").unwrap();
     let archive = source.dir.join("omnivault-backup-del.zip");
     export_vault(&mut source.conn, &source.dir, &archive).unwrap();
@@ -155,9 +221,16 @@ fn a_deletion_in_the_backup_is_a_fact_with_a_timestamp() {
     import_vault(&mut stale.conn, &stale.dir, &archive).unwrap();
     let gone: i64 = stale
         .conn
-        .query_row("SELECT is_deleted FROM vault_items WHERE id = ?1", [&kept.id], |r| r.get(0))
+        .query_row(
+            "SELECT is_deleted FROM vault_items WHERE id = ?1",
+            [&kept.id],
+            |r| r.get(0),
+        )
         .unwrap();
-    assert_eq!(gone, 1, "a newer deletion in the backup should have applied");
+    assert_eq!(
+        gone, 1,
+        "a newer deletion in the backup should have applied"
+    );
 
     // A device that edited the same note after the backup: the edit wins.
     let mut edited = vault("del-edited");
@@ -173,9 +246,16 @@ fn a_deletion_in_the_backup_is_a_fact_with_a_timestamp() {
     import_vault(&mut edited.conn, &edited.dir, &archive).unwrap();
     let still_here: i64 = edited
         .conn
-        .query_row("SELECT is_deleted FROM vault_items WHERE id = ?1", [&kept.id], |r| r.get(0))
+        .query_row(
+            "SELECT is_deleted FROM vault_items WHERE id = ?1",
+            [&kept.id],
+            |r| r.get(0),
+        )
         .unwrap();
-    assert_eq!(still_here, 0, "an edit made after the backup was undone by the restore");
+    assert_eq!(
+        still_here, 0,
+        "an edit made after the backup was undone by the restore"
+    );
 }
 
 #[test]
@@ -190,14 +270,20 @@ fn media_comes_back_and_existing_blobs_are_left_alone() {
     let mut target = vault("media-dst");
     let summary = import_vault(&mut target.conn, &target.dir, &archive).unwrap();
     assert_eq!(summary.media_added, 1);
-    let blob = target.dir.join("media").join(format!("{}.webp", media.file_hash));
+    let blob = target
+        .dir
+        .join("media")
+        .join(format!("{}.webp", media.file_hash));
     assert!(blob.is_file(), "the image did not come back");
 
     // Second restore: the blob is already there and is not rewritten.
     let before = fs::metadata(&blob).unwrap().modified().unwrap();
     std::thread::sleep(std::time::Duration::from_millis(20));
     let again = import_vault(&mut target.conn, &target.dir, &archive).unwrap();
-    assert_eq!(again.media_added, 0, "a blob already on disk was written again");
+    assert_eq!(
+        again.media_added, 0,
+        "a blob already on disk was written again"
+    );
     assert_eq!(fs::metadata(&blob).unwrap().modified().unwrap(), before);
 }
 
@@ -209,7 +295,11 @@ fn a_restore_never_takes_on_the_backups_identity() {
     let mut source = vault("id-src");
     let source_id: String = source
         .conn
-        .query_row("SELECT value FROM device_meta WHERE key = 'device_id'", [], |r| r.get(0))
+        .query_row(
+            "SELECT value FROM device_meta WHERE key = 'device_id'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or_else(|_| {
             source
                 .conn
@@ -235,22 +325,35 @@ fn a_restore_never_takes_on_the_backups_identity() {
     let mut target = vault("id-dst");
     target
         .conn
-        .execute("INSERT INTO device_meta (key, value) VALUES ('device_id', 'this-device')", [])
+        .execute(
+            "INSERT INTO device_meta (key, value) VALUES ('device_id', 'this-device')",
+            [],
+        )
         .unwrap();
     import_vault(&mut target.conn, &target.dir, &archive).unwrap();
 
     let id_now: String = target
         .conn
-        .query_row("SELECT value FROM device_meta WHERE key = 'device_id'", [], |r| r.get(0))
+        .query_row(
+            "SELECT value FROM device_meta WHERE key = 'device_id'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
-    assert_eq!(id_now, "this-device", "the restore took on the backup's identity");
+    assert_eq!(
+        id_now, "this-device",
+        "the restore took on the backup's identity"
+    );
     assert_ne!(id_now, source_id);
 
     let pairings: i64 = target
         .conn
         .query_row("SELECT COUNT(*) FROM paired_devices", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(pairings, 0, "the restore imported someone else's pairing token");
+    assert_eq!(
+        pairings, 0,
+        "the restore imported someone else's pairing token"
+    );
 }
 
 #[test]
@@ -258,7 +361,9 @@ fn a_file_that_is_not_a_backup_says_so_plainly() {
     let mut v = vault("junk");
     let junk = v.dir.join("not-a-backup.zip");
     fs::write(&junk, b"this is not a zip file at all").unwrap();
-    let err = import_vault(&mut v.conn, &v.dir, &junk).unwrap_err().to_string();
+    let err = import_vault(&mut v.conn, &v.dir, &junk)
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("not a zip") || err.contains("too small"),
         "the message would not help anyone: {err}"
@@ -272,10 +377,20 @@ fn a_file_that_is_not_a_backup_says_so_plainly() {
         "import zipfile\nz=zipfile.ZipFile(r'{}','w',zipfile.ZIP_DEFLATED)\nz.writestr('holiday/readme.txt','not a vault')\nz.close()\n",
         stripped.to_string_lossy()
     );
-    let out = std::process::Command::new("python").arg("-c").arg(&script).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = std::process::Command::new("python")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
-    let err = import_vault(&mut v.conn, &v.dir, &stripped).unwrap_err().to_string();
+    let err = import_vault(&mut v.conn, &v.dir, &stripped)
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("OmniVault backup"), "unhelpful message: {err}");
 }
 
@@ -288,19 +403,21 @@ fn backups_are_listed_newest_first() {
     fs::write(dir.join("omnivault-backup-2026-02-02-1000.zip"), b"b").unwrap();
     fs::write(dir.join("holiday-photos.zip"), b"c").unwrap();
 
-    let found = list_backups(&[dir.clone()]);
-    assert_eq!(found.len(), 2, "something that is not a backup was offered: {found:?}");
-    assert!(found[0].name.contains("2026-02-02"), "not newest first: {found:?}");
+    let found = list_backups(std::slice::from_ref(&dir));
+    assert_eq!(
+        found.len(),
+        2,
+        "something that is not a backup was offered: {found:?}"
+    );
+    assert!(
+        found[0].name.contains("2026-02-02"),
+        "not newest first: {found:?}"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
-/// Android cannot hand the app a path.
-///
-/// Scoped storage gives a chosen file over as a stream, and Tauri's own IPC
-/// cannot carry bytes on that platform at all, so the archive reaches the vault
-/// as a body on the loopback server with no name on this filesystem behind it.
-/// This is the same restore as every test above, minus the path — if it ever
-/// starts needing one again, Android silently loses the ability to restore.
+/// Restoring from bytes, as Android does: its document picker yields a stream,
+/// not a path.
 #[test]
 fn a_restore_works_from_bytes_with_no_file_behind_them() {
     let mut source = vault("bytes-src");
@@ -315,7 +432,16 @@ fn a_restore_works_from_bytes_with_no_file_behind_them() {
         "dev",
     )
     .unwrap();
-    let item = create_item(&mut source.conn, None, "note", "Unfiled", "Inbox note.", None, "dev").unwrap();
+    let item = create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Unfiled",
+        "Inbox note.",
+        None,
+        "dev",
+    )
+    .unwrap();
     save_image_media(&mut source.conn, &source.dir, &item.id, &png(6), "dev").unwrap();
 
     let archive = source.dir.join("omnivault-backup-bytes.zip");
@@ -330,8 +456,14 @@ fn a_restore_works_from_bytes_with_no_file_behind_them() {
     let summary = import_vault_bytes(&mut fresh.conn, &fresh.dir, &bytes).unwrap();
 
     assert_eq!(summary.notes_in_backup, 2);
-    assert!(summary.applied >= 3, "folder and both notes should have landed");
-    assert_eq!(summary.media_added, 1, "the image should have come back too");
+    assert!(
+        summary.applied >= 3,
+        "folder and both notes should have landed"
+    );
+    assert_eq!(
+        summary.media_added, 1,
+        "the image should have come back too"
+    );
 
     let inbox = list_inbox_items(&fresh.conn).unwrap();
     assert_eq!(inbox.len(), 1);
@@ -343,7 +475,16 @@ fn a_restore_works_from_bytes_with_no_file_behind_them() {
 fn bytes_and_path_restores_agree() {
     let mut source = vault("agree-src");
     create_folder(&mut source.conn, "Shared", None, None, "dev").unwrap();
-    create_item(&mut source.conn, None, "note", "Only note", "Body.", None, "dev").unwrap();
+    create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Only note",
+        "Body.",
+        None,
+        "dev",
+    )
+    .unwrap();
     let archive = source.dir.join("omnivault-backup-agree.zip");
     export_vault(&mut source.conn, &source.dir, &archive).unwrap();
     let bytes = fs::read(&archive).unwrap();
@@ -380,28 +521,45 @@ fn bytes_that_are_not_an_archive_are_refused() {
 }
 
 /// The bounds the callers enforce have to be worth enforcing.
-#[test]
-fn the_archive_bounds_are_sane() {
-    assert_eq!(MIN_ARCHIVE_BYTES, 22, "an empty zip is 22 bytes; below that nothing can parse");
-    assert!(
-        MAX_ARCHIVE_BYTES > 64 * 1024 * 1024,
-        "a real vault with images was 8.8 MB, so the ceiling must leave room to grow"
-    );
-}
+// An empty zip is 22 bytes, and a real vault with images must fit comfortably.
+const _: () = assert!(MIN_ARCHIVE_BYTES == 22);
+const _: () = assert!(MAX_ARCHIVE_BYTES > 64 * 1024 * 1024);
 
-/// A restore that brings almost nothing back has to say so.
-///
-/// This is the desktop's own case: a backup holding notes that were later
-/// deleted here reports a healthy-looking `applied` count while the notes stay
-/// gone. The summary used to say "N records taken from a backup holding 18
-/// notes" and leave the person to work out whether that was success, partial
-/// failure or a bug. See D-078.
+/// A restore that brings little back must say why: notes deleted on this
+/// device after the backup was taken stay deleted and are reported.
 #[test]
 fn a_restore_says_how_many_notes_it_could_not_bring_back() {
     let mut source = vault("silent-src");
-    let keep = create_item(&mut source.conn, None, "note", "Still wanted", "Body.", None, "dev").unwrap();
-    let dropped = create_item(&mut source.conn, None, "note", "Deleted later", "Body.", None, "dev").unwrap();
-    let also = create_item(&mut source.conn, None, "note", "Deleted later too", "Body.", None, "dev").unwrap();
+    let keep = create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Still wanted",
+        "Body.",
+        None,
+        "dev",
+    )
+    .unwrap();
+    let dropped = create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Deleted later",
+        "Body.",
+        None,
+        "dev",
+    )
+    .unwrap();
+    let also = create_item(
+        &mut source.conn,
+        None,
+        "note",
+        "Deleted later too",
+        "Body.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     let archive = source.dir.join("omnivault-backup-silent.zip");
     export_vault(&mut source.conn, &source.dir, &archive).unwrap();
@@ -415,7 +573,10 @@ fn a_restore_says_how_many_notes_it_could_not_bring_back() {
     let summary = import_vault(&mut local.conn, &local.dir, &archive).unwrap();
 
     assert_eq!(summary.notes_in_backup, 3);
-    assert_eq!(summary.notes_present, 1, "only the undeleted note should be here");
+    assert_eq!(
+        summary.notes_present, 1,
+        "only the undeleted note should be here"
+    );
     assert_eq!(
         summary.notes_left_deleted, 2,
         "the two deleted after the backup must be reported, not silently missing"
@@ -424,12 +585,22 @@ fn a_restore_says_how_many_notes_it_could_not_bring_back() {
     // And the note that survived really is the one that should have. The two
     // others are still rows — a deletion is a tombstone, not an absence — so
     // the check is on the flag, not on whether a title can be read.
-    assert_eq!(title_of(&local.conn, &keep.id).as_deref(), Some("Still wanted"));
+    assert_eq!(
+        title_of(&local.conn, &keep.id).as_deref(),
+        Some("Still wanted")
+    );
     let dropped_is_deleted: i64 = local
         .conn
-        .query_row("SELECT is_deleted FROM vault_items WHERE id = ?1", [&dropped.id], |r| r.get(0))
+        .query_row(
+            "SELECT is_deleted FROM vault_items WHERE id = ?1",
+            [&dropped.id],
+            |r| r.get(0),
+        )
         .unwrap();
-    assert_eq!(dropped_is_deleted, 1, "the restore must not have resurrected it");
+    assert_eq!(
+        dropped_is_deleted, 1,
+        "the restore must not have resurrected it"
+    );
 }
 
 /// The happy case still reads as a clean success.

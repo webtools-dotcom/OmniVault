@@ -27,7 +27,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadStatus, setDownloadStatus] = useState<{ text: string; filePath?: string } | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<{ text: string; filePath?: string } | null>(
+    null,
+  );
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   // Reset zoom, pan, & download status when opening

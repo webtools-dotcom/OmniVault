@@ -10,7 +10,7 @@ export interface QuickCaptureBarProps {
     title: string,
     content: string,
     metadata?: string,
-    existingItem?: VaultItem
+    existingItem?: VaultItem,
   ) => Promise<void> | void;
   folderId?: string | null;
 }
@@ -26,7 +26,10 @@ const CAPTURE_TYPES: { value: ItemType; label: string }[] = [
 /** Uploads travel as base64 inside a 50 MB request, so this leaves headroom. */
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, folderId: _folderId = null }) => {
+export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({
+  onCapture,
+  folderId: _folderId = null,
+}) => {
   const [itemType, setItemType] = useState<ItemType>("note");
   const [title, setTitle] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -80,7 +83,13 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         setPendingFile(null);
         setJustSynced(true);
         setTimeout(() => setJustSynced(false), 2000);
-        await onCapture("file", uploadRes.item.title, uploadRes.item.content, uploadRes.item.metadata || undefined, uploadRes.item);
+        await onCapture(
+          "file",
+          uploadRes.item.title,
+          uploadRes.item.content,
+          uploadRes.item.metadata || undefined,
+          uploadRes.item,
+        );
         return;
       }
 
@@ -126,7 +135,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
                 uploadRes.item.title,
                 uploadRes.item.content,
                 uploadRes.item.metadata || undefined,
-                uploadRes.item
+                uploadRes.item,
               );
             }
             return;
@@ -149,12 +158,9 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       setTimeout(() => setJustSynced(false), 2000);
       inputRef.current?.focus();
     } catch (err) {
-      // Silence here used to mean a failed capture looked identical to a
-      // successful one apart from the text staying in the box.
+      // Tell the user; otherwise a failed capture looks like a slow one.
       console.error("Quick capture failed:", err);
-      setCaptureError(
-        err instanceof Error ? err.message : "Could not save that. Try again."
-      );
+      setCaptureError(err instanceof Error ? err.message : "Could not save that. Try again.");
     } finally {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
@@ -190,7 +196,9 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
     e.target.value = "";
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) {
-      setCaptureError(`${file.name} is ${formatFileSize(file.size)}. Files up to 25 MB can be stored.`);
+      setCaptureError(
+        `${file.name} is ${formatFileSize(file.size)}. Files up to 25 MB can be stored.`,
+      );
       return;
     }
     setCaptureError(null);
@@ -199,13 +207,15 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
   };
 
   return (
-    <div className={cn(
+    <div
+      className={cn(
         "bg-vault-card transition-shadow",
         // Phone: parked at the bottom edge, clear of the home indicator.
         "fixed inset-x-0 bottom-0 z-30 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(9,10,13,0.5)]",
         // Anything wider: back in the flow above the list.
-        "sm:static sm:rounded-xl sm:px-3 sm:py-2 sm:mb-4 sm:shadow-none sm:ring-1 sm:ring-vault-border sm:focus-within:ring-vault-border-active"
-      )}>
+        "sm:static sm:rounded-xl sm:px-3 sm:py-2 sm:mb-4 sm:shadow-none sm:ring-1 sm:ring-vault-border sm:focus-within:ring-vault-border-active",
+      )}
+    >
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -216,12 +226,19 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
       />
       <input ref={docInputRef} type="file" onChange={handleDocChange} className="hidden" />
 
-      <form onSubmit={handleCapture} className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-2.5">
+      <form
+        onSubmit={handleCapture}
+        className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-2.5"
+      >
         <Sparkles className="hidden sm:block w-3.5 h-3.5 text-vault-muted select-none shrink-0" />
 
         {/* Our own control, not the platform's: a native select drops a
             system-styled menu into the middle of the design. */}
-        <div className="order-1 sm:order-none flex items-center gap-0.5 shrink-0" role="group" aria-label="What are you capturing?">
+        <div
+          className="order-1 sm:order-none flex items-center gap-0.5 shrink-0"
+          role="group"
+          aria-label="What are you capturing?"
+        >
           {CAPTURE_TYPES.map((t) => (
             <button
               key={t.value}
@@ -240,7 +257,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
                 "h-7 px-2.5 rounded-lg text-xs transition-colors cursor-pointer",
                 itemType === t.value
                   ? "bg-vault-elevated text-vault-primary font-medium"
-                  : "text-vault-muted hover:text-vault-secondary"
+                  : "text-vault-muted hover:text-vault-secondary",
               )}
             >
               {t.label}
@@ -257,12 +274,14 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             itemType === "ticker"
               ? "Ticker symbol — NVDA, BTC…"
               : itemType === "link"
-              ? "Paste a link…"
-              : itemType === "image"
-              ? "Choose a photo, or paste one…"
-              : itemType === "file"
-              ? pendingFile ? "Name it, or leave it as the file name…" : "Choose a PDF, spreadsheet, any file…"
-              : "Capture a thought, a link, a ticker…"
+                ? "Paste a link…"
+                : itemType === "image"
+                  ? "Choose a photo, or paste one…"
+                  : itemType === "file"
+                    ? pendingFile
+                      ? "Name it, or leave it as the file name…"
+                      : "Choose a PDF, spreadsheet, any file…"
+                    : "Capture a thought, a link, a ticker…"
           }
           className="order-3 sm:order-none basis-full sm:basis-auto flex-1 min-w-0 h-8 sm:h-auto bg-vault-elevated sm:bg-transparent rounded-lg sm:rounded-none px-2.5 sm:px-0 text-[0.8125rem] text-vault-primary placeholder:text-vault-subtle focus:outline-none"
           disabled={isSubmitting}
@@ -271,11 +290,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         {/* Image preview badge if loaded */}
         {imagePreview && (
           <div className="order-1 sm:order-none flex items-center gap-1.5 px-2 py-1 rounded-lg bg-vault-elevated text-vault-primary text-xs shrink-0">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="w-4 h-4 rounded object-cover"
-            />
+            <img src={imagePreview} alt="Preview" className="w-4 h-4 rounded object-cover" />
             <span className="max-w-[100px] truncate">{imageInfo?.name || "Photo attached"}</span>
             <button
               type="button"
@@ -332,11 +347,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
         </button>
       </form>
 
-      {captureError && (
-        <div className="mt-2 text-xs text-vault-error">
-          {captureError}
-        </div>
-      )}
+      {captureError && <div className="mt-2 text-xs text-vault-error">{captureError}</div>}
 
       {/* Uploading progress status bar for large photos */}
       {isSubmitting && itemType === "image" && (
@@ -345,7 +356,9 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({ onCapture, fol
             <Loader2 className="w-3 h-3 animate-spin text-vault-secondary" />
             <span>Compressing and sending the photo…</span>
           </div>
-          {imageInfo?.sizeStr && <span className="text-vault-secondary/80">{imageInfo.sizeStr}</span>}
+          {imageInfo?.sizeStr && (
+            <span className="text-vault-secondary/80">{imageInfo.sizeStr}</span>
+          )}
         </div>
       )}
     </div>

@@ -55,11 +55,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   const [armedToDelete, setArmedToDelete] = useState(false);
 
   /**
-   * Whether this device has no pointer that can hover.
-   *
-   * Asked of the browser rather than guessed from the width, because a narrow
-   * window on a laptop still has a mouse and a tablet in landscape still does
-   * not. See D-083.
+   * Whether the device's primary pointer cannot hover. Asked of the browser
+   * rather than inferred from width: a narrow laptop window still has a mouse.
    */
   const isTouch =
     typeof window !== "undefined" &&
@@ -67,14 +64,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
     window.matchMedia("(hover: none)").matches;
 
   /**
-   * Deleting takes two taps on a touchscreen.
-   *
-   * Nothing confirms a delete and nothing can undo one. On a desktop the row of
-   * actions is hidden until the pointer is over the card, so reaching Delete is
-   * deliberate. On a phone the same row is permanently visible, four small
-   * targets a few pixels apart, with Delete next to the action used most — so
-   * the arrangement that is safe with a mouse is a way to lose a note with a
-   * thumb. The first tap arms, the second deletes, and it disarms itself.
+   * On touch screens the action row is always visible, so Delete takes two taps:
+   * the first arms it, the second deletes, and it disarms after three seconds.
    */
   const handleDelete = () => {
     if (!isTouch) {
@@ -91,14 +82,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   };
 
   /**
-   * Puts the note on the clipboard.
-   *
-   * This exists because the round trip the app is for does not end at sync: a
-   * note captured on a phone is usually going somewhere else on the computer,
-   * and until now the only way to get the text out was to open the note, select
-   * it by hand and copy. `writeText` can reject when the document is not
-   * focused or the clipboard is blocked, so the tick is only shown once the
-   * write has actually resolved.
+   * Copies the note to the clipboard. The tick is shown only once the write has
+   * resolved; `writeText` rejects when the document is unfocused.
    */
   const handleCopy = async () => {
     try {
@@ -125,7 +110,10 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
   /** A document is opened by saving it where the rest of the computer can reach it. */
   const handleSaveFile = async () => {
     setFileStatus("Saving…");
-    const res = await StorageService.saveMediaToDownloads(item.content, fileMeta.fileName || item.title);
+    const res = await StorageService.saveMediaToDownloads(
+      item.content,
+      fileMeta.fileName || item.title,
+    );
     if (res.success && res.filePath) StorageService.openFileInFolder(res.filePath);
     setFileStatus(res.success ? "Saved to Downloads" : res.error || "Could not save it");
     setTimeout(() => setFileStatus(null), 2500);
@@ -159,10 +147,9 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       onClick={() => (isFile ? handleSaveFile() : onSelectItem?.(item))}
       className={cn(
         "group relative rounded-xl transition-colors duration-150 cursor-pointer flex flex-col",
-        // A photo needs no panel: the picture is the item. Text sits one step
-        // above the ground instead of inside a bordered box. D-070.
+        // An image is shown on its own, without a card panel.
         isImage ? "bg-transparent" : "bg-vault-card hover:bg-vault-card-hover",
-        isDragging && "opacity-30 scale-[0.98]"
+        isDragging && "opacity-30 scale-[0.98]",
       )}
     >
       {isImage && item.content ? (
@@ -185,13 +172,9 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         </div>
       ) : (
         <div className="px-4 pt-3.5 pb-3">
-          {/* The action row is absolutely positioned in the top-right corner.
-              On a pointer device it only appears while hovering, so a title
-              running under it is momentary and harmless. On a touchscreen the
-              row is always there, and at four 36px targets it covered the first
-              line of every title permanently. Four 36px targets, three 4px gaps
-              and an 8px offset come to 164px, so the heading reserves 172px.
-              See D-085. */}
+          {/* On touch screens the action row is always visible, so the heading
+              reserves room for it: four 36px buttons, three 4px gaps and an 8px
+              offset. */}
           <div className="flex items-start gap-2 [@media(hover:none)]:pr-[10.75rem]">
             <h3 className="flex-1 min-w-0 text-sm font-semibold text-vault-primary leading-snug line-clamp-2">
               {item.title || "Untitled"}
@@ -233,7 +216,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
       <div
         className={cn(
           "flex items-center gap-2 select-none text-xs text-vault-muted",
-          isImage ? "px-0.5 pt-2.5" : "px-4 pb-3"
+          isImage ? "px-0.5 pt-2.5" : "px-4 pb-3",
         )}
       >
         {isImage && (
@@ -254,11 +237,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
         <span className="shrink-0 text-vault-subtle">{formatRelativeTime(item.updated_at)}</span>
       </div>
 
-      {/* Actions stay out of the way until the item is under the cursor — but a
-          phone has no cursor. `(hover: none)` keeps them permanently visible
-          there, because a control revealed only by hovering does not exist on a
-          touchscreen: copy, pin, move and delete were all unreachable on the
-          device most captures are made on. See D-083. */}
+      {/* Actions appear on hover, and are always visible on touch screens
+          where there is no hover. */}
       <div
         className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         onClick={(e) => e.stopPropagation()}
@@ -276,7 +256,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           aria-label={copied ? "Copied" : "Copy the text"}
           className={cn(
             "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
-            copied ? "text-vault-success" : "text-vault-secondary hover:text-vault-primary"
+            copied ? "text-vault-success" : "text-vault-secondary hover:text-vault-primary",
           )}
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -287,7 +267,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           title={item.is_pinned ? "Unpin" : "Pin to the top"}
           className={cn(
             "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md bg-vault-overlay transition-colors cursor-pointer",
-            item.is_pinned ? "text-vault-primary" : "text-vault-secondary hover:text-vault-primary"
+            item.is_pinned ? "text-vault-primary" : "text-vault-secondary hover:text-vault-primary",
           )}
         >
           <Pin className={cn("w-3.5 h-3.5", item.is_pinned && "fill-current")} />
@@ -309,7 +289,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
             "w-6.5 h-6.5 [@media(hover:none)]:w-9 [@media(hover:none)]:h-9 flex items-center justify-center rounded-md transition-colors cursor-pointer",
             armedToDelete
               ? "bg-vault-error text-vault-ink"
-              : "bg-vault-overlay text-vault-secondary hover:text-vault-error"
+              : "bg-vault-overlay text-vault-secondary hover:text-vault-error",
           )}
         >
           <Trash2 className="w-3.5 h-3.5" />

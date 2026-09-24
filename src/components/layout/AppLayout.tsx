@@ -107,7 +107,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
     <div
       className={cn(
         "app-viewport flex w-screen bg-vault-bg text-vault-primary overflow-hidden font-sans",
-        isAndroid && "pt-6"
+        isAndroid && "pt-6",
       )}
     >
       {/* Mobile Backdrop Overlay */}
@@ -126,9 +126,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ sidebar, children }) => {
           // On mobile the sidebar itself is `fixed`, so this wrapper has zero
           // width and translating it would be a no-op. The drawer slide is
           // owned by Sidebar via its `isOpen` prop instead.
-          isMobile
-            ? "w-0"
-            : (sidebarOpen ? "w-56" : "w-0 overflow-hidden")
+          isMobile ? "w-0" : sidebarOpen ? "w-56" : "w-0 overflow-hidden",
         )}
       >
         {sidebar({

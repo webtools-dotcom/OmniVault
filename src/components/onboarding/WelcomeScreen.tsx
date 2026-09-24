@@ -7,13 +7,8 @@ export interface WelcomeScreenProps {
 }
 
 /**
- * The first thing a stranger sees.
- *
- * It says what the app is, and — deliberately — what it will not do. The
- * limitation is on this screen rather than buried in a README because the
- * alternative is someone concluding the app is broken the first time two
- * devices are not on the same Wi-Fi at the same moment. Told up front it is a
- * design; discovered later it is a bug. See D-075.
+ * First-run screen. It states up front that devices sync only while they share
+ * a network, so that limitation is never mistaken for a bug.
  */
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnectDevice, onDismiss }) => {
   return (
@@ -39,9 +34,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnectDevice, o
           <div className="flex gap-3.5">
             <HardDrive className="w-4 h-4 mt-0.5 text-vault-muted shrink-0" />
             <p className="text-[0.8125rem] leading-relaxed text-vault-secondary">
-              <span className="text-vault-primary font-medium">Your notes live on your devices.</span>{" "}
-              Each one keeps its own copy in a plain database. <span className="text-vault-primary font-medium">Back up</span>{" "}
-              writes the lot out as Markdown you can read in any text editor, with or without this app.
+              <span className="text-vault-primary font-medium">
+                Your notes live on your devices.
+              </span>{" "}
+              Each one keeps its own copy in a plain database.{" "}
+              <span className="text-vault-primary font-medium">Back up</span> writes the lot out as
+              Markdown you can read in any text editor, with or without this app.
             </p>
           </div>
 
@@ -52,8 +50,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnectDevice, o
                 Devices sync when they are both awake on the same Wi-Fi.
               </span>{" "}
               There is no server in between to relay through, so a note written on your phone
-              reaches your laptop the next time both are open on the same network — not before.
-              That is the trade for keeping it all off the internet.
+              reaches your laptop the next time both are open on the same network — not before. That
+              is the trade for keeping it all off the internet.
             </p>
           </div>
         </div>

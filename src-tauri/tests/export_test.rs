@@ -1,14 +1,8 @@
-//! Proves the export is a real archive holding a real vault.
-//!
-//! The zip writer is hand-rolled (D-072), so a test that only round-trips
-//! through our own reader would prove nothing. These tests write the archive
-//! and then shell out to Python's `zipfile` — an independent implementation
-//! that verifies every CRC — to open it and read the entries back. If the
-//! bytes are subtly wrong, this fails; a backup nobody else can open is not a
-//! backup.
+//! Export tests. The zip writer is hand-rolled, so archives are read back with
+//! Python's `zipfile`, an independent implementation that verifies every CRC.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use omnivault_lib::db::export::{export_filename, export_vault};
@@ -25,7 +19,7 @@ fn temp_dir(tag: &str) -> PathBuf {
 
 /// Reads the archive with Python, returning "name\tbytes" per entry. Python
 /// raises on a bad CRC, so a clean listing is itself a checksum verification.
-fn read_with_python(zip_path: &PathBuf) -> Option<Vec<(String, usize)>> {
+fn read_with_python(zip_path: &Path) -> Option<Vec<(String, usize)>> {
     let script = format!(
         "import zipfile,sys\n\
          z=zipfile.ZipFile(r'{}')\n\
@@ -34,7 +28,11 @@ fn read_with_python(zip_path: &PathBuf) -> Option<Vec<(String, usize)>> {
          [sys.stdout.write(n+chr(9)+str(len(z.read(n)))+chr(10)) for n in z.namelist()]\n",
         zip_path.to_string_lossy()
     );
-    let out = Command::new("python").arg("-c").arg(&script).output().ok()?;
+    let out = Command::new("python")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .ok()?;
     if !out.status.success() {
         panic!(
             "python could not read the archive: {}",
@@ -79,8 +77,16 @@ fn the_export_is_an_archive_any_other_tool_can_open() {
         "dev",
     )
     .unwrap();
-    create_item(&mut conn, None, "note", "Unfiled thought", "Stays in the inbox.", None, "dev")
-        .unwrap();
+    create_item(
+        &mut conn,
+        None,
+        "note",
+        "Unfiled thought",
+        "Stays in the inbox.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     let dest = dir.join(export_filename(chrono::Utc::now()));
     let summary = export_vault(&mut conn, &dir, &dest).unwrap();
@@ -91,8 +97,14 @@ fn the_export_is_an_archive_any_other_tool_can_open() {
     let entries = read_with_python(&dest).expect("python is needed to verify the archive");
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
 
-    assert!(names.contains(&"README.txt"), "missing the explanation: {names:?}");
-    assert!(names.contains(&"omnivault.db"), "missing the database: {names:?}");
+    assert!(
+        names.contains(&"README.txt"),
+        "missing the explanation: {names:?}"
+    );
+    assert!(
+        names.contains(&"omnivault.db"),
+        "missing the database: {names:?}"
+    );
     assert!(
         names.iter().any(|n| n.starts_with("notes/Market Setups/")),
         "the folder tree did not survive: {names:?}"
@@ -138,11 +150,21 @@ fn a_note_is_readable_without_the_app() {
          sys.stdout.write(z.read(n).decode('utf-8'))\n",
         dest.to_string_lossy()
     );
-    let out = Command::new("python").arg("-c").arg(&script).output().unwrap();
+    let out = Command::new("python")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .unwrap();
     let body = String::from_utf8_lossy(&out.stdout);
 
-    assert!(body.contains("title: Sync test / with a slash"), "front matter lost: {body}");
-    assert!(body.contains("The body survives."), "the note itself is missing: {body}");
+    assert!(
+        body.contains("title: Sync test / with a slash"),
+        "front matter lost: {body}"
+    );
+    assert!(
+        body.contains("The body survives."),
+        "the note itself is missing: {body}"
+    );
     assert!(body.starts_with("---"), "not Markdown front matter: {body}");
 }
 
@@ -171,8 +193,10 @@ fn media_travels_with_the_notes_that_point_at_it() {
     assert_eq!(summary.media_files, 2, "a blob was left behind");
 
     let entries = read_with_python(&dest).unwrap();
-    let blobs: Vec<&(String, usize)> =
-        entries.iter().filter(|(n, _)| n.starts_with("media/")).collect();
+    let blobs: Vec<&(String, usize)> = entries
+        .iter()
+        .filter(|(n, _)| n.starts_with("media/"))
+        .collect();
     assert_eq!(blobs.len(), 2);
     for (name, len) in blobs {
         assert!(*len > 0, "{name} was archived empty");
@@ -187,7 +211,11 @@ fn media_travels_with_the_notes_that_point_at_it() {
          sys.stdout.write(z.read(n).decode('utf-8'))\n",
         dest.to_string_lossy()
     );
-    let out = Command::new("python").arg("-c").arg(&script).output().unwrap();
+    let out = Command::new("python")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .unwrap();
     let body = String::from_utf8_lossy(&out.stdout);
     assert!(
         body.contains(&format!("](../../media/{}.webp)", media.file_hash)),
@@ -197,18 +225,24 @@ fn media_travels_with_the_notes_that_point_at_it() {
 
 #[test]
 fn the_newest_note_is_in_the_database_that_gets_exported() {
-    // In WAL mode a committed write can sit entirely in the -wal file, so an
-    // export that copies omnivault.db without checkpointing looks complete and
-    // silently lacks whatever was written most recently. This is the trap from
-    // D-058, aimed at the backup path where it would be worst.
+    // In WAL mode a committed write can live only in the -wal file; the export
+    // must checkpoint before copying the database.
     let dir = temp_dir("wal");
     let db_path = dir.join("omnivault.db");
     let mut conn = Connection::open(&db_path).unwrap();
     conn.execute_batch("PRAGMA journal_mode=WAL;").unwrap();
     initialize_schema(&conn).unwrap();
 
-    create_item(&mut conn, None, "note", "Written seconds ago", "Must be in the backup.", None, "dev")
-        .unwrap();
+    create_item(
+        &mut conn,
+        None,
+        "note",
+        "Written seconds ago",
+        "Must be in the backup.",
+        None,
+        "dev",
+    )
+    .unwrap();
 
     let dest = dir.join("out.zip");
     export_vault(&mut conn, &dir, &dest).unwrap();
@@ -223,12 +257,24 @@ fn the_newest_note_is_in_the_database_that_gets_exported() {
         dest.to_string_lossy(),
         restored_dir.join("restored.db").to_string_lossy()
     );
-    let out = Command::new("python").arg("-c").arg(&script).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = Command::new("python")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let restored = Connection::open(restored_dir.join("restored.db")).unwrap();
     let title: String = restored
-        .query_row("SELECT title FROM vault_items WHERE is_deleted = 0", [], |r| r.get(0))
+        .query_row(
+            "SELECT title FROM vault_items WHERE is_deleted = 0",
+            [],
+            |r| r.get(0),
+        )
         .expect("the newest note never reached the exported database");
     assert_eq!(title, "Written seconds ago");
 }

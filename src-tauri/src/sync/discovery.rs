@@ -1,10 +1,10 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use std::time::Duration;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 
@@ -17,10 +17,9 @@ const MAX_PEER_NAME_CHARS: usize = 64;
 /// At the 5 s beacon interval, a full sweep every 30 s.
 const SWEEP_EVERY_TICKS: u64 = 6;
 
-/// Every host address in `ip`'s /24 and its neighbouring /24 — that is, its
-/// /23 — which covers home routers, phone hotspots and most shared Wi-Fi.
-// ponytail: assumes the LAN is at most a /23; read the real netmask if a
-// larger campus network needs it.
+/// Every host address in `ip`'s /24 and the neighbouring /24 (its /23), which
+/// covers home routers, phone hotspots and most shared networks. The real
+/// netmask is not read; larger subnets are only partly swept.
 pub fn sweep_targets(ip: Ipv4Addr) -> Vec<Ipv4Addr> {
     let [a, b, c, _] = ip.octets();
     [c & !1, c | 1]
@@ -60,10 +59,8 @@ impl PeerRegistry {
     }
 
     pub async fn register_or_update(&self, mut peer: PeerInfo) {
-        // Beacons are unauthenticated by nature, so anything in one is a claim,
-        // not a fact: a name is truncated before it reaches the UI, and the
-        // registry is capped so a flood of invented device ids cannot grow it
-        // without bound or point the sync loop at hundreds of made-up peers.
+        // Beacons are unauthenticated: names are truncated before they reach the
+        // UI, and the registry is capped so invented device ids cannot grow it.
         if peer.device_name.chars().count() > MAX_PEER_NAME_CHARS {
             peer.device_name = peer.device_name.chars().take(MAX_PEER_NAME_CHARS).collect();
         }
@@ -165,15 +162,11 @@ impl DiscoveryService {
 
     /// Announces this device every `interval_secs`.
     ///
-    /// Multicast and broadcast alone are not enough: large shared Wi-Fi (a
-    /// hostel, a campus, an office) commonly drops both between clients while
-    /// passing ordinary unicast, and there the two apps never heard of each
-    /// other and the only way to connect was typing an IP address. So every
-    /// tick also goes directly to each peer already known, which keeps it from
-    /// expiring, and every `SWEEP_EVERY_TICKS` the beacon goes directly to
-    /// every address on the local network. A device that hears from someone new
-    /// answers directly (see `run_listener`), so one sweep introduces both
-    /// sides. See D-090.
+    /// Many shared networks drop multicast and broadcast between clients but pass
+    /// unicast, so each tick also goes directly to every known peer (keeping it
+    /// from expiring), and every `SWEEP_EVERY_TICKS` ticks to every address on the
+    /// local network. Peers answer a first contact directly (see `run_listener`),
+    /// so one sweep introduces both sides.
     pub async fn run_broadcaster(
         device_id: String,
         device_name: String,
@@ -186,7 +179,8 @@ impl DiscoveryService {
         socket.set_broadcast(true)?;
 
         let multicast_target = SocketAddr::V4(SocketAddrV4::new(MULTICAST_IPV4, DISCOVERY_PORT));
-        let broadcast_target = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::BROADCAST, DISCOVERY_PORT));
+        let broadcast_target =
+            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::BROADCAST, DISCOVERY_PORT));
 
         let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
         let mut stop = stop_rx;
@@ -213,7 +207,7 @@ impl DiscoveryService {
                             let _ = socket.send_to(&bytes, SocketAddr::new(peer.addr, DISCOVERY_PORT)).await;
                         }
 
-                        if tick % SWEEP_EVERY_TICKS == 0 {
+                        if tick.is_multiple_of(SWEEP_EVERY_TICKS) {
                             let own_ip = crate::http_server::find_local_lan_ip()
                                 .and_then(|ip| ip.parse::<Ipv4Addr>().ok());
                             if let Some(ip) = own_ip {
@@ -238,10 +232,9 @@ impl DiscoveryService {
         Ok(())
     }
 
-    /// Records every device whose beacon arrives, and answers a device heard
-    /// from for the first time directly, so a sweep that reaches us introduces
-    /// us back even where broadcasts are dropped. Only a first contact is
-    /// answered, so two devices cannot keep replying to each other.
+    /// Records every device whose beacon arrives and answers a first contact
+    /// directly, so a unicast sweep introduces this device back. Only first
+    /// contacts are answered, so two devices cannot keep replying to each other.
     pub async fn run_listener(
         my_beacon: DiscoveryBeacon,
         registry: PeerRegistry,
@@ -300,7 +293,9 @@ mod tests {
         assert!(targets.contains(&Ipv4Addr::new(172, 17, 1, 233)));
         assert!(targets.contains(&Ipv4Addr::new(172, 17, 0, 7)));
         assert!(!targets.contains(&Ipv4Addr::new(172, 17, 2, 7)));
-        assert!(!targets.iter().any(|t| t.octets()[3] == 0 || t.octets()[3] == 255));
+        assert!(!targets
+            .iter()
+            .any(|t| t.octets()[3] == 0 || t.octets()[3] == 255));
         // An even third octet sweeps the same pair from the other side.
         assert_eq!(sweep_targets(Ipv4Addr::new(172, 17, 0, 9)), targets);
     }
@@ -382,13 +377,15 @@ mod tests {
         // Ingest beacons into registry with self-filter
         for b in [beacon_b, beacon_self] {
             if b.protocol == PROTOCOL_IDENTIFIER && b.device_id != my_device_id {
-                registry.register_or_update(PeerInfo {
-                    device_id: b.device_id,
-                    device_name: b.device_name,
-                    sync_port: b.sync_port,
-                    addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 120)),
-                    last_seen: Utc::now().timestamp(),
-                }).await;
+                registry
+                    .register_or_update(PeerInfo {
+                        device_id: b.device_id,
+                        device_name: b.device_name,
+                        sync_port: b.sync_port,
+                        addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 120)),
+                        last_seen: Utc::now().timestamp(),
+                    })
+                    .await;
             }
         }
 
@@ -416,6 +413,8 @@ mod tests {
         }
         assert_eq!(registry.peer_count().await, MAX_TRACKED_PEERS);
         let peers = registry.get_active_peers().await;
-        assert!(peers.iter().all(|p| p.device_name.chars().count() <= MAX_PEER_NAME_CHARS));
+        assert!(peers
+            .iter()
+            .all(|p| p.device_name.chars().count() <= MAX_PEER_NAME_CHARS));
     }
 }

@@ -14,7 +14,7 @@ export interface QuickInboxViewProps {
     title: string,
     content: string,
     metadata?: string,
-    existingItem?: VaultItem
+    existingItem?: VaultItem,
   ) => Promise<void> | void;
   onTogglePin: (itemId: string) => Promise<void> | void;
   onMoveItem: (itemId: string, folderId: string | null) => Promise<void> | void;
@@ -64,8 +64,8 @@ export const QuickInboxView: React.FC<QuickInboxViewProps> = ({
               {searchQuery
                 ? `No capture contains “${searchQuery}”. Try a shorter word, or clear the search.`
                 : isTouchDevice(isTauriEnvironment())
-                ? "Anything you capture lands here first — a thought, a link, a ticker, a photo. File it into a folder later, or leave it."
-                : "Anything you capture lands here first — a thought, a link, a ticker, a screenshot pasted with Ctrl+V. File it into a folder later, or leave it."}
+                  ? "Anything you capture lands here first — a thought, a link, a ticker, a photo. File it into a folder later, or leave it."
+                  : "Anything you capture lands here first — a thought, a link, a ticker, a screenshot pasted with Ctrl+V. File it into a folder later, or leave it."}
             </p>
           </div>
         </div>

@@ -106,7 +106,10 @@ pub fn list_paired_devices(conn: &Connection) -> Result<Vec<PairedDevice>> {
 }
 
 pub fn unpair_device(conn: &Connection, device_id: &str) -> Result<()> {
-    conn.execute("DELETE FROM paired_devices WHERE device_id = ?1", [device_id])?;
+    conn.execute(
+        "DELETE FROM paired_devices WHERE device_id = ?1",
+        [device_id],
+    )?;
     Ok(())
 }
 

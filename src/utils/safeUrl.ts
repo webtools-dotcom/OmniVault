@@ -1,13 +1,9 @@
 /**
- * Restricts a link to schemes that are safe to put in an `href`.
+ * Restricts a link to schemes that are safe in an `href`. Notes can arrive
+ * from paired devices and the Android share sheet, and React does not sanitise
+ * `href`, so a `javascript:` link would otherwise run inside the app.
  *
- * Note content is not necessarily written by the person reading it: notes
- * arrive from paired devices and from the Android share sheet. React does not
- * sanitise `href`, so `[click me](javascript:...)` in a synced note renders a
- * working anchor — and inside the Tauri webview that script reaches the app's
- * IPC surface, which can read and modify the vault. See D-061.
- *
- * Returns null when the URL should not be linked at all.
+ * Returns null when the URL should not be linked.
  */
 export function safeHref(raw: string | null | undefined): string | null {
   if (!raw) return null;

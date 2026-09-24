@@ -129,7 +129,10 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="peer-pin-title" className="font-display text-base font-semibold tracking-[-0.01em] text-vault-primary">
+              <h2
+                id="peer-pin-title"
+                className="font-display text-base font-semibold tracking-[-0.01em] text-vault-primary"
+              >
                 Connect to the desktop
               </h2>
               <p className="text-[0.815rem] text-vault-secondary">
@@ -139,9 +142,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-vault-subtle block">
-              Six-digit PIN
-            </label>
+            <label className="text-xs text-vault-subtle block">Six-digit PIN</label>
             <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               {digits.map((digit, idx) => (
                 <input
@@ -162,9 +163,7 @@ export const PeerPinModal: React.FC<PeerPinModalProps> = ({ isOpen, onClose, onP
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-vault-subtle block">
-              What to call this device
-            </label>
+            <label className="text-xs text-vault-subtle block">What to call this device</label>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-vault-card border border-white/[0.08] rounded-lg">
               <Laptop className="w-3.5 h-3.5 text-vault-secondary shrink-0" />
               <input

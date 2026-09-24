@@ -46,7 +46,7 @@ export function App() {
   // real peers instead of reading this.
   const [, setIsPaired] = useState(() => StorageService.isPaired());
 
-  // BridgeMind Stream Filter State (Stream | Notes | Markets)
+  // Stream filter: everything, notes only, or tickers and links.
   const [streamFilter, setStreamFilter] = useState<"stream" | "notes" | "markets">("stream");
 
   // UI Density (0.90, 1.00, 1.15, 1.30). 1.0 renders the layout at the 16px
@@ -177,9 +177,8 @@ export function App() {
     return () => window.removeEventListener("omnivault:unauthorized", handleUnauthorized);
   }, []);
 
-  // Every write handler below hands its promise to a child component or to
-  // nothing at all, so a failed save used to disappear into the console. One
-  // listener catches all of them, including paths added later.
+  // Write handlers pass their promises to child components; surface any
+  // failed save in one place instead of letting it vanish into the console.
   const [vaultError, setVaultError] = useState<string | null>(null);
 
   // Shown once, on the app's own devices. A browser peer meets the pairing
@@ -221,7 +220,7 @@ export function App() {
     const handleRejection = (e: PromiseRejectionEvent) => {
       const reason = e.reason;
       setVaultError(
-        reason instanceof Error ? reason.message : "Something went wrong while saving."
+        reason instanceof Error ? reason.message : "Something went wrong while saving.",
       );
     };
     window.addEventListener("unhandledrejection", handleRejection);
@@ -323,7 +322,7 @@ export function App() {
   const handleCreateFolder = async (
     name: string,
     parentId: string | null,
-    color: string | null
+    color: string | null,
   ) => {
     const created = await StorageService.createFolder(name, parentId, color);
     await refreshFolders();
@@ -335,10 +334,7 @@ export function App() {
     await refreshFolders();
   };
 
-  const handleMoveFolder = async (
-    folderId: string,
-    newParentId: string | null
-  ) => {
+  const handleMoveFolder = async (folderId: string, newParentId: string | null) => {
     await StorageService.moveFolder(folderId, newParentId);
     await refreshFolders();
   };
@@ -357,7 +353,7 @@ export function App() {
     title: string,
     content: string,
     metadata?: string,
-    existingItem?: VaultItem
+    existingItem?: VaultItem,
   ) => {
     const currentFolderId = activeView.type === "folder" ? activeView.folderId : null;
     if (existingItem) {
@@ -375,7 +371,7 @@ export function App() {
       itemType,
       title,
       content,
-      metadata || null
+      metadata || null,
     );
 
     if (created) {
@@ -419,10 +415,8 @@ export function App() {
       const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
       const title = `Pasted Screenshot (${timeStr})`;
 
-      // Go through the media pipeline, as Quick Capture does. Handing the raw
-      // data URL to createItem writes the whole image into the database and
-      // into a revision row - the base64 bloat D-035 removed, re-created on
-      // every paste until the next restart cleaned it up again.
+      // Upload through the media pipeline so the image is stored on disk, not
+      // inlined into the database.
       const uploaded = await StorageService.uploadMedia(dataUrl, { title });
       if (uploaded?.item) {
         if (uploaded.url) cacheLocalMedia(uploaded.url, dataUrl);
@@ -432,7 +426,7 @@ export function App() {
           uploaded.item.title,
           uploaded.item.content,
           uploaded.item.metadata || undefined,
-          uploaded.item
+          uploaded.item,
         );
         return;
       }
@@ -445,7 +439,7 @@ export function App() {
           originalName: file.name,
           byteSize: file.size,
           mimeType: "image/webp",
-        })
+        }),
       );
     },
   });
@@ -483,7 +477,7 @@ export function App() {
     content: string,
     targetFolderId: string | null,
     itemType: ItemType,
-    metadata?: string | null
+    metadata?: string | null,
   ): Promise<VaultItem | void> => {
     let resultItem: VaultItem | null = null;
     if (itemId) {
@@ -499,7 +493,7 @@ export function App() {
         itemType,
         title,
         content,
-        metadata || null
+        metadata || null,
       );
     }
 
@@ -513,7 +507,8 @@ export function App() {
   const filteredInboxItems = useMemo(() => {
     return inboxItems.filter((item) => {
       if (streamFilter === "notes") return item.item_type === "note";
-      if (streamFilter === "markets") return item.item_type === "ticker" || item.item_type === "link";
+      if (streamFilter === "markets")
+        return item.item_type === "ticker" || item.item_type === "link";
       return true;
     });
   }, [inboxItems, streamFilter]);
@@ -521,7 +516,8 @@ export function App() {
   const displayedFolderItems = useMemo(() => {
     return folderItems.filter((item) => {
       if (streamFilter === "notes" && item.item_type !== "note") return false;
-      if (streamFilter === "markets" && item.item_type !== "ticker" && item.item_type !== "link") return false;
+      if (streamFilter === "markets" && item.item_type !== "ticker" && item.item_type !== "link")
+        return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q);
@@ -593,7 +589,9 @@ export function App() {
                   className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium text-vault-secondary bg-vault-card hover:bg-vault-card-hover rounded-lg transition-colors cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-vault-success" />
-                  <span className="hidden sm:inline">{meshState.peerCount > 0 ? `Synced (${meshState.peerCount})` : "Synced"}</span>
+                  <span className="hidden sm:inline">
+                    {meshState.peerCount > 0 ? `Synced (${meshState.peerCount})` : "Synced"}
+                  </span>
                   <span className="sm:hidden">{meshState.peerCount || ""}</span>
                 </button>
               ) : (
@@ -646,10 +644,7 @@ export function App() {
           ) : (
             <div className="w-full h-full flex flex-col gap-3">
               {/* Direct Folder Capture Bar */}
-              <QuickCaptureBar
-                onCapture={handleCaptureItem}
-                folderId={activeFolder?.id}
-              />
+              <QuickCaptureBar onCapture={handleCaptureItem} folderId={activeFolder?.id} />
 
               {/* Folder Items Grid */}
               {displayedFolderItems.length === 0 ? (
@@ -766,7 +761,6 @@ export function App() {
               </div>
             </div>
           )}
-
         </ContentPane>
       )}
     </AppLayout>

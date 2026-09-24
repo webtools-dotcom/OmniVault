@@ -1,18 +1,10 @@
-//! Exporting the whole vault to a single file.
+//! Exports the whole vault to a single zip archive containing the database
+//! (for an exact restore), the media files, and every note as plain Markdown.
 //!
-//! The point of this module is not convenience, it is trust. A vault nobody can
-//! get out of is a box with no lid: if the device dies, or the app is
-//! uninstalled, or the owner simply stops believing in it, the writing is gone.
-//! So the export carries three things at once — the database for an exact
-//! restore, the media the notes point at, and a tree of plain Markdown that
-//! stays readable in any text editor long after this app is forgotten.
-//!
-//! The archive is written by hand, stored (uncompressed), with no zip crate.
-//! That follows D-043: the vault's bulk is already-compressed WebP, deflate
-//! would buy almost nothing, and a dependency that must cross-compile to the
-//! Android NDK is a cost this does not need to pay. The format is small enough
-//! to be correct, and `export_tests` proves that by reading every archive back
-//! with an independent implementation.
+//! The archive is written by hand with stored (uncompressed) entries. The bulk
+//! of a vault is already-compressed WebP, and avoiding a zip crate keeps the
+//! Android cross-compile simple. The tests read every archive back with an
+//! independent implementation.
 
 use std::fs::{self, File};
 use std::io::{BufWriter, Read, Write};
@@ -22,7 +14,7 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use rusqlite::Connection;
 
 use crate::db::models::{Folder, VaultItem};
-use crate::db::storage::{list_folders, list_items_by_folder, list_inbox_items};
+use crate::db::storage::{list_folders, list_inbox_items, list_items_by_folder};
 
 #[derive(Debug)]
 pub enum ExportError {
@@ -88,7 +80,13 @@ impl<W: Write> ZipWriter<W> {
         let dos_date = ((year - 1980) << 9) | ((now.month() as u16) << 5) | now.day() as u16;
         let dos_time =
             ((now.hour() as u16) << 11) | ((now.minute() as u16) << 5) | (now.second() as u16 / 2);
-        Self { out, entries: Vec::new(), offset: 0, dos_time, dos_date }
+        Self {
+            out,
+            entries: Vec::new(),
+            offset: 0,
+            dos_time,
+            dos_date,
+        }
     }
 
     fn add(&mut self, name: &str, data: &[u8]) -> std::io::Result<()> {
@@ -106,13 +104,19 @@ impl<W: Write> ZipWriter<W> {
         self.out.write_all(&crc.to_le_bytes())?;
         self.out.write_all(&size.to_le_bytes())?; // compressed
         self.out.write_all(&size.to_le_bytes())?; // uncompressed
-        self.out.write_all(&(name_bytes.len() as u16).to_le_bytes())?;
+        self.out
+            .write_all(&(name_bytes.len() as u16).to_le_bytes())?;
         self.out.write_all(&0u16.to_le_bytes())?; // extra field length
         self.out.write_all(name_bytes)?;
         self.out.write_all(data)?;
 
         self.offset += 30 + name_bytes.len() as u32 + size;
-        self.entries.push(ZipEntry { name: name.to_string(), crc, size, offset });
+        self.entries.push(ZipEntry {
+            name: name.to_string(),
+            crc,
+            size,
+            offset,
+        });
         Ok(())
     }
 
@@ -130,7 +134,8 @@ impl<W: Write> ZipWriter<W> {
             self.out.write_all(&e.crc.to_le_bytes())?;
             self.out.write_all(&e.size.to_le_bytes())?;
             self.out.write_all(&e.size.to_le_bytes())?;
-            self.out.write_all(&(name_bytes.len() as u16).to_le_bytes())?;
+            self.out
+                .write_all(&(name_bytes.len() as u16).to_le_bytes())?;
             self.out.write_all(&0u16.to_le_bytes())?; // extra
             self.out.write_all(&0u16.to_le_bytes())?; // comment
             self.out.write_all(&0u16.to_le_bytes())?; // disk number
@@ -139,15 +144,18 @@ impl<W: Write> ZipWriter<W> {
             self.out.write_all(&e.offset.to_le_bytes())?;
             self.out.write_all(name_bytes)?;
         }
-        let dir_size = self.entries.iter().fold(0u32, |acc, e| {
-            acc + 46 + e.name.as_bytes().len() as u32
-        });
+        let dir_size = self
+            .entries
+            .iter()
+            .fold(0u32, |acc, e| acc + 46 + e.name.len() as u32);
 
         self.out.write_all(&0x0605_4b50u32.to_le_bytes())?; // end of central directory
         self.out.write_all(&0u16.to_le_bytes())?; // this disk
         self.out.write_all(&0u16.to_le_bytes())?; // disk with the directory
-        self.out.write_all(&(self.entries.len() as u16).to_le_bytes())?;
-        self.out.write_all(&(self.entries.len() as u16).to_le_bytes())?;
+        self.out
+            .write_all(&(self.entries.len() as u16).to_le_bytes())?;
+        self.out
+            .write_all(&(self.entries.len() as u16).to_le_bytes())?;
         self.out.write_all(&dir_size.to_le_bytes())?;
         self.out.write_all(&dir_start.to_le_bytes())?;
         self.out.write_all(&0u16.to_le_bytes())?; // comment length
@@ -183,7 +191,9 @@ fn safe_name(raw: &str, fallback: &str) -> String {
             out.push('-');
         }
     }
-    let trimmed = out.trim_matches(|c: char| c == '-' || c == ' ' || c == '.').to_string();
+    let trimmed = out
+        .trim_matches(|c: char| c == '-' || c == ' ' || c == '.')
+        .to_string();
     let capped: String = trimmed.chars().take(60).collect();
     let capped = capped.trim_end().to_string();
     if capped.is_empty() {
@@ -205,7 +215,10 @@ fn note_markdown(item: &VaultItem, folder: Option<&Folder>, depth: usize) -> Str
     let mut out = String::new();
     out.push_str("---\n");
     out.push_str(&format!("title: {}\n", item.title.replace('\n', " ")));
-    out.push_str(&format!("folder: {}\n", folder.map(|f| f.name.as_str()).unwrap_or("Quick Inbox")));
+    out.push_str(&format!(
+        "folder: {}\n",
+        folder.map(|f| f.name.as_str()).unwrap_or("Quick Inbox")
+    ));
     out.push_str(&format!("type: {}\n", item.item_type));
     out.push_str(&format!("created: {}\n", iso(item.created_at)));
     out.push_str(&format!("updated: {}\n", iso(item.updated_at)));
@@ -261,11 +274,8 @@ so keep it where you would keep the notes themselves.
 
 /// Writes the whole vault to `dest` as a single archive.
 ///
-/// The WAL checkpoint on the first line is not optional. In WAL mode a
-/// committed write can live entirely in `omnivault.db-wal`, so a `.db` copied
-/// without it looks complete and silently lacks the newest notes — which is
-/// exactly the trap that made a 21 MB write look like a 0.2 MB database during
-/// the Phase 10 audit (D-058).
+/// The WAL checkpoint comes first: in WAL mode committed writes can live only
+/// in `omnivault.db-wal`, and a `.db` copied without it silently misses them.
 pub fn export_vault(
     conn: &mut Connection,
     base_dir: &Path,
@@ -344,7 +354,9 @@ pub fn export_vault(
         zip.add("omnivault.db", &bytes)?;
     }
 
-    zip.finish()?.into_inner().map_err(|e| ExportError::Io(e.into()))?;
+    zip.finish()?
+        .into_inner()
+        .map_err(|e| ExportError::Io(e.into()))?;
 
     let bytes = fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
     Ok(ExportSummary {
@@ -355,7 +367,7 @@ pub fn export_vault(
     })
 }
 
-/// `omnivault-backup-2026-09-18-1432.zip`, stamped in the clock the person is
+/// `omnivault-backup-2026-09-18-1432.zip`, stamped in the clock the user is
 /// reading. A UTC name on a device showing 10:17 local came out as 0447, which
 /// makes the newest backup hard to pick out of a list.
 pub fn export_filename(now: DateTime<Utc>) -> String {

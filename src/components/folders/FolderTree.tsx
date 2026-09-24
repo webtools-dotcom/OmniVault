@@ -12,7 +12,11 @@ export interface FolderTreeProps {
   folders: Folder[];
   activeFolderId: string | null;
   onSelectFolder: (folderId: string) => void;
-  onCreateFolder: (name: string, parentId: string | null, color: string | null) => Promise<void> | void;
+  onCreateFolder: (
+    name: string,
+    parentId: string | null,
+    color: string | null,
+  ) => Promise<void> | void;
   onRenameFolder: (folderId: string, newName: string) => Promise<void> | void;
   onMoveFolder: (folderId: string, newParentId: string | null) => Promise<void> | void;
   onDeleteFolder: (folderId: string) => Promise<void> | void;

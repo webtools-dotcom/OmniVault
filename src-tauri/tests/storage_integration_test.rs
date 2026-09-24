@@ -1,7 +1,7 @@
-use std::fs;
-use std::io::Cursor;
 use image::{ImageFormat, Rgba, RgbaImage};
 use rusqlite::Connection;
+use std::fs;
+use std::io::Cursor;
 use uuid::Uuid;
 
 use omnivault_lib::db::media::{read_media_bytes, save_image_media};
@@ -20,7 +20,8 @@ fn create_sample_png_bytes(width: u32, height: u32) -> Vec<u8> {
         }
     }
     let mut bytes = Vec::new();
-    img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png).unwrap();
+    img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
+        .unwrap();
     bytes
 }
 
@@ -35,9 +36,23 @@ fn test_storage_integration_e2e_workflow() {
 
     // 2. Build 5-Level Deep Hierarchical Folder Tree
     // Product Ideas -> SaaS -> AI Image Generator -> Models -> Prompts
-    let l1 = create_folder(&mut conn, "Product Ideas", None, Some("#2F81F7"), &device_id).unwrap();
+    let l1 = create_folder(
+        &mut conn,
+        "Product Ideas",
+        None,
+        Some("#2F81F7"),
+        &device_id,
+    )
+    .unwrap();
     let l2 = create_folder(&mut conn, "SaaS", Some(&l1.id), None, &device_id).unwrap();
-    let l3 = create_folder(&mut conn, "AI Image Generator", Some(&l2.id), None, &device_id).unwrap();
+    let l3 = create_folder(
+        &mut conn,
+        "AI Image Generator",
+        Some(&l2.id),
+        None,
+        &device_id,
+    )
+    .unwrap();
     let l4 = create_folder(&mut conn, "Models", Some(&l3.id), None, &device_id).unwrap();
     let l5 = create_folder(&mut conn, "Prompts", Some(&l4.id), None, &device_id).unwrap();
 
@@ -54,7 +69,8 @@ fn test_storage_integration_e2e_workflow() {
         "Generate 4k candlestick chart with neon breakout lines and orderbook depth heatmap",
         Some(r#"{"tags":["saas","ai","prompt"]}"#),
         &device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     let inbox_list = list_inbox_items(&conn).unwrap();
     assert_eq!(inbox_list.len(), 1);
@@ -78,7 +94,14 @@ fn test_storage_integration_e2e_workflow() {
     fs::create_dir_all(&temp_storage).unwrap();
 
     let sample_png = create_sample_png_bytes(64, 64);
-    let media = save_image_media(&mut conn, &temp_storage, &moved_item.id, &sample_png, &device_id).unwrap();
+    let media = save_image_media(
+        &mut conn,
+        &temp_storage,
+        &moved_item.id,
+        &sample_png,
+        &device_id,
+    )
+    .unwrap();
     assert_eq!(media.mime_type, "image/webp");
     assert_eq!(media.width, Some(64));
     assert_eq!(media.height, Some(64));
@@ -90,18 +113,28 @@ fn test_storage_integration_e2e_workflow() {
     // 6. Delete a folder (L4, which cascades to child L5 and re-parents item to Quick Inbox)
     delete_folder(&mut conn, &l4.id, &device_id).unwrap();
     let remaining_folders = list_folders(&conn, false).unwrap();
-    assert_eq!(remaining_folders.len(), 3, "L4 and child L5 must be recursively soft-deleted");
+    assert_eq!(
+        remaining_folders.len(),
+        3,
+        "L4 and child L5 must be recursively soft-deleted"
+    );
 
     // Verify child item was preserved in Quick Inbox
     let rescued_inbox = list_inbox_items(&conn).unwrap();
-    assert_eq!(rescued_inbox.len(), 1, "Child item must be safely rescued to Quick Inbox");
+    assert_eq!(
+        rescued_inbox.len(),
+        1,
+        "Child item must be safely rescued to Quick Inbox"
+    );
     assert_eq!(rescued_inbox[0].id, moved_item.id);
 
     // 7. Audit Complete Revision Stream for Store-and-Forward Sync
-    let mut rev_stmt = conn.prepare(
-        "SELECT id, entity_type, entity_id, device_id, change_type, payload, timestamp
+    let mut rev_stmt = conn
+        .prepare(
+            "SELECT id, entity_type, entity_id, device_id, change_type, payload, timestamp
          FROM revisions ORDER BY id ASC",
-    ).unwrap();
+        )
+        .unwrap();
 
     let revisions: Vec<(i64, String, String, String, String, String, i64)> = rev_stmt
         .query_map([], |row| {
@@ -127,7 +160,11 @@ fn test_storage_integration_e2e_workflow() {
     // 2 folder deletions (L4, L5)
     // 1 item re-parent move (L5 -> Inbox)
     // Total = 11 revisions
-    assert_eq!(revisions.len(), 11, "Expected exactly 11 revisions in delta audit");
+    assert_eq!(
+        revisions.len(),
+        11,
+        "Expected exactly 11 revisions in delta audit"
+    );
 
     // Assert revision timestamps are valid and monotonic
     for i in 1..revisions.len() {

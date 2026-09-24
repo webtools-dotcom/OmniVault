@@ -124,8 +124,8 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
           isDragOver
             ? "bg-vault-accent/20 text-vault-primary font-medium ring-2 ring-vault-accent shadow-xs scale-[1.01]"
             : isActive
-            ? "bg-vault-accent-subtle text-vault-primary font-semibold ring-1 ring-vault-accent/30 shadow-xs"
-            : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]"
+              ? "bg-vault-accent-subtle text-vault-primary font-semibold ring-1 ring-vault-accent/30 shadow-xs"
+              : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]",
         )}
         style={{ paddingLeft: `${depth * 14 + 6}px` }}
         onClick={() => onSelectFolder(folder.id)}
@@ -141,7 +141,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
           }}
           className={cn(
             "w-4 h-4 mr-0.5 flex items-center justify-center rounded transition-colors text-vault-muted hover:text-vault-secondary focus:outline-none",
-            !hasChildren && "invisible pointer-events-none"
+            !hasChildren && "invisible pointer-events-none",
           )}
           aria-label={isExpanded ? "Collapse subfolders" : "Expand subfolders"}
         >
@@ -152,8 +152,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
           )}
         </button>
 
-        {/* A small square in the folder's own tint, always beside its name so
-            colour is never the only way to tell two folders apart. D-070. */}
+        {/* Tint swatch beside the name, so colour is never the only distinction. */}
         <span
           className="w-1.5 h-1.5 rounded-sm mr-2.5 shrink-0"
           style={{ backgroundColor: folderTint(folder) }}
@@ -166,9 +165,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
 
         {/* Child count indicator when collapsed */}
         {hasChildren && !isExpanded && (
-          <span className="text-[0.741rem] text-vault-muted px-1 mr-1">
-            {children.length}
-          </span>
+          <span className="text-[0.741rem] text-vault-muted px-1 mr-1">{children.length}</span>
         )}
 
         {/* Action Menu & Quick Trigger */}
@@ -177,7 +174,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
             "flex items-center gap-0.5 transition-opacity",
             menuOpen
               ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
           )}
           onClick={(e) => e.stopPropagation()}
         >
@@ -199,7 +196,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
               title="Folder options"
               className={cn(
                 "w-5 h-5 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-card transition-colors",
-                menuOpen && "bg-vault-card text-vault-primary"
+                menuOpen && "bg-vault-card text-vault-primary",
               )}
             >
               <MoreVertical className="w-3 h-3" />

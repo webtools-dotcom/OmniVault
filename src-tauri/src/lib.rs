@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
+use std::sync::{Arc, Mutex};
 use tauri::State;
 
 pub mod db;
-pub mod sync;
 pub mod http_server;
+pub mod sync;
 
 use crate::db::media;
 use crate::db::models::{Folder, MediaFile, VaultItem};
@@ -27,7 +27,9 @@ fn get_system_status() -> String {
 }
 
 #[tauri::command]
-async fn get_discovered_peers_cmd(state: State<'_, AppState>) -> Result<Vec<sync::discovery::PeerInfo>, String> {
+async fn get_discovered_peers_cmd(
+    state: State<'_, AppState>,
+) -> Result<Vec<sync::discovery::PeerInfo>, String> {
     Ok(state.peer_registry.get_active_peers().await)
 }
 
@@ -42,7 +44,10 @@ async fn trigger_mesh_sync_cmd(state: State<'_, AppState>) -> Result<usize, Stri
         let p = peer.clone();
         if let Ok(applied) = tokio::task::spawn_blocking(move || {
             sync::mesh_sync::sync_with_peer(db, &dev_id, &p, &b_dir)
-        }).await.unwrap_or_else(|e| Err(e.to_string())) {
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()))
+        {
             total_applied += applied;
         }
     }
@@ -50,15 +55,17 @@ async fn trigger_mesh_sync_cmd(state: State<'_, AppState>) -> Result<usize, Stri
 }
 
 #[tauri::command]
-async fn get_mesh_sync_status_cmd(state: State<'_, AppState>) -> Result<sync::mesh_sync::MeshSyncStatus, String> {
+async fn get_mesh_sync_status_cmd(
+    state: State<'_, AppState>,
+) -> Result<sync::mesh_sync::MeshSyncStatus, String> {
     let peers = state.peer_registry.get_active_peers().await;
     let (last_sync_at, paired_device_ids) = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
-        let last = conn.query_row(
-            "SELECT MAX(last_sync_at) FROM paired_devices",
-            [],
-            |r| r.get(0),
-        ).unwrap_or(None);
+        let last = conn
+            .query_row("SELECT MAX(last_sync_at) FROM paired_devices", [], |r| {
+                r.get(0)
+            })
+            .unwrap_or(None);
         let paired = sync::pairing::list_paired_devices(&conn)
             .unwrap_or_default()
             .into_iter()
@@ -66,9 +73,8 @@ async fn get_mesh_sync_status_cmd(state: State<'_, AppState>) -> Result<sync::me
             .collect();
         (last, paired)
     };
-    // What the sidebar shows has to be the same question the browser answers,
-    // asked the same way: mesh peers plus paired devices that have spoken to
-    // this server recently. See D-082.
+    // Same definition the HTTP status endpoint uses: mesh peers plus paired
+    // devices that made a request recently.
     let present = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         http_server::present_device_ids(&conn, &peers)
@@ -98,14 +104,7 @@ async fn pair_with_peer_cmd(
     let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
 
     tokio::task::spawn_blocking(move || {
-        sync::mesh_sync::pair_with_remote_peer(
-            db,
-            &dev_id,
-            &dev_name,
-            &peer_ip,
-            peer_port,
-            &pin,
-        )
+        sync::mesh_sync::pair_with_remote_peer(db, &dev_id, &dev_name, &peer_ip, peer_port, &pin)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -126,7 +125,14 @@ async fn request_pair_approval_cmd(
     let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
 
     tokio::task::spawn_blocking(move || {
-        sync::mesh_sync::request_pairing_approval(db, &dev_id, &dev_name, &peer_ip, peer_port, peer_name.as_deref())
+        sync::mesh_sync::request_pairing_approval(
+            db,
+            &dev_id,
+            &dev_name,
+            &peer_ip,
+            peer_port,
+            peer_name.as_deref(),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -138,7 +144,11 @@ fn get_pending_pair_request_cmd() -> Option<http_server::PendingPairRequest> {
 }
 
 #[tauri::command]
-fn answer_pair_request_cmd(state: State<AppState>, request_id: String, allow: bool) -> Result<(), String> {
+fn answer_pair_request_cmd(
+    state: State<AppState>,
+    request_id: String,
+    allow: bool,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     http_server::answer_pair_request(&conn, &request_id, allow)
 }
@@ -172,11 +182,7 @@ fn create_folder_cmd(
 }
 
 #[tauri::command]
-fn rename_folder_cmd(
-    state: State<AppState>,
-    id: String,
-    name: String,
-) -> Result<Folder, String> {
+fn rename_folder_cmd(state: State<AppState>, id: String, name: String) -> Result<Folder, String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
     storage::rename_folder(&mut conn, &id, &name, &state.device_id).map_err(|e| e.to_string())
 }
@@ -188,7 +194,8 @@ fn move_folder_cmd(
     parent_id: Option<String>,
 ) -> Result<Folder, String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
-    storage::move_folder(&mut conn, &id, parent_id.as_deref(), &state.device_id).map_err(|e| e.to_string())
+    storage::move_folder(&mut conn, &id, parent_id.as_deref(), &state.device_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -208,7 +215,10 @@ fn list_inbox_items_cmd(state: State<AppState>) -> Result<Vec<VaultItem>, String
 }
 
 #[tauri::command]
-fn list_folder_items_cmd(state: State<AppState>, folder_id: String) -> Result<Vec<VaultItem>, String> {
+fn list_folder_items_cmd(
+    state: State<AppState>,
+    folder_id: String,
+) -> Result<Vec<VaultItem>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     storage::list_items_by_folder(&conn, &folder_id).map_err(|e| e.to_string())
 }
@@ -262,7 +272,8 @@ fn move_item_cmd(
     folder_id: Option<String>,
 ) -> Result<VaultItem, String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
-    storage::move_item(&mut conn, &id, folder_id.as_deref(), &state.device_id).map_err(|e| e.to_string())
+    storage::move_item(&mut conn, &id, folder_id.as_deref(), &state.device_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -288,15 +299,18 @@ fn save_image_media_cmd(
     raw_bytes: Vec<u8>,
 ) -> Result<MediaFile, String> {
     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
-    media::save_image_media(&mut conn, &state.base_dir, &item_id, &raw_bytes, &state.device_id)
-        .map_err(|e| e.to_string())
+    media::save_image_media(
+        &mut conn,
+        &state.base_dir,
+        &item_id,
+        &raw_bytes,
+        &state.device_id,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_item_media_cmd(
-    state: State<AppState>,
-    item_id: String,
-) -> Result<Vec<MediaFile>, String> {
+fn get_item_media_cmd(state: State<AppState>, item_id: String) -> Result<Vec<MediaFile>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     media::get_media_by_item_id(&conn, &item_id).map_err(|e| e.to_string())
 }
@@ -306,7 +320,7 @@ fn get_lan_connection_info_cmd(state: State<AppState>) -> http_server::LanConnec
     http_server::get_lan_connection_info(state.server_port)
 }
 
-/// Where a file the person wants to keep should land. On Android the public
+/// Where a file the user wants to keep should land. On Android the public
 /// Download folder if it is reachable, otherwise the app's own directory so an
 /// export never silently fails for want of a path.
 fn downloads_dir(base_dir: &std::path::Path) -> std::path::PathBuf {
@@ -325,20 +339,20 @@ fn downloads_dir(base_dir: &std::path::Path) -> std::path::PathBuf {
         let _ = base_dir;
         std::env::var("USERPROFILE")
             .map(|p| std::path::PathBuf::from(p).join("Downloads"))
-            .or_else(|_| std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads")))
+            .or_else(|_| {
+                std::env::var("HOME").map(|p| std::path::PathBuf::from(p).join("Downloads"))
+            })
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
     }
 }
 
 /// Writes the whole vault to one archive in the downloads folder.
-///
-/// This is the lid on the box (D-072): without it a person's notes live only
-/// inside an app they cannot open the files of, on a device that can be lost.
 #[tauri::command]
 fn export_vault_cmd(state: State<AppState>) -> Result<db::export::ExportSummary, String> {
     let dir = downloads_dir(&state.base_dir);
     if !dir.exists() {
-        std::fs::create_dir_all(&dir).map_err(|e| format!("Could not open the downloads folder: {e}"))?;
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| format!("Could not open the downloads folder: {e}"))?;
     }
 
     let mut dest = dir.join(db::export::export_filename(chrono::Utc::now()));
@@ -362,8 +376,7 @@ fn list_backups_cmd(state: State<AppState>) -> Result<Vec<db::import::BackupFile
     Ok(db::import::list_backups(&dirs))
 }
 
-/// Merges a backup into this vault. Never a mirror: see D-073 for what happens
-/// on every kind of collision.
+/// Merges a backup into this vault. Newer local changes are never overwritten.
 #[tauri::command]
 fn import_vault_cmd(
     state: State<AppState>,
@@ -416,12 +429,19 @@ fn save_media_to_downloads_cmd(
                 .collect::<String>()
         })
         .unwrap_or_else(|| {
-            let short = if clean_hash.len() > 12 { &clean_hash[..12] } else { clean_hash };
+            let short = if clean_hash.len() > 12 {
+                &clean_hash[..12]
+            } else {
+                clean_hash
+            };
             format!("omnivault_{}", short)
         });
 
     // A photo is `.webp`; a document keeps the extension it was stored with.
-    let ext = src_path.extension().and_then(|e| e.to_str()).unwrap_or("webp");
+    let ext = src_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("webp");
     let dot_ext = format!(".{}", ext);
     let stem = if base_name.to_ascii_lowercase().ends_with(&dot_ext) {
         &base_name[..base_name.len() - dot_ext.len()]
@@ -460,12 +480,8 @@ fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
     }
 }
 
-/// Opens a link in the system browser rather than inside the app's own webview,
-/// which would navigate the vault away and strand the person on a web page.
-///
-/// Only http and https: a URL arriving here is a string from the UI, and a
-/// scheme like `file:` or a shell-special one has no business being handed to
-/// the operating system's opener.
+/// Opens a link in the system browser instead of navigating the app's webview.
+/// Only `http` and `https` URLs are accepted.
 #[tauri::command]
 fn open_url_cmd(url: String) -> Result<(), String> {
     let url = url.trim();
@@ -484,7 +500,7 @@ fn open_url_cmd(url: String) -> Result<(), String> {
             .arg(url)
             .spawn()
             .map_err(|e| e.to_string())?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -503,16 +519,26 @@ pub struct PendingShareResult {
 }
 
 #[tauri::command]
-fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<PendingShareResult, String> {
+fn check_and_process_pending_shares_cmd(
+    state: State<AppState>,
+) -> Result<PendingShareResult, String> {
     let mut processed_items = Vec::new();
     let shares_dir = state.base_dir.join("incoming_shares");
     if !shares_dir.exists() {
-        return Ok(PendingShareResult { count: 0, items: processed_items });
+        return Ok(PendingShareResult {
+            count: 0,
+            items: processed_items,
+        });
     }
 
     let entries = match std::fs::read_dir(&shares_dir) {
         Ok(e) => e,
-        Err(_) => return Ok(PendingShareResult { count: 0, items: processed_items }),
+        Err(_) => {
+            return Ok(PendingShareResult {
+                count: 0,
+                items: processed_items,
+            })
+        }
     };
 
     for entry in entries.flatten() {
@@ -521,16 +547,20 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
             if let Ok(content) = std::fs::read_to_string(&path) {
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
                     let share_type = v.get("type").and_then(|s| s.as_str()).unwrap_or("text");
-                    let title = v.get("title").and_then(|s| s.as_str()).unwrap_or("Shared capture");
+                    let title = v
+                        .get("title")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("Shared capture");
                     let mut conn = state.db.lock().map_err(|e| e.to_string())?;
 
                     if share_type == "text" {
                         let text = v.get("content").and_then(|s| s.as_str()).unwrap_or("");
-                        let item_type = if text.starts_with("http://") || text.starts_with("https://") {
-                            "link"
-                        } else {
-                            "note"
-                        };
+                        let item_type =
+                            if text.starts_with("http://") || text.starts_with("https://") {
+                                "link"
+                            } else {
+                                "note"
+                            };
                         if let Ok(item) = storage::create_item(
                             &mut conn,
                             None,
@@ -568,9 +598,8 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
                                         None,
                                         &state.device_id,
                                     ) {
-                                        // An unreadable image used to leave an
-                                        // empty item behind and delete the only
-                                        // copy of the picture with it.
+                                        // Don't leave an empty item behind for
+                                        // an image that could not be read.
                                         match media::save_image_media(
                                             &mut conn,
                                             &state.base_dir,
@@ -580,7 +609,9 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
                                         ) {
                                             Ok(_) => processed_items.push(item),
                                             Err(e) => {
-                                                eprintln!("[share] could not store shared image: {e:?}");
+                                                eprintln!(
+                                                    "[share] could not store shared image: {e:?}"
+                                                );
                                                 let _ = storage::delete_item(
                                                     &mut conn,
                                                     &item.id,
@@ -608,12 +639,13 @@ fn check_and_process_pending_shares_cmd(state: State<AppState>) -> Result<Pendin
     })
 }
 
-/// Issues the local pairing PIN to the desktop app's own window over IPC.
-/// This is deliberately NOT an HTTP endpoint: the PIN is the out-of-band
-/// secret that proves physical presence at this machine, so serving it over
-/// the same network it protects would defeat pairing entirely. See D-051.
+/// Issues a pairing PIN to this device's own window. Deliberately not an HTTP
+/// endpoint: the PIN proves presence at this machine, so it must never travel
+/// over the network it protects.
 #[tauri::command]
-fn get_pairing_session_cmd(state: State<AppState>) -> Result<http_server::ActivePairingSession, String> {
+fn get_pairing_session_cmd(
+    state: State<AppState>,
+) -> Result<http_server::ActivePairingSession, String> {
     let now = chrono::Utc::now().timestamp_millis();
     let mut session_lock = state.pairing_session.lock().map_err(|e| e.to_string())?;
 
@@ -623,10 +655,7 @@ fn get_pairing_session_cmd(state: State<AppState>) -> Result<http_server::Active
         }
     }
 
-    // Cryptographically random, not timestamp-derived: the previous generator
-    // was `timestamp_nanos ^ constant`, which anyone who knew roughly when a PIN
-    // was issued could narrow to a handful of candidates. UUIDv4 is backed by
-    // getrandom, so this needs no new dependency. See D-057.
+    // Cryptographically random (UUIDv4 is backed by getrandom).
     let bytes = *uuid::Uuid::new_v4().as_bytes();
     let entropy = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64;
     let num = (entropy % 900_000) + 100_000;
@@ -645,8 +674,7 @@ fn get_browser_access_cmd() -> bool {
     http_server::browser_access_enabled()
 }
 
-/// Turns browser access on or off and remembers the choice for next launch.
-/// The sync API is unaffected either way — see D-059.
+/// Turns browser access on or off and persists the choice. Sync is unaffected.
 #[tauri::command]
 fn set_browser_access_cmd(state: State<AppState>, enabled: bool) -> Result<bool, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
@@ -694,8 +722,11 @@ pub fn resolve_app_base_dir() -> std::path::PathBuf {
 /// Leaves a readable reason behind when the app cannot start at all.
 fn report_fatal_startup_error(base_dir: &std::path::Path, message: &str) {
     let stamp = chrono::Utc::now().to_rfc3339();
-    let body = format!("OmniVault could not start.{nl}{nl}{stamp}{nl}{message}{nl}", nl = "
-");
+    let body = format!(
+        "OmniVault could not start.{nl}{nl}{stamp}{nl}{message}{nl}",
+        nl = "
+"
+    );
     for dir in [base_dir.to_path_buf(), std::env::temp_dir()] {
         if std::fs::write(dir.join("omnivault-startup-error.txt"), &body).is_ok() {
             break;
@@ -712,46 +743,53 @@ pub fn run() {
 
     let db_path = base_dir.join("omnivault.db");
 
-    // No in-memory fallback. It used to be the last resort here, which meant a
-    // vault that could not be opened - locked file, bad permissions, full disk -
-    // started as an empty one instead: the user saw a wiped vault, typed into
-    // it, and lost that too when the app closed. A release build is a GUI
-    // binary with no console, so the reason is written next to the vault where
-    // it can actually be found.
+    // Never fall back to an in-memory database: the user would see an empty
+    // vault and lose anything they typed into it. Release builds have no
+    // console, so the error is written next to the vault instead.
     let mut conn = match Connection::open(&db_path).or_else(|_| Connection::open("omnivault.db")) {
         Ok(c) => c,
         Err(e) => {
-            report_fatal_startup_error(&base_dir, &format!("Could not open the vault database at {}: {e}", db_path.display()));
+            report_fatal_startup_error(
+                &base_dir,
+                &format!(
+                    "Could not open the vault database at {}: {e}",
+                    db_path.display()
+                ),
+            );
             panic!("failed to open database: {e}");
         }
     };
     if let Err(e) = schema::initialize_schema(&conn) {
-        report_fatal_startup_error(&base_dir, &format!("The vault database could not be prepared: {e}"));
+        report_fatal_startup_error(
+            &base_dir,
+            &format!("The vault database could not be prepared: {e}"),
+        );
         panic!("failed to init schema: {e}");
     }
     let device_id = match storage::get_or_create_device_id(&conn) {
         Ok(id) => id,
         Err(e) => {
-            report_fatal_startup_error(&base_dir, &format!("The vault database could not be read: {e}"));
+            report_fatal_startup_error(
+                &base_dir,
+                &format!("The vault database could not be read: {e}"),
+            );
             panic!("failed to get device_id: {e}");
         }
     };
     let _ = storage::seed_defaults_if_empty(&mut conn, &device_id);
 
-    // Move any pre-D-035 inline base64 images onto disk. No-op on a clean vault.
+    // Move inline base64 images from older vaults onto disk. No-op when clean.
     let mut reclaimed = 0usize;
     match db::media::migrate_inline_media_to_disk(&mut conn, &base_dir, &device_id) {
         Ok(n) => reclaimed += n,
         Err(e) => eprintln!("[media] inline media migration failed: {e:?}"),
     }
-    // The live rows are usually already clean; the bulk of the bloat sits in the
-    // append-only revision log, which still carries the payloads those rows had
-    // before D-035.
+    // Older revisions may still carry the inline payloads their rows had.
     match db::media::compact_inline_media_in_revisions(&mut conn, &base_dir) {
         Ok(n) => reclaimed += n,
         Err(e) => eprintln!("[media] revision compaction failed: {e:?}"),
     }
-    // Collapse the duplicate snapshots left behind by the autosave loop (D-055).
+    // Collapse duplicate autosave snapshots.
     match db::media::compact_redundant_item_revisions(&mut conn) {
         Ok(0) => {}
         Ok(n) => {
@@ -776,25 +814,32 @@ pub fn run() {
         println!("[media] reclaimed {reclaimed} oversized or duplicate row(s)");
     }
 
-    // Deleting rows only marks their pages free; the file keeps its size until
-    // a VACUUM rewrites it. Trigger on measured free space rather than on
-    // whether this particular run compacted anything, so a database left
-    // bloated by an earlier run still recovers — and so a healthy database
-    // never pays for a VACUUM it does not need.
+    // Deleted rows only free pages; the file shrinks after a VACUUM. Decide on
+    // measured free space so a bloated database always recovers and a healthy
+    // one never pays for an unnecessary VACUUM.
     let free_ratio = {
-        let free: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap_or(0);
-        let total: i64 = conn.query_row("PRAGMA page_count", [], |r| r.get(0)).unwrap_or(0);
-        if total > 0 { free as f64 / total as f64 } else { 0.0 }
+        let free: i64 = conn
+            .query_row("PRAGMA freelist_count", [], |r| r.get(0))
+            .unwrap_or(0);
+        let total: i64 = conn
+            .query_row("PRAGMA page_count", [], |r| r.get(0))
+            .unwrap_or(0);
+        if total > 0 {
+            free as f64 / total as f64
+        } else {
+            0.0
+        }
     };
     if free_ratio > 0.25 {
-        println!("[db] {:.0}% of the database file is unused; compacting", free_ratio * 100.0);
+        println!(
+            "[db] {:.0}% of the database file is unused; compacting",
+            free_ratio * 100.0
+        );
         if let Err(e) = conn.execute_batch("VACUUM;") {
             eprintln!("[db] VACUUM failed: {e}");
         }
-        // The database runs in WAL mode, so VACUUM's result lands in the -wal
-        // file and the space is not actually returned to the filesystem until a
-        // checkpoint folds it back. Without this the vault looks compacted in
-        // SQLite's own terms while still occupying the old size on disk.
+        // In WAL mode the VACUUM result lands in the -wal file; checkpoint it so the
+        // space is actually returned to the filesystem.
         if let Err(e) = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);") {
             eprintln!("[db] WAL checkpoint after VACUUM failed: {e}");
         }
@@ -836,9 +881,15 @@ pub fn run() {
     let base_dir_sync = base_dir.clone();
 
     #[cfg(target_os = "android")]
-    let dev_name = format!("OmniVault Mobile ({})", &device_id[..6.min(device_id.len())]);
+    let dev_name = format!(
+        "OmniVault Mobile ({})",
+        &device_id[..6.min(device_id.len())]
+    );
     #[cfg(not(target_os = "android"))]
-    let dev_name = format!("OmniVault Desktop ({})", &device_id[..6.min(device_id.len())]);
+    let dev_name = format!(
+        "OmniVault Desktop ({})",
+        &device_id[..6.min(device_id.len())]
+    );
 
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread()
@@ -872,7 +923,8 @@ pub fn run() {
                     5,
                     peer_reg_broadcaster,
                     stop_rx1,
-                ).await;
+                )
+                .await;
             });
 
             tokio::spawn(async move {
@@ -880,7 +932,8 @@ pub fn run() {
                     my_beacon,
                     peer_reg_clone,
                     stop_rx2,
-                ).await;
+                )
+                .await;
             });
 
             tokio::spawn(async move {
@@ -890,7 +943,8 @@ pub fn run() {
                     peer_reg_sync,
                     base_dir_sync,
                     stop_rx3,
-                ).await;
+                )
+                .await;
             });
 
             // Keep discovery runtime alive indefinitely

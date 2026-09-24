@@ -13,7 +13,10 @@
     "build:android": "node scripts/build_android.mjs",
     "build:android:debug": "cargo tauri android build --target aarch64 --apk --debug",
     "package:android": "node scripts/package_android.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,html}\" \"docs/**/*.md\" README.md && cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,html}\" \"docs/**/*.md\" README.md && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+    "lint": "tsc --noEmit && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",
@@ -30,6 +33,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.1",
+    "prettier": "3.9.9",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"

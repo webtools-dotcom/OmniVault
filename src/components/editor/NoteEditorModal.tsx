@@ -19,7 +19,7 @@ export interface NoteEditorModalProps {
     content: string,
     folderId: string | null,
     itemType: ItemType,
-    metadata?: string | null
+    metadata?: string | null,
   ) => Promise<VaultItem | void>;
   onDelete?: (itemId: string) => Promise<void> | void;
   onTogglePin?: (itemId: string) => Promise<void> | void;
@@ -44,11 +44,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [folderId, setFolderId] = useState<string | null>(initialFolderId);
   const [itemType, setItemType] = useState<ItemType>("note");
   /**
-   * Side by side is the right default on a desktop and the wrong one on a
-   * phone, where it splits a 390px screen into two 190px columns and makes
-   * both of them unusable. The narrow case opens straight into the editor;
-   * the split control is hidden there rather than offered and regretted.
-   * See D-083.
+   * Side by side suits a desktop but splits a phone screen into two unusable
+   * columns, so narrow screens open in the editor and hide the split option.
    */
   const [viewMode, setViewMode] = useState<EditorViewMode>(() => {
     if (typeof window === "undefined") return "split";
@@ -85,30 +82,19 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
   }, [isOpen, item, initialFolderId]);
 
-  // `onSave` is recreated on every App render, so depending on it directly made
-  // each completed save schedule the next one: the editor re-saved roughly
-  // every 600ms for as long as it stayed open, writing a revision each time and
-  // never letting the status badge settle. Hold the latest callback in a ref so
-  // the effect re-runs only when the note itself changes.
+  // `onSave` changes identity on every App render. Keep the latest one in a
+  // ref so the autosave effect only re-runs when the note itself changes.
   const onSaveRef = useRef(onSave);
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
 
-  // Writing the note is its own function so that closing the editor can flush a
-  // save that is still inside the debounce window. The effect cleanup cancels
-  // that pending timer, so typing and closing within 600ms used to drop the
-  // last edit without a word.
+  // Kept separate so closing the editor can flush a save still waiting in
+  // the debounce window.
   const persist = async (): Promise<boolean> => {
     try {
       const finalTitle = title.trim() || "Untitled Note";
-      const saved = await onSaveRef.current(
-        currentId,
-        finalTitle,
-        content,
-        folderId,
-        itemType
-      );
+      const saved = await onSaveRef.current(currentId, finalTitle, content, folderId, itemType);
       if (saved && saved.id) {
         setCurrentId(saved.id);
       }
@@ -154,7 +140,11 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleInsertSyntax = (prefix: string, suffix: string = "", defaultPlaceholder: string = "") => {
+  const handleInsertSyntax = (
+    prefix: string,
+    suffix: string = "",
+    defaultPlaceholder: string = "",
+  ) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -172,7 +162,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       textarea.focus();
       textarea.setSelectionRange(
         start + prefix.length,
-        start + prefix.length + selectedText.length
+        start + prefix.length + selectedText.length,
       );
     }, 10);
   };
@@ -191,7 +181,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     const stillUnsaved = saveStatus === "saving" ? !(await persist()) : saveStatus === "error";
     if (stillUnsaved) {
       const discard = window.confirm(
-        "This note has not been saved to the vault. Close anyway and lose the unsaved changes?"
+        "This note has not been saved to the vault. Close anyway and lose the unsaved changes?",
       );
       if (!discard) return;
     }
@@ -246,7 +236,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 "px-2.5 py-1 rounded-lg text-xs transition-all font-medium cursor-pointer",
                 viewMode === "edit"
                   ? "bg-vault-card text-vault-primary shadow-xs"
-                  : "text-vault-muted hover:text-vault-secondary"
+                  : "text-vault-muted hover:text-vault-secondary",
               )}
               title="Edit only"
             >
@@ -259,7 +249,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 "px-2.5 py-1 rounded-lg text-xs transition-all font-medium hidden sm:flex items-center gap-1.5 cursor-pointer",
                 viewMode === "split"
                   ? "bg-vault-card text-vault-primary shadow-xs"
-                  : "text-vault-muted hover:text-vault-secondary"
+                  : "text-vault-muted hover:text-vault-secondary",
               )}
               title="Split View"
             >
@@ -273,7 +263,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                 "px-2.5 py-1 rounded-lg text-xs transition-all font-medium flex items-center gap-1.5 cursor-pointer",
                 viewMode === "preview"
                   ? "bg-vault-card text-vault-primary shadow-xs"
-                  : "text-vault-muted hover:text-vault-secondary"
+                  : "text-vault-muted hover:text-vault-secondary",
               )}
               title="Preview only"
             >
@@ -316,9 +306,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         </div>
 
         {/* Markdown Toolbar (visible in edit or split mode) */}
-        {viewMode !== "preview" && (
-          <MarkdownToolbar onInsertSyntax={handleInsertSyntax} />
-        )}
+        {viewMode !== "preview" && <MarkdownToolbar onInsertSyntax={handleInsertSyntax} />}
 
         {/* Editor Body */}
         <div className="flex-1 flex overflow-hidden">
@@ -327,7 +315,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             <div
               className={cn(
                 "h-full flex flex-col bg-vault-bg",
-                viewMode === "split" ? "w-1/2 border-r border-vault-border" : "w-full"
+                viewMode === "split" ? "w-1/2 border-r border-vault-border" : "w-full",
               )}
             >
               <textarea
@@ -345,7 +333,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             <div
               className={cn(
                 "h-full p-4 sm:p-6 overflow-y-auto bg-vault-card/40",
-                viewMode === "split" ? "w-1/2" : "w-full"
+                viewMode === "split" ? "w-1/2" : "w-full",
               )}
             >
               {content.trim() ? (
@@ -396,7 +384,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors cursor-pointer",
                     isPinned
                       ? "text-vault-pending bg-vault-pending/10 font-medium"
-                      : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated"
+                      : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated",
                   )}
                 >
                   <Pin className={cn("w-3.5 h-3.5", isPinned && "fill-current")} />

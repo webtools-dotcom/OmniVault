@@ -12,8 +12,7 @@ export interface CreateFolderModalProps {
   folders: Folder[];
 }
 
-// Three low-chroma marks, not a paintbox: a folder tag sits beside a note and
-// must not out-shout it. D-070.
+// A few low-chroma marks, so a folder tag never competes with the note.
 const PRESET_COLORS = [
   { label: "Moss", value: FOLDER_TINTS[0] },
   { label: "Slate", value: FOLDER_TINTS[1] },

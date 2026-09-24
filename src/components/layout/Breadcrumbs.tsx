@@ -9,7 +9,10 @@ export interface BreadcrumbsProps {
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 shrink-0 overflow-hidden select-none">
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center gap-1.5 shrink-0 overflow-hidden select-none"
+    >
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
         return (

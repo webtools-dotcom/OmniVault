@@ -62,7 +62,10 @@ fn pinning_an_item_propagates_to_a_peer() {
     apply_remote_revisions(&mut laptop, &deltas).unwrap();
 
     assert!(
-        get_item_by_id(&laptop, &item.id).unwrap().unwrap().is_pinned,
+        get_item_by_id(&laptop, &item.id)
+            .unwrap()
+            .unwrap()
+            .is_pinned,
         "the pin must reach the laptop"
     );
 }
@@ -79,11 +82,24 @@ fn deleting_a_folder_propagates_with_its_descendants_and_rescued_items() {
 
     let parent = create_folder(&mut phone, "Research", None, None, "phone").unwrap();
     let child = create_folder(&mut phone, "Sub", Some(&parent.id), None, "phone").unwrap();
-    let note = create_item(&mut phone, Some(&child.id), "note", "inside", "x", None, "phone").unwrap();
+    let note = create_item(
+        &mut phone,
+        Some(&child.id),
+        "note",
+        "inside",
+        "x",
+        None,
+        "phone",
+    )
+    .unwrap();
 
     let deltas = query_revisions_since(&phone, 0, None).unwrap();
     apply_remote_revisions(&mut laptop, &deltas).unwrap();
-    assert_eq!(list_folders(&laptop, false).unwrap().len(), 2, "precondition: both folders synced");
+    assert_eq!(
+        list_folders(&laptop, false).unwrap().len(),
+        2,
+        "precondition: both folders synced"
+    );
 
     let before = chrono::Utc::now().timestamp_millis() - 1;
     delete_folder(&mut phone, &parent.id, "phone").unwrap();
@@ -97,7 +113,10 @@ fn deleting_a_folder_propagates_with_its_descendants_and_rescued_items() {
         "both the folder and its subfolder must be gone on the laptop"
     );
     let rescued = get_item_by_id(&laptop, &note.id).unwrap().unwrap();
-    assert!(!rescued.is_deleted, "the note itself must survive the folder deletion");
+    assert!(
+        !rescued.is_deleted,
+        "the note itself must survive the folder deletion"
+    );
     assert_eq!(
         rescued.folder_id, None,
         "the note must be rescued to Quick Inbox on the laptop too, not left pointing at a deleted folder"

@@ -1,10 +1,10 @@
+use image::{ImageFormat, Rgba, RgbaImage};
+use rusqlite::Connection;
 use std::fs;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use image::{ImageFormat, Rgba, RgbaImage};
-use rusqlite::Connection;
 use uuid::Uuid;
 
 use omnivault_lib::db::media::save_image_media;
@@ -27,7 +27,8 @@ fn create_synthetic_png_bytes(width: u32, height: u32) -> Vec<u8> {
         }
     }
     let mut bytes = Vec::new();
-    img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png).unwrap();
+    img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
+        .unwrap();
     bytes
 }
 
@@ -42,7 +43,8 @@ impl TestNode {
     fn new(name: &str) -> Self {
         let conn = Connection::open_in_memory().expect("open memory db");
         initialize_schema(&conn).expect("schema init");
-        let storage_dir = std::env::temp_dir().join(format!("omnivault_sync_{}_{}", name, Uuid::new_v4()));
+        let storage_dir =
+            std::env::temp_dir().join(format!("omnivault_sync_{}_{}", name, Uuid::new_v4()));
         fs::create_dir_all(storage_dir.join("media")).expect("create media dir");
 
         Self {
@@ -72,8 +74,22 @@ async fn test_headless_two_node_sync_e2e() {
     // STAGE 1: Offline Capture on Phone (User outside)
     // -------------------------------------------------------------
     // 1.1 Create nested folder tree: "Research" -> "Breakouts"
-    let f_research = create_folder(&mut phone.conn, "Research", None, Some("#2F81F7"), &phone.device_id).unwrap();
-    let f_breakouts = create_folder(&mut phone.conn, "Breakouts", Some(&f_research.id), None, &phone.device_id).unwrap();
+    let f_research = create_folder(
+        &mut phone.conn,
+        "Research",
+        None,
+        Some("#2F81F7"),
+        &phone.device_id,
+    )
+    .unwrap();
+    let f_breakouts = create_folder(
+        &mut phone.conn,
+        "Breakouts",
+        Some(&f_research.id),
+        None,
+        &phone.device_id,
+    )
+    .unwrap();
 
     // 1.2 Capture item in "Breakouts" folder
     let item_nvda = create_item(
@@ -84,7 +100,8 @@ async fn test_headless_two_node_sync_e2e() {
         "Volume expansion on 15m chart with RSI confirmation",
         Some(r#"{"ticker":"NVDA"}"#),
         &phone.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // 1.3 Attach WebP screenshot chart to NVDA item
     let chart_png = create_synthetic_png_bytes(80, 80);
@@ -94,7 +111,8 @@ async fn test_headless_two_node_sync_e2e() {
         &item_nvda.id,
         &chart_png,
         &phone.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // 1.4 Quick Capture into Inbox: unfiled idea
     let _inbox_idea = create_item(
@@ -105,7 +123,8 @@ async fn test_headless_two_node_sync_e2e() {
         "Review pre-market gaps, check VIX, verify open orders",
         None,
         &phone.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Verify Phone has 2 folders, 2 items, 1 media file, and 5 revisions
     assert_eq!(list_folders(&phone.conn, false).unwrap().len(), 2);
@@ -121,13 +140,15 @@ async fn test_headless_two_node_sync_e2e() {
     // STAGE 2: Local Peer Discovery Simulation
     // -------------------------------------------------------------
     let laptop_registry = PeerRegistry::new();
-    laptop_registry.register_or_update(PeerInfo {
-        device_id: phone.device_id.clone(),
-        device_name: phone.device_name.clone(),
-        sync_port: 42425,
-        addr: "192.168.1.50".parse().unwrap(),
-        last_seen: chrono::Utc::now().timestamp(),
-    }).await;
+    laptop_registry
+        .register_or_update(PeerInfo {
+            device_id: phone.device_id.clone(),
+            device_name: phone.device_name.clone(),
+            sync_port: 42425,
+            addr: "192.168.1.50".parse().unwrap(),
+            last_seen: chrono::Utc::now().timestamp(),
+        })
+        .await;
 
     let active_peers = laptop_registry.get_active_peers().await;
     assert_eq!(active_peers.len(), 1);
@@ -139,11 +160,22 @@ async fn test_headless_two_node_sync_e2e() {
     // The PIN handshake itself is exercised against the real HTTP surface in
     // http_server's tests; here both sides simply end up holding one token.
     let auth_token = "f".repeat(64);
-    store_paired_device(&phone.conn, &laptop.device_id, &laptop.device_name, &auth_token)
-        .unwrap();
+    store_paired_device(
+        &phone.conn,
+        &laptop.device_id,
+        &laptop.device_name,
+        &auth_token,
+    )
+    .unwrap();
 
     // Laptop stores the mutual pairing token
-    store_paired_device(&laptop.conn, &phone.device_id, &phone.device_name, &auth_token).unwrap();
+    store_paired_device(
+        &laptop.conn,
+        &phone.device_id,
+        &phone.device_name,
+        &auth_token,
+    )
+    .unwrap();
 
     assert!(is_device_paired(&phone.conn, &laptop.device_id).unwrap());
     assert!(is_device_paired(&laptop.conn, &phone.device_id).unwrap());
@@ -158,7 +190,10 @@ async fn test_headless_two_node_sync_e2e() {
     // Assert Laptop database now matches Phone identically!
     let laptop_folders = list_folders(&laptop.conn, false).unwrap();
     assert_eq!(laptop_folders.len(), 2);
-    let l_breakouts = laptop_folders.iter().find(|f| f.name == "Breakouts").unwrap();
+    let l_breakouts = laptop_folders
+        .iter()
+        .find(|f| f.name == "Breakouts")
+        .unwrap();
     assert_eq!(l_breakouts.parent_id, Some(f_research.id.clone()));
 
     let laptop_items = list_items_by_folder(&laptop.conn, &l_breakouts.id).unwrap();
@@ -181,11 +216,13 @@ async fn test_headless_two_node_sync_e2e() {
         "Logged trading executions and updated risk metrics",
         None,
         &laptop.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Phone pulls deltas since its last sync timestamp
     let last_phone_sync_ts = phone_deltas.last().unwrap().timestamp;
-    let laptop_deltas = query_revisions_since(&laptop.conn, last_phone_sync_ts, Some(&phone.device_id)).unwrap();
+    let laptop_deltas =
+        query_revisions_since(&laptop.conn, last_phone_sync_ts, Some(&phone.device_id)).unwrap();
     assert_eq!(laptop_deltas.len(), 1);
     assert_eq!(laptop_deltas[0].entity_id, laptop_note.id);
 
@@ -196,8 +233,12 @@ async fn test_headless_two_node_sync_e2e() {
     // Verify Phone now also contains the Laptop's note in Quick Inbox!
     let phone_inbox_all = list_inbox_items(&phone.conn).unwrap();
     assert_eq!(phone_inbox_all.len(), 2);
-    assert!(phone_inbox_all.iter().any(|item| item.title == "End of Day Journal"));
-    assert!(phone_inbox_all.iter().any(|item| item.title == "Market Open Checklist"));
+    assert!(phone_inbox_all
+        .iter()
+        .any(|item| item.title == "End of Day Journal"));
+    assert!(phone_inbox_all
+        .iter()
+        .any(|item| item.title == "Market Open Checklist"));
 
     // -------------------------------------------------------------
     // STAGE 7: Concurrent Edit & LWW Conflict Resolution
@@ -210,7 +251,8 @@ async fn test_headless_two_node_sync_e2e() {
         "Volume expansion on 15m chart with RSI confirmation",
         Some(r#"{"ticker":"NVDA"}"#),
         &phone.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Sleep briefly to ensure distinct millisecond timestamp
     thread::sleep(Duration::from_millis(20));
@@ -223,7 +265,8 @@ async fn test_headless_two_node_sync_e2e() {
         "Volume expansion on 15m chart with RSI confirmation",
         Some(r#"{"ticker":"NVDA"}"#),
         &laptop.device_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Exchange deltas both ways
     let phone_new_deltas = query_revisions_since(&phone.conn, last_phone_sync_ts, None).unwrap();
@@ -234,29 +277,46 @@ async fn test_headless_two_node_sync_e2e() {
 
     // Both nodes MUST deterministically converge on Laptop's newer edit
     let final_nvda_on_phone = get_item_by_id(&phone.conn, &item_nvda.id).unwrap().unwrap();
-    let final_nvda_on_laptop = get_item_by_id(&laptop.conn, &item_nvda.id).unwrap().unwrap();
+    let final_nvda_on_laptop = get_item_by_id(&laptop.conn, &item_nvda.id)
+        .unwrap()
+        .unwrap();
 
-    assert_eq!(final_nvda_on_phone.title, "$NVDA Breakout (Laptop Newest Edit)");
-    assert_eq!(final_nvda_on_laptop.title, "$NVDA Breakout (Laptop Newest Edit)");
+    assert_eq!(
+        final_nvda_on_phone.title,
+        "$NVDA Breakout (Laptop Newest Edit)"
+    );
+    assert_eq!(
+        final_nvda_on_laptop.title,
+        "$NVDA Breakout (Laptop Newest Edit)"
+    );
 }
 
 #[tokio::test]
 async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let mut phone_conn = Connection::open_in_memory().unwrap();
     initialize_schema(&phone_conn).unwrap();
-    let phone_storage = std::env::temp_dir().join(format!("omnivault_test_phone_{}", Uuid::new_v4()));
+    let phone_storage =
+        std::env::temp_dir().join(format!("omnivault_test_phone_{}", Uuid::new_v4()));
     fs::create_dir_all(phone_storage.join("media")).unwrap();
 
     let laptop_conn = Connection::open_in_memory().unwrap();
     initialize_schema(&laptop_conn).unwrap();
-    let laptop_storage = std::env::temp_dir().join(format!("omnivault_test_laptop_{}", Uuid::new_v4()));
+    let laptop_storage =
+        std::env::temp_dir().join(format!("omnivault_test_laptop_{}", Uuid::new_v4()));
     fs::create_dir_all(laptop_storage.join("media")).unwrap();
 
     let phone_dev_id = "device-android-phone";
     let laptop_dev_id = "device-windows-laptop";
 
     // 1. Outdoors: Phone captures a folder, note, and WebP photo while offline
-    let folder = create_folder(&mut phone_conn, "Solar Tech", None, Some("#10B981"), phone_dev_id).unwrap();
+    let folder = create_folder(
+        &mut phone_conn,
+        "Solar Tech",
+        None,
+        Some("#10B981"),
+        phone_dev_id,
+    )
+    .unwrap();
     let note = create_item(
         &mut phone_conn,
         Some(&folder.id),
@@ -265,7 +325,8 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
         "Measured 98.2% conversion efficiency at 45 deg angle",
         None,
         phone_dev_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     let synthetic_png = create_synthetic_png_bytes(64, 64);
     let _photo = save_image_media(
@@ -274,7 +335,8 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
         &note.id,
         &synthetic_png,
         phone_dev_id,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Verify phone has 3 revisions
     let phone_revs = query_revisions_since(&phone_conn, 0, None).unwrap();
@@ -284,17 +346,14 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let phone_db = Arc::new(Mutex::new(phone_conn));
     let laptop_db = Arc::new(Mutex::new(laptop_conn));
 
-    let _phone_server = http_server::start_http_server(phone_db.clone(), phone_dev_id.to_string(), 0).unwrap();
-    let laptop_server = http_server::start_http_server(laptop_db.clone(), laptop_dev_id.to_string(), 0).unwrap();
+    let _phone_server =
+        http_server::start_http_server(phone_db.clone(), phone_dev_id.to_string(), 0).unwrap();
+    let laptop_server =
+        http_server::start_http_server(laptop_db.clone(), laptop_dev_id.to_string(), 0).unwrap();
 
-    // 3. One-time pairing handshake: Phone pairs with Laptop.
-    //
-    // The PIN is issued locally on the laptop and read off its screen by the
-    // user — it is deliberately NOT obtainable over HTTP (D-051), because a PIN
-    // served over the network it protects is not an out-of-band secret. This
-    // test therefore seeds the session through the same shared handle the
-    // desktop UI writes to via `get_pairing_session_cmd`, which models the real
-    // flow: issued on the laptop, typed on the phone.
+    // 3. Pairing: the PIN is issued locally on the laptop and never served over
+    // HTTP, so the test seeds the session through the same shared handle the
+    // desktop UI uses.
     let laptop_pin = "424 242".to_string();
     {
         let now_ms = std::time::SystemTime::now()
@@ -316,7 +375,8 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
         "127.0.0.1",
         laptop_server.port,
         &laptop_pin,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(paired_device.device_id, laptop_dev_id);
 
@@ -340,7 +400,8 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
         phone_dev_id,
         &laptop_peer_info,
         &phone_storage,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Revisions pushed from Phone to Laptop: Laptop now has the folder and note in SQLite!
     {
@@ -358,4 +419,3 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let _ = fs::remove_dir_all(&phone_storage);
     let _ = fs::remove_dir_all(&laptop_storage);
 }
-

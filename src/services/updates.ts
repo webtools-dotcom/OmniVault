@@ -1,24 +1,10 @@
 import { isTauriEnvironment } from "./storageService";
 import { invoke } from "@tauri-apps/api/core";
 
-/**
- * Where releases are published, as `owner/repo`.
- *
- * This is the only channel that reaches somebody who already installed the app.
- * Without it there is no mechanism by which a person running a broken build
- * learns that a fix exists — they keep running it until told in person.
- *
- * It was deliberately empty until the repository was public, because an update
- * check against a repository that does not exist would have reported "up to
- * date" forever, which is the one lie an update checker must never tell.
- */
+/** Repository whose GitHub releases the update check reads, as `owner/repo`. */
 export const RELEASES_REPO = "webtools-dotcom/OmniVault";
 
-/**
- * Kept in step with package.json and tauri.conf.json by a harness guard, because
- * a version number that drifts makes the update check quietly wrong in the one
- * direction that matters: it would stop offering an update that exists.
- */
+/** Must match package.json, tauri.conf.json and Cargo.toml (checked by the tests). */
 export const APP_VERSION = "0.1.0";
 
 export type UpdateStatus = "unconfigured" | "current" | "available" | "failed";
@@ -49,13 +35,8 @@ export function isNewer(candidate: string, current: string): boolean {
 }
 
 /**
- * Asks, once, whether a newer release exists.
- *
- * This is the only outbound request the app ever makes, and it happens solely
- * because someone pressed the button — there is no background check, no stored
- * preference quietly polling, and nothing about the vault goes with it. The
- * request is a plain GET for a public page; what it discloses is what any HTTP
- * request discloses, which is that this address asked at this moment.
+ * Checks once whether a newer release exists. This is the app's only outbound
+ * request, made only when the user asks; nothing about the vault is sent.
  */
 export async function checkForUpdate(): Promise<UpdateCheck> {
   if (!RELEASES_REPO) {

@@ -58,16 +58,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
   });
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
-  /**
-   * This device's pairing PIN, or null when it does not have one.
-   *
-   * It used to start at a hardcoded "749 201". On the desktop that flashed a
-   * fabricated PIN until the real one arrived; in a browser it never arrived at
-   * all, because a browser client is deliberately never issued one (D-051) — so
-   * a phone showed an invented six-digit number under the words "Valid for
-   * Wi-Fi peers" and told the reader to type it into another device. It could
-   * not work, and nothing said so. See D-083.
-   */
+  /** This device's pairing PIN, or null when it does not issue one (browsers). */
   const [pairingPin, setPairingPin] = useState<string | null>(null);
 
   // Mesh peer state
@@ -177,7 +168,9 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
       const count = await StorageService.triggerMeshSync();
       await fetchMeshStatus();
       onSyncTriggered?.();
-      setSyncFeedback(count > 0 ? `Synced ${count} item${count > 1 ? "s" : ""}!` : "Vault is up to date");
+      setSyncFeedback(
+        count > 0 ? `Synced ${count} item${count > 1 ? "s" : ""}!` : "Vault is up to date",
+      );
     } catch (err) {
       setSyncFeedback("Sync check complete");
     } finally {
@@ -186,14 +179,18 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
     }
   };
 
-  /** Asks the other device, and waits for someone there to press Allow. See D-090. */
+  /** Asks the other device to connect and waits for someone there to press Allow. */
   const handlePairPeer = async (peer: PeerInfo) => {
     setPairingPeerId(peer.device_id);
     setIsPairingSubmit(true);
     setPairError(null);
     setPairSuccess(null);
 
-    const res = await StorageService.requestPairApproval(peer.addr, peer.sync_port, peer.device_name);
+    const res = await StorageService.requestPairApproval(
+      peer.addr,
+      peer.sync_port,
+      peer.device_name,
+    );
     setIsPairingSubmit(false);
     setPairingPeerId(null);
 
@@ -256,7 +253,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
       onSyncTriggered?.();
       setTimeout(() => setPairSuccess(null), 3500);
     } else {
-      setPairError(res.error || `Could not connect to ${ip}:${port}. Check IP/PIN and make sure Desktop app is running.`);
+      setPairError(
+        res.error ||
+          `Could not connect to ${ip}:${port}. Check IP/PIN and make sure Desktop app is running.`,
+      );
     }
   };
 
@@ -281,7 +281,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               <Wifi className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 id="qr-modal-title" className="font-display text-base font-semibold text-vault-primary tracking-tight">
+              <h2
+                id="qr-modal-title"
+                className="font-display text-base font-semibold text-vault-primary tracking-tight"
+              >
                 Connect a device
               </h2>
               <p className="text-[0.815rem] text-vault-muted font-medium">
@@ -364,7 +367,9 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   disabled={isSyncingManual}
                   className="h-8 px-3 text-xs font-semibold shrink-0 gap-1.5"
                 >
-                  <RefreshCw className={`w-3 h-3 ${isSyncingManual ? "animate-spin text-vault-secondary" : ""}`} />
+                  <RefreshCw
+                    className={`w-3 h-3 ${isSyncingManual ? "animate-spin text-vault-secondary" : ""}`}
+                  />
                   <span>{isSyncingManual ? "Syncing…" : "Sync now"}</span>
                 </Button>
               </div>
@@ -405,11 +410,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     <div className="w-10 h-10 rounded-full bg-vault-accent/10 border border-vault-border-active/20 flex items-center justify-center mx-auto text-vault-secondary">
                       <Radio className="w-5 h-5 animate-pulse" />
                     </div>
-                    <h3 className="text-xs font-semibold text-vault-primary">
-                      Nothing found yet
-                    </h3>
+                    <h3 className="text-xs font-semibold text-vault-primary">Nothing found yet</h3>
                     <p className="text-[0.815rem] text-vault-muted max-w-xs mx-auto leading-relaxed">
-                      Open OmniVault on the other device, on the same Wi-Fi or hotspot. It shows up here within about 30 seconds.
+                      Open OmniVault on the other device, on the same Wi-Fi or hotspot. It shows up
+                      here within about 30 seconds.
                     </p>
                   </div>
                 ) : (
@@ -472,7 +476,10 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                           {isPairingThis && (
                             <div className="pt-2 border-t border-white/[0.06] flex items-center gap-2 text-[0.815rem] text-vault-secondary">
                               <Radio className="w-3.5 h-3.5 animate-pulse shrink-0" />
-                              <span>Press <strong className="text-vault-primary">Allow</strong> on {peer.device_name} to finish.</span>
+                              <span>
+                                Press <strong className="text-vault-primary">Allow</strong> on{" "}
+                                {peer.device_name} to finish.
+                              </span>
                             </div>
                           )}
                         </div>
@@ -482,144 +489,149 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 )}
               </div>
 
-              {/* The address and PIN are the fallback now, not the way in. D-090. */}
+              {/* Manual pairing is the fallback when discovery finds nothing. */}
               <details className="group">
                 <summary className="cursor-pointer list-none text-[0.815rem] text-vault-muted hover:text-vault-secondary py-1 select-none">
-                  <span className="group-open:hidden">Not showing up? Connect by address and PIN</span>
+                  <span className="group-open:hidden">
+                    Not showing up? Connect by address and PIN
+                  </span>
                   <span className="hidden group-open:inline">Hide address and PIN</span>
                 </summary>
                 <div className="space-y-4 pt-3">
-              {/* Direct IP & PIN Connection Card */}
-              <div className="p-4 bg-vault-primary/[0.03] hover:bg-vault-primary/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-secondary">
-                      <Link2 className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-vault-primary">
-                      Connect by address
-                    </span>
-                  </div>
-                  <span className="text-[0.741rem] text-vault-muted font-medium">
-                    If discovery is blocked
-                  </span>
-                </div>
-                <p className="text-[0.815rem] text-vault-secondary leading-relaxed">
-                  Some routers keep devices from seeing each other. Type the desktop's address and PIN instead.
-                </p>
-                <div className="space-y-2.5 pt-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
-                        Desktop address
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 192.168.1.10:42420"
-                        value={manualHostInput}
-                        onChange={(e) => setManualHostInput(e.target.value)}
-                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
-                        Pairing PIN
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 749 201"
-                        value={manualPinInput}
-                        onChange={(e) => setManualPinInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleManualPair();
-                        }}
-                        className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={handleManualPair}
-                      disabled={isManualPairing || !manualHostInput.trim() || !manualPinInput.trim()}
-                      className="h-8 px-4 text-xs font-semibold rounded-lg gap-1.5"
-                    >
-                      {isManualPairing ? (
-                        "Linking to Desktop..."
-                      ) : (
-                        <>
-                          <span>Connect</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Local Device's Authorization PIN Card */}
-              <div className="p-4 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-vault-secondary" />
-                    <span className="text-xs font-semibold text-vault-primary">
-                      This device's PIN
-                    </span>
-                  </div>
-                  {pairingPin && (
-                    <button
-                      type="button"
-                      onClick={handleCopyPin}
-                      className="text-[0.815rem] font-mono text-vault-secondary hover:text-vault-primary flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedPin ? (
-                        <>
-                          <Check className="w-3 h-3 text-vault-success" />
-                          <span className="text-vault-success font-semibold">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copy PIN</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {pairingPin ? (
-                  <>
-                    <div className="flex items-center justify-between p-2.5 bg-vault-bg/80 border border-white/[0.06] rounded-xl">
-                      <span className="text-base font-mono font-bold text-vault-primary tracking-widest pl-1">
-                        {pairingPin}
-                      </span>
-                      <span className="text-[0.741rem] text-vault-muted">
-                        Valid for Wi-Fi peers
+                  {/* Direct IP & PIN Connection Card */}
+                  <div className="p-4 bg-vault-primary/[0.03] hover:bg-vault-primary/[0.04] border border-white/[0.08] rounded-2xl space-y-3 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-vault-accent/15 border border-vault-border-active/30 flex items-center justify-center text-vault-secondary">
+                          <Link2 className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-vault-primary">
+                          Connect by address
+                        </span>
+                      </div>
+                      <span className="text-[0.741rem] text-vault-muted font-medium">
+                        If discovery is blocked
                       </span>
                     </div>
-                    <p className="text-[0.815rem] text-vault-muted leading-relaxed">
-                      When pairing from another phone or tablet, enter this 6-digit PIN on that device to authorize peer sync.
+                    <p className="text-[0.815rem] text-vault-secondary leading-relaxed">
+                      Some routers keep devices from seeing each other. Type the desktop's address
+                      and PIN instead.
                     </p>
-                  </>
-                ) : (
-                  <p className="text-[0.815rem] text-vault-muted leading-relaxed">
-                    This device does not issue a PIN. A PIN is only ever shown by the app running
-                    on the computer, and is read off that screen — which is what makes typing it
-                    proof you are standing in front of the machine. To pair something new, open
-                    OmniVault on the computer and use the PIN it shows.
-                  </p>
-                )}
-              </div>
+                    <div className="space-y-2.5 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
+                            Desktop address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 192.168.1.10:42420"
+                            value={manualHostInput}
+                            onChange={(e) => setManualHostInput(e.target.value)}
+                            className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[0.741rem] font-medium text-vault-muted block mb-1">
+                            Pairing PIN
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="e.g. 749 201"
+                            value={manualPinInput}
+                            onChange={(e) => setManualPinInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleManualPair();
+                            }}
+                            className="w-full h-8 px-3 text-xs font-mono bg-vault-bg/90 border border-white/[0.1] rounded-lg text-vault-primary placeholder-vault-muted/40 focus:outline-hidden focus:border-vault-border-active/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-1">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleManualPair}
+                          disabled={
+                            isManualPairing || !manualHostInput.trim() || !manualPinInput.trim()
+                          }
+                          className="h-8 px-4 text-xs font-semibold rounded-lg gap-1.5"
+                        >
+                          {isManualPairing ? (
+                            "Linking to Desktop..."
+                          ) : (
+                            <>
+                              <span>Connect</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Local Device's Authorization PIN Card */}
+                  <div className="p-4 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-vault-secondary" />
+                        <span className="text-xs font-semibold text-vault-primary">
+                          This device's PIN
+                        </span>
+                      </div>
+                      {pairingPin && (
+                        <button
+                          type="button"
+                          onClick={handleCopyPin}
+                          className="text-[0.815rem] font-mono text-vault-secondary hover:text-vault-primary flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedPin ? (
+                            <>
+                              <Check className="w-3 h-3 text-vault-success" />
+                              <span className="text-vault-success font-semibold">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy PIN</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {pairingPin ? (
+                      <>
+                        <div className="flex items-center justify-between p-2.5 bg-vault-bg/80 border border-white/[0.06] rounded-xl">
+                          <span className="text-base font-mono font-bold text-vault-primary tracking-widest pl-1">
+                            {pairingPin}
+                          </span>
+                          <span className="text-[0.741rem] text-vault-muted">
+                            Valid for Wi-Fi peers
+                          </span>
+                        </div>
+                        <p className="text-[0.815rem] text-vault-muted leading-relaxed">
+                          When pairing from another phone or tablet, enter this 6-digit PIN on that
+                          device to authorize peer sync.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[0.815rem] text-vault-muted leading-relaxed">
+                        This device does not issue a PIN. A PIN is only ever shown by the app
+                        running on the computer, and is read off that screen — which is what makes
+                        typing it proof you are standing in front of the machine. To pair something
+                        new, open OmniVault on the computer and use the PIN it shows.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </details>
             </>
           ) : (
             <>
-              {/* Browser access is off by default: serving a UI to browsers is
-                  the one surface that exposes the hand-written HTTP parser to
-                  unknown clients. Mesh sync is unaffected either way (D-059). */}
+              {/* Browser access is off by default: it exposes the HTTP server to
+                  unknown clients. Sync is unaffected either way. */}
               <div className="flex items-center justify-between p-3.5 bg-vault-primary/[0.03] border border-white/[0.08] rounded-2xl">
                 <div className="min-w-0 pr-3 text-left">
                   <span className="text-xs font-semibold text-vault-primary block">
@@ -639,13 +651,13 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   onClick={handleToggleBrowserAccess}
                   className={cn(
                     "relative w-11 h-6 rounded-full shrink-0 transition-colors cursor-pointer",
-                    browserAccess ? "bg-vault-success/80" : "bg-vault-primary/[0.12]"
+                    browserAccess ? "bg-vault-success/80" : "bg-vault-primary/[0.12]",
                   )}
                 >
                   <span
                     className={cn(
                       "absolute top-0.5 w-5 h-5 rounded-full bg-vault-primary transition-transform",
-                      browserAccess ? "translate-x-5.5" : "translate-x-0.5"
+                      browserAccess ? "translate-x-5.5" : "translate-x-0.5",
                     )}
                   />
                 </button>
@@ -661,8 +673,8 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 {!browserAccess ? (
                   <div className="w-full rounded-2xl border border-white/[0.08] bg-vault-bg/60 px-5 py-6 text-center">
                     <p className="text-[0.815rem] leading-relaxed text-vault-secondary">
-                      Browser access is off, so there is nothing to scan yet. Other devices
-                      still sync — this only controls opening the vault in a browser.
+                      Browser access is off, so there is nothing to scan yet. Other devices still
+                      sync — this only controls opening the vault in a browser.
                     </p>
                     <button
                       type="button"
@@ -675,9 +687,9 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 ) : !lanInfo.reachable ? (
                   <div className="w-full rounded-2xl border border-white/[0.08] bg-vault-bg/60 px-5 py-6 text-center">
                     <p className="text-[0.815rem] leading-relaxed text-vault-secondary">
-                      This computer is not on a network another device can reach, so there is
-                      no address to hand out. Join a Wi-Fi network or a phone's hotspot, then
-                      reopen this panel.
+                      This computer is not on a network another device can reach, so there is no
+                      address to hand out. Join a Wi-Fi network or a phone's hotspot, then reopen
+                      this panel.
                     </p>
                   </div>
                 ) : (
@@ -694,7 +706,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                 )}
 
                 {/* Connection URL Pill with 1-Click Copy */}
-                <div className={cn("w-full space-y-2", (!browserAccess || !lanInfo.reachable) && "hidden")}>
+                <div
+                  className={cn(
+                    "w-full space-y-2",
+                    (!browserAccess || !lanInfo.reachable) && "hidden",
+                  )}
+                >
                   <div className="text-[0.815rem] font-semibold text-vault-secondary flex items-center justify-center gap-1.5 ">
                     <Wifi className="w-3.5 h-3.5 text-vault-success" />
                     <span>Address on this network</span>
@@ -730,13 +747,17 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                     <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       1
                     </span>
-                    <span className="leading-snug">Connect phone/tablet to the same Wi-Fi or mobile hotspot.</span>
+                    <span className="leading-snug">
+                      Connect phone/tablet to the same Wi-Fi or mobile hotspot.
+                    </span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
                     <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
                       2
                     </span>
-                    <span className="leading-snug">Open the camera and scan the code above, or type the address into the browser.</span>
+                    <span className="leading-snug">
+                      Open the camera and scan the code above, or type the address into the browser.
+                    </span>
                   </div>
                   <div className="flex items-start gap-2.5 text-vault-secondary">
                     <span className="w-5 h-5 rounded-full bg-vault-accent/10 text-vault-secondary border border-vault-border-active/20 text-[0.741rem] font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -760,7 +781,12 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
               Listening on port {lanInfo.port} • this network only
             </span>
           </div>
-          <Button variant="primary" size="sm" onClick={onClose} className="rounded-xl px-4 py-1.5 font-semibold">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onClose}
+            className="rounded-xl px-4 py-1.5 font-semibold"
+          >
             Done
           </Button>
         </div>
@@ -768,4 +794,3 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
     </div>
   );
 };
-

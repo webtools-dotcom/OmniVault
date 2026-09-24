@@ -1,10 +1,6 @@
 /**
- * What kind of machine this is, for wording rather than layout.
- *
- * The sidebar used the responsive `isMobile` flag to choose between "This
- * tablet" and "This computer", so a tablet in landscape — wide enough to get
- * the desktop layout — called itself a computer. Layout breakpoints answer
- * "how much room is there", which is a different question from "what am I".
+ * What kind of device this is, for wording such as "This tablet". Layout
+ * breakpoints are the wrong signal: a landscape tablet gets the desktop layout.
  */
 export type DeviceKind = "phone" | "tablet" | "computer" | "browser";
 

@@ -9,11 +9,17 @@ export interface SmartMarketLauncherProps {
   links?: DetectedLink[];
 }
 
-export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({ tickers, links = [] }) => {
+export const SmartMarketLauncher: React.FC<SmartMarketLauncherProps> = ({
+  tickers,
+  links = [],
+}) => {
   if (tickers.length === 0 && links.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 pt-2 select-none" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="flex flex-wrap items-center gap-2 pt-2 select-none"
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Tickers */}
       {tickers.map((t) => (
         <div

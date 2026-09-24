@@ -4,19 +4,16 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 const rootDir = process.cwd();
-// The version comes from package.json and nowhere else. It used to be typed
-// into artifact filenames in three scripts, so a release meant editing ten
-// hardcoded strings by hand and the version guard only ever checked three
-// files. See D-085.
+// Artifact names derive from the version in package.json.
 const VERSION = JSON.parse(fs.readFileSync(path.resolve(rootDir, "package.json"), "utf-8")).version;
 
 const releaseApkPath = path.resolve(
   rootDir,
-  "src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
+  "src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk",
 );
 const debugApkPath = path.resolve(
   rootDir,
-  "src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk"
+  "src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",
 );
 
 const targetApkDir = path.resolve(rootDir, "release");
@@ -51,19 +48,9 @@ console.log(`[1/4] Found Android APK: ${sourceApkPath}`);
 console.log(`      Build type: ${isReleaseBuild ? "Optimized Release (Signed)" : "Debug"}`);
 console.log(`      APK size: ${stats.size.toLocaleString()} bytes (${sizeMB} MB)`);
 
-// 2. Size budget check.
-//
-// The budget exists to catch this project's own code growing, and a flat
-// ceiling on the whole APK stopped measuring that the moment the build went
-// universal: one APK carrying arm64, armeabi-v7a and x86_64 holds three copies
-// of the same library, so the file tripled while the code did not change at
-// all. Judging the package by its total would have meant either failing a
-// build that got no heavier, or raising a number until it stopped complaining
-// — which is how a budget quietly stops being one.
-//
-// So the code is measured per ABI, against the original 15 MB, and the package
-// as a whole gets a separate and looser ceiling that still catches assets or
-// ABIs piling up unnoticed. See D-084.
+// 2. Size budget. A universal APK carries one native library per ABI, so
+// the code is measured per ABI against 15 MB and the whole package against a
+// looser ceiling.
 const MAX_CODE_MB = 15;
 const MAX_PACKAGE_MB = 32;
 
@@ -106,7 +93,7 @@ console.log(`      ABIs: ${abiReport}`);
 const largestAbi = Math.max(...abiSizes.values());
 if (largestAbi > MAX_CODE_MB * 1024 * 1024) {
   console.error(
-    `❌ Native code for one ABI exceeds ${MAX_CODE_MB} MB! Actual: ${(largestAbi / (1024 * 1024)).toFixed(2)} MB`
+    `❌ Native code for one ABI exceeds ${MAX_CODE_MB} MB! Actual: ${(largestAbi / (1024 * 1024)).toFixed(2)} MB`,
   );
   process.exit(1);
 }
@@ -115,19 +102,12 @@ if (stats.size > MAX_PACKAGE_MB * 1024 * 1024) {
   process.exit(1);
 }
 console.log(
-  `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ✅ PASS`
+  `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ✅ PASS`,
 );
 
-
 /**
- * The APK must declare the version this repository says it is.
- *
- * Gradle does not track `tauri.properties` as an input to its resource task,
- * so a version bump followed by an incremental build produces an APK whose
- * manifest still carries the previous versionName — a package that says 0.1.0
- * while the release around it says 0.1.1. Nothing caught that: the existing
- * version guard compares package.json, tauri.conf.json and updates.ts to each
- * other, and never asks the artifact. See D-085.
+ * Checks the APK declares the version in package.json. Gradle can reuse a
+ * stale manifest after a version bump, so the artifact itself is inspected.
  */
 function findAapt2() {
   const sdk =
@@ -163,9 +143,11 @@ if (!aapt2) {
   const declared = (badging.match(/versionName='([^']*)'/) || [])[1];
   if (declared !== VERSION) {
     console.error(
-      `❌ The APK declares versionName='${declared}' but this repository is ${VERSION}.`
+      `❌ The APK declares versionName='${declared}' but this repository is ${VERSION}.`,
     );
-    console.error("   Gradle reused a stale manifest. Delete src-tauri/gen/android/app/build and rebuild.");
+    console.error(
+      "   Gradle reused a stale manifest. Delete src-tauri/gen/android/app/build and rebuild.",
+    );
     process.exit(1);
   }
   console.log(`      APK declares versionName=${declared}: ✅ matches package.json`);

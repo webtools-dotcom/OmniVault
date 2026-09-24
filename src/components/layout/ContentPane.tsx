@@ -82,7 +82,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "stream"
                   ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
-                  : "text-vault-secondary hover:text-vault-primary"
+                  : "text-vault-secondary hover:text-vault-primary",
               )}
             >
               Stream
@@ -94,7 +94,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "notes"
                   ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
-                  : "text-vault-secondary hover:text-vault-primary"
+                  : "text-vault-secondary hover:text-vault-primary",
               )}
             >
               Notes
@@ -106,7 +106,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
                 "px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                 streamFilter === "markets"
                   ? "bg-vault-primary/[0.08] text-vault-primary shadow-xs font-semibold"
-                  : "text-vault-secondary hover:text-vault-primary"
+                  : "text-vault-secondary hover:text-vault-primary",
               )}
             >
               Markets
@@ -147,9 +147,7 @@ export const ContentPane: React.FC<ContentPaneProps> = ({
 
       {/* Content Viewport */}
       <div className="flex-1 overflow-y-auto p-2.5 sm:p-3.5 lg:p-4">
-        <div className="w-full h-full pb-24 sm:pb-0">
-          {children}
-        </div>
+        <div className="w-full h-full pb-24 sm:pb-0">{children}</div>
       </div>
     </main>
   );

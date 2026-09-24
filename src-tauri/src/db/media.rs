@@ -74,21 +74,44 @@ pub fn save_image_media<P: AsRef<Path>>(
                 Err(_) => {
                     // Fallback to PNG encode
                     let mut png_buf = Vec::new();
-                    if dynamic.write_to(&mut Cursor::new(&mut png_buf), ImageFormat::Png).is_ok() {
+                    if dynamic
+                        .write_to(&mut Cursor::new(&mut png_buf), ImageFormat::Png)
+                        .is_ok()
+                    {
                         (png_buf, "image/png".to_string(), Some(w), Some(h))
                     } else {
-                        (raw_bytes.to_vec(), "application/octet-stream".to_string(), Some(w), Some(h))
+                        (
+                            raw_bytes.to_vec(),
+                            "application/octet-stream".to_string(),
+                            Some(w),
+                            Some(h),
+                        )
                     }
                 }
             }
         }
         Err(_) => {
             // Raw binary or unsupported image format preserved as is
-            (raw_bytes.to_vec(), "application/octet-stream".to_string(), None, None)
+            (
+                raw_bytes.to_vec(),
+                "application/octet-stream".to_string(),
+                None,
+                None,
+            )
         }
     };
 
-    store_media(conn, storage_dir, item_id, &final_bytes, "webp", &mime_type, width, height, device_id)
+    store_media(
+        conn,
+        storage_dir,
+        item_id,
+        &final_bytes,
+        "webp",
+        &mime_type,
+        width,
+        height,
+        device_id,
+    )
 }
 
 /// A document kept exactly as it arrived: no transcoding, named
@@ -103,7 +126,17 @@ pub fn save_file_media<P: AsRef<Path>>(
 ) -> Result<MediaFile, MediaError> {
     let ext = file_extension(file_name);
     let mime = crate::http_server::mime_for_extension(&ext);
-    store_media(conn, storage_dir, item_id, raw_bytes, &ext, mime, None, None, device_id)
+    store_media(
+        conn,
+        storage_dir,
+        item_id,
+        raw_bytes,
+        &ext,
+        mime,
+        None,
+        None,
+        device_id,
+    )
 }
 
 /// The lowercase extension of a file name, or `bin` when it has none that is
@@ -111,7 +144,9 @@ pub fn save_file_media<P: AsRef<Path>>(
 pub fn file_extension(file_name: &str) -> String {
     match file_name.rsplit_once('.') {
         Some((_, ext))
-            if !ext.is_empty() && ext.len() <= 8 && ext.chars().all(|c| c.is_ascii_alphanumeric()) =>
+            if !ext.is_empty()
+                && ext.len() <= 8
+                && ext.chars().all(|c| c.is_ascii_alphanumeric()) =>
         {
             ext.to_ascii_lowercase()
         }
@@ -209,7 +244,10 @@ pub fn get_media_by_item_id(conn: &Connection, item_id: &str) -> Result<Vec<Medi
     Ok(list)
 }
 
-pub fn read_media_bytes<P: AsRef<Path>>(storage_dir: P, relative_path: &str) -> std::io::Result<Vec<u8>> {
+pub fn read_media_bytes<P: AsRef<Path>>(
+    storage_dir: P,
+    relative_path: &str,
+) -> std::io::Result<Vec<u8>> {
     let full_path = storage_dir.as_ref().join(relative_path);
     let mut file = File::open(full_path)?;
     let mut buf = Vec::new();
@@ -217,14 +255,12 @@ pub fn read_media_bytes<P: AsRef<Path>>(storage_dir: P, relative_path: &str) -> 
     Ok(buf)
 }
 
-/// Deletes media blobs nothing points at any more.
+/// Deletes media files that no live item references.
 ///
-/// Deleting an item only flips `is_deleted`; the `media/<hash>.webp` it pointed
-/// at stayed on disk forever, so a vault used as an image scratchpad grows
-/// without bound even when the user empties it. A blob is live while any
-/// undeleted item references it - through `content` or through `media_files` -
-/// and blobs younger than the grace window are spared so an upload that has not
-/// yet had its item row written is never swept out from under itself.
+/// Deleting an item is a soft delete, so its file would otherwise stay on disk
+/// forever. A file is live while an undeleted item references it through
+/// `content` or `media_files`. Files younger than `grace` are kept so an upload
+/// whose item row is not yet written is never swept.
 pub fn purge_orphan_media<P: AsRef<Path>>(
     conn: &Connection,
     storage_dir: P,
@@ -309,7 +345,8 @@ mod tests {
             }
         }
         let mut bytes = Vec::new();
-        img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png).unwrap();
+        img.write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
+            .unwrap();
         bytes
     }
 
@@ -321,10 +358,24 @@ mod tests {
         let temp_dir = std::env::temp_dir().join(format!("omnivault_test_{}", Uuid::new_v4()));
 
         let bytes = b"PK\x03\x04 not really a spreadsheet".to_vec();
-        let media = save_file_media(&mut conn, &temp_dir, &item.id, &bytes, "Q3 Budget.XLSX", "dev").unwrap();
+        let media = save_file_media(
+            &mut conn,
+            &temp_dir,
+            &item.id,
+            &bytes,
+            "Q3 Budget.XLSX",
+            "dev",
+        )
+        .unwrap();
 
-        assert_eq!(media.relative_path, format!("media/{}.xlsx", media.file_hash));
-        assert_eq!(read_media_bytes(&temp_dir, &media.relative_path).unwrap(), bytes);
+        assert_eq!(
+            media.relative_path,
+            format!("media/{}.xlsx", media.file_hash)
+        );
+        assert_eq!(
+            read_media_bytes(&temp_dir, &media.relative_path).unwrap(),
+            bytes
+        );
         assert_eq!(compute_sha256(&bytes), media.file_hash);
 
         // Nothing unsafe for a path or URL survives as an extension.
@@ -369,11 +420,13 @@ mod tests {
         assert_eq!(item_media[0].id, media.id);
 
         // Verify revision log entry
-        let rev_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM revisions WHERE entity_type = 'media_file'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let rev_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM revisions WHERE entity_type = 'media_file'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(rev_count, 1);
 
         // Cleanup
@@ -381,17 +434,12 @@ mod tests {
     }
 }
 
-/// One-shot repair that moves inline `data:image/...;base64,...` payloads out of
-/// `vault_items.content` and onto disk as content-addressed WebP.
+/// Moves inline `data:image/...;base64` payloads out of `vault_items.content`
+/// into content-addressed WebP files, for vaults created before media was stored
+/// on disk.
 ///
-/// Architecture Rule 3 and D-003 put media on disk precisely so the database
-/// stays small and sync stays cheap, but the D-035 migration to disk-backed
-/// WebP only changed the write path — rows created before it kept their inline
-/// payloads. Those rows bloat every delta that touches them and had grown the
-/// active database past its 15 MB budget. See D-058.
-///
-/// Returns the number of items migrated. Safe to call on every startup: it
-/// selects only rows that still carry a data URL, so a clean vault does nothing.
+/// Returns the number of items migrated. Cheap to run on every start-up: only
+/// rows still holding a data URL are selected.
 pub fn migrate_inline_media_to_disk<P: AsRef<Path>>(
     conn: &mut Connection,
     storage_dir: P,
@@ -413,15 +461,20 @@ pub fn migrate_inline_media_to_disk<P: AsRef<Path>>(
             // A payload we cannot decode is left exactly as it is: dropping it
             // would destroy the only copy of the user's image.
             _ => {
-                eprintln!("[media] item {item_id} has an undecodable inline payload; left untouched");
+                eprintln!(
+                    "[media] item {item_id} has an undecodable inline payload; left untouched"
+                );
                 continue;
             }
         };
 
-        let media = match save_image_media(conn, storage_dir.as_ref(), &item_id, &bytes, device_id) {
+        let media = match save_image_media(conn, storage_dir.as_ref(), &item_id, &bytes, device_id)
+        {
             Ok(m) => m,
             Err(e) => {
-                eprintln!("[media] item {item_id} could not be written to disk ({e:?}); left untouched");
+                eprintln!(
+                    "[media] item {item_id} could not be written to disk ({e:?}); left untouched"
+                );
                 continue;
             }
         };
@@ -429,14 +482,9 @@ pub fn migrate_inline_media_to_disk<P: AsRef<Path>>(
         // Only rewrite the row once the bytes are safely on disk, so an
         // interrupted run can never leave an item pointing at a missing file.
         let new_content = format!("/api/media/{}.webp", media.file_hash);
-        if let Err(e) = crate::db::storage::update_item(
-            conn,
-            &item_id,
-            &title,
-            &new_content,
-            None,
-            device_id,
-        ) {
+        if let Err(e) =
+            crate::db::storage::update_item(conn, &item_id, &title, &new_content, None, device_id)
+        {
             eprintln!("[media] item {item_id} saved to disk but the row was not updated ({e:?})");
             continue;
         }
@@ -473,8 +521,16 @@ mod migration_tests {
             let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
             out.push(T[(n >> 18) as usize & 63] as char);
             out.push(T[(n >> 12) as usize & 63] as char);
-            out.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
-            out.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' });
+            out.push(if c.len() > 1 {
+                T[(n >> 6) as usize & 63] as char
+            } else {
+                '='
+            });
+            out.push(if c.len() > 2 {
+                T[n as usize & 63] as char
+            } else {
+                '='
+            });
         }
         out
     }
@@ -488,8 +544,26 @@ mod migration_tests {
         let dev = "test-device";
 
         let data_url = format!("data:image/png;base64,{}", b64(&png_bytes()));
-        let image_item = create_item(&mut conn, None, "image", "inline shot", &data_url, None, dev).unwrap();
-        let note_item = create_item(&mut conn, None, "note", "just text", "not a data url", None, dev).unwrap();
+        let image_item = create_item(
+            &mut conn,
+            None,
+            "image",
+            "inline shot",
+            &data_url,
+            None,
+            dev,
+        )
+        .unwrap();
+        let note_item = create_item(
+            &mut conn,
+            None,
+            "note",
+            "just text",
+            "not a data url",
+            None,
+            dev,
+        )
+        .unwrap();
 
         let moved = migrate_inline_media_to_disk(&mut conn, &dir, dev).unwrap();
         assert_eq!(moved, 1, "exactly the one inline payload should migrate");
@@ -500,41 +574,45 @@ mod migration_tests {
             "content should now reference a file on disk, got: {}",
             migrated.content
         );
-        let hash = migrated.content.trim_start_matches("/api/media/").trim_end_matches(".webp");
+        let hash = migrated
+            .content
+            .trim_start_matches("/api/media/")
+            .trim_end_matches(".webp");
         assert!(
             dir.join("media").join(format!("{hash}.webp")).exists(),
             "the referenced blob must actually exist on disk before the row is rewritten"
         );
 
         let untouched = get_item_by_id(&conn, &note_item.id).unwrap().unwrap();
-        assert_eq!(untouched.content, "not a data url", "non-image rows must not be touched");
+        assert_eq!(
+            untouched.content, "not a data url",
+            "non-image rows must not be touched"
+        );
 
         // Idempotent: a second pass has nothing left to do.
-        assert_eq!(migrate_inline_media_to_disk(&mut conn, &dir, dev).unwrap(), 0);
+        assert_eq!(
+            migrate_inline_media_to_disk(&mut conn, &dir, dev).unwrap(),
+            0
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
 }
 
-/// Replaces inline `data:image/...` payloads inside historical revision rows
-/// with a reference to the same bytes on disk.
+/// Replaces inline `data:image/...` payloads in historical revisions with a
+/// reference to the same bytes on disk.
 ///
-/// The revision log is append-only and is the substrate mesh sync replays
-/// (D-012, D-017), so rows are never deleted here — only the oversized
-/// `content` field inside a payload is swapped for `/api/media/<hash>.webp`
-/// pointing at bytes that are written to disk first. A peer replaying such a
-/// revision now receives a reference and pulls the blob through the
-/// self-healing media path (D-055/P9-T02) instead of carrying megabytes of
-/// base64 through every delta. Causality, ordering and timestamps are
-/// untouched, so Last-Write-Wins convergence is unaffected. See D-058.
+/// Revisions are never deleted; only the oversized `content` field is swapped,
+/// after the bytes are written. Ordering and timestamps are untouched, so
+/// Last-Write-Wins convergence is unaffected, and peers fetch the file through
+/// the normal media sync path.
 pub fn compact_inline_media_in_revisions<P: AsRef<Path>>(
     conn: &mut Connection,
     storage_dir: P,
 ) -> Result<usize, MediaError> {
     let pending: Vec<(i64, String)> = {
-        let mut stmt = conn.prepare(
-            "SELECT id, payload FROM revisions WHERE payload LIKE '%data:image/%'",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, payload FROM revisions WHERE payload LIKE '%data:image/%'")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         rows.flatten().collect()
     };
@@ -562,12 +640,9 @@ pub fn compact_inline_media_in_revisions<P: AsRef<Path>>(
             continue;
         }
 
-        // Encode to WebP before hashing, so `<hash>.webp` keeps its meaning:
-        // the SHA-256 of the file's own bytes (D-013/D-018). Writing raw PNG
-        // into a .webp name would still verify, but it would quietly break the
-        // convention every other reader relies on. Re-encoding the same source
-        // through the same pipeline yields the same hash the live row already
-        // points at, so this de-duplicates rather than adding a second copy.
+        // Re-encode to WebP before hashing so the file name stays the SHA-256 of
+        // the file's bytes. The live row went through the same pipeline, so this
+        // produces the same hash rather than a second copy.
         let Ok(decoded) = image::load_from_memory(&bytes) else {
             continue;
         };
@@ -600,35 +675,30 @@ pub fn compact_inline_media_in_revisions<P: AsRef<Path>>(
     Ok(compacted)
 }
 
-/// Collapses runs of consecutive `vault_item/updated` revisions that describe
-/// the same state, keeping the newest of each run.
+/// Collapses runs of consecutive identical `vault_item/updated` revisions,
+/// keeping the newest of each run.
 ///
-/// The autosave loop fixed in D-055 re-saved an open note roughly every 600 ms,
-/// producing thousands of snapshots that differ only in `updated_at`. They carry
-/// no information — the note did not change — but they are replayed to every
-/// peer and had grown the revision log to 13 MB across 5,276 rows.
-///
-/// This is deliberately narrow. Only consecutive duplicates within one entity
-/// are removed, and the newest of each run survives, so every state the item
-/// ever actually held is still represented and in order. Last-Write-Wins
-/// convergence depends on the newest revision per entity (D-017), which is
-/// always kept. Nothing is removed for folders, media, creations or deletions.
-/// See D-058.
+/// An older autosave bug wrote a snapshot every 600 ms while an editor was open.
+/// Only consecutive duplicates of one entity are removed and the newest always
+/// survives, so every state an item held is still represented in order.
+/// Folders, media, creations and deletions are never touched.
 pub fn compact_redundant_item_revisions(conn: &mut Connection) -> Result<usize, MediaError> {
     /// The fields that describe an item's actual state, ignoring `updated_at`.
     fn state_signature(payload: &str) -> Option<String> {
         let v: serde_json::Value = serde_json::from_str(payload).ok()?;
         let field = |k: &str| v.get(k).map(|x| x.to_string()).unwrap_or_default();
-        Some([
-            field("title"),
-            field("content"),
-            field("folder_id"),
-            field("item_type"),
-            field("metadata"),
-            field("is_pinned"),
-            field("is_archived"),
-        ]
-        .join("\u{1f}"))
+        Some(
+            [
+                field("title"),
+                field("content"),
+                field("folder_id"),
+                field("item_type"),
+                field("metadata"),
+                field("is_pinned"),
+                field("is_archived"),
+            ]
+            .join("\u{1f}"),
+        )
     }
 
     let rows: Vec<(i64, String, String)> = {
@@ -653,7 +723,9 @@ pub fn compact_redundant_item_revisions(conn: &mut Connection) -> Result<usize, 
     };
 
     for (id, entity_id, payload) in rows {
-        let Some(sig) = state_signature(&payload) else { continue };
+        let Some(sig) = state_signature(&payload) else {
+            continue;
+        };
         let key = (entity_id, sig);
         if run_key.as_ref() != Some(&key) {
             flush(&mut run, &mut doomed);
@@ -685,7 +757,14 @@ mod revision_compaction_tests {
     use super::*;
     use crate::db::schema::initialize_schema;
 
-    fn insert_rev(conn: &Connection, entity: &str, change: &str, content: &str, updated_at: i64, ts: i64) {
+    fn insert_rev(
+        conn: &Connection,
+        entity: &str,
+        change: &str,
+        content: &str,
+        updated_at: i64,
+        ts: i64,
+    ) {
         let payload = format!(
             r#"{{"id":"{entity}","title":"n","content":"{content}","folder_id":null,"item_type":"note","metadata":null,"is_pinned":false,"is_archived":false,"updated_at":{updated_at}}}"#
         );
@@ -724,23 +803,43 @@ mod revision_compaction_tests {
         insert_rev(&conn, "item-a", "deleted", "hello world", 400, 400);
 
         let removed = compact_redundant_item_revisions(&mut conn).unwrap();
-        assert_eq!(removed, 4, "three redundant 'hello' plus one redundant 'hello world'");
+        assert_eq!(
+            removed, 4,
+            "three redundant 'hello' plus one redundant 'hello world'"
+        );
 
         let updates = remaining(&conn, "updated");
         assert_eq!(updates.len(), 3, "one per distinct state per item");
-        assert!(updates[0].contains(r#""content":"hello""#) && updates[0].contains(r#""updated_at":104"#),
-            "the newest of a duplicate run must survive, not the oldest: {}", updates[0]);
-        assert!(updates[1].contains(r#""content":"hello world""#) && updates[1].contains(r#""updated_at":201"#));
-        assert!(updates[2].contains(r#""content":"other""#), "the other item is untouched");
+        assert!(
+            updates[0].contains(r#""content":"hello""#)
+                && updates[0].contains(r#""updated_at":104"#),
+            "the newest of a duplicate run must survive, not the oldest: {}",
+            updates[0]
+        );
+        assert!(
+            updates[1].contains(r#""content":"hello world""#)
+                && updates[1].contains(r#""updated_at":201"#)
+        );
+        assert!(
+            updates[2].contains(r#""content":"other""#),
+            "the other item is untouched"
+        );
 
-        assert_eq!(remaining(&conn, "created").len(), 1, "creations are never removed");
-        assert_eq!(remaining(&conn, "deleted").len(), 1, "deletions are never removed");
+        assert_eq!(
+            remaining(&conn, "created").len(),
+            1,
+            "creations are never removed"
+        );
+        assert_eq!(
+            remaining(&conn, "deleted").len(),
+            1,
+            "deletions are never removed"
+        );
 
         // Idempotent.
         assert_eq!(compact_redundant_item_revisions(&mut conn).unwrap(), 0);
     }
 }
-
 
 #[cfg(test)]
 mod orphan_sweep_tests {
@@ -751,7 +850,8 @@ mod orphan_sweep_tests {
     fn png(size: u32) -> Vec<u8> {
         let mut buf = Vec::new();
         let img = image::DynamicImage::ImageRgba8(image::RgbaImage::new(size, size));
-        img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png).unwrap();
+        img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
+            .unwrap();
         buf
     }
 
@@ -777,8 +877,14 @@ mod orphan_sweep_tests {
         // With no grace, exactly the deleted item's blob goes.
         let swept = purge_orphan_media(&conn, &dir, std::time::Duration::ZERO).unwrap();
         assert_eq!(swept, 1, "expected only the orphan to be swept");
-        assert!(!dir.join(&m1.relative_path).exists(), "orphan blob survived");
-        assert!(dir.join(&m2.relative_path).exists(), "live blob was deleted");
+        assert!(
+            !dir.join(&m1.relative_path).exists(),
+            "orphan blob survived"
+        );
+        assert!(
+            dir.join(&m2.relative_path).exists(),
+            "live blob was deleted"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }

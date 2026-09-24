@@ -4,7 +4,7 @@ const STATIC_ASSETS = [
   "/index.html",
   "/manifest.json",
   "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  "/icons/icon-512.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -13,7 +13,7 @@ self.addEventListener("install", (event) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
         console.warn("Failed to pre-cache static assets:", err);
       });
-    })
+    }),
   );
   self.skipWaiting();
 });
@@ -26,9 +26,9 @@ self.addEventListener("activate", (event) => {
           if (key !== CACHE_NAME) {
             return caches.delete(key);
           }
-        })
+        }),
       );
-    })
+    }),
   );
   self.clients.claim();
 });
@@ -52,7 +52,7 @@ self.addEventListener("fetch", (event) => {
         return caches.match("/index.html").then((response) => {
           return response || caches.match("/");
         });
-      })
+      }),
     );
     return;
   }
@@ -62,7 +62,11 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            networkResponse.type === "basic"
+          ) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
@@ -73,6 +77,6 @@ self.addEventListener("fetch", (event) => {
         .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
-    })
+    }),
   );
 });

@@ -68,15 +68,9 @@ interface QrConfig {
   dataCapacity: number;
   ecCount: number;
   /**
-   * Centre of this version's single alignment pattern, as (row, col).
-   *
-   * Versions 2 to 4 have exactly one, and the spec gives its position through a
-   * coordinate list — [6, 18] for version 2 — whose entries are combined
-   * pairwise, with the combinations that collide with a finder dropped. For
-   * these versions that leaves only the last coordinate paired with itself, so
-   * version 2's pattern belongs at (18, 18). Reading the list itself as a
-   * coordinate put it at (6, 18) instead: on the timing row, in the data area,
-   * and absent from where every decoder looks for it. See D-081.
+   * Centre of this version's single alignment pattern, as (row, col). For
+   * versions 2 to 4 the spec's coordinate list (e.g. [6, 18]) yields exactly one
+   * usable pairing, the last coordinate with itself: (18, 18) for version 2.
    */
   alignmentCentre?: number;
 }
@@ -101,12 +95,8 @@ export function generateQrMatrix(text: string): boolean[][] {
     QR_CONFIGS[QR_CONFIGS.length - 1];
 
   const size = config.size;
-  const matrix: (boolean | null)[][] = Array.from({ length: size }, () =>
-    Array(size).fill(null)
-  );
-  const reserved: boolean[][] = Array.from({ length: size }, () =>
-    Array(size).fill(false)
-  );
+  const matrix: (boolean | null)[][] = Array.from({ length: size }, () => Array(size).fill(null));
+  const reserved: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
 
   // 1. Finder Patterns (7x7 at (0,0), (size-7, 0), (0, size-7))
   const addFinder = (row: number, col: number) => {
@@ -262,11 +252,8 @@ export function generateQrMatrix(text: string): boolean[][] {
   matrix[7][8] = formatBits[8] === 1;
   for (let i = 9; i < 15; i++) matrix[14 - i][8] = formatBits[i] === 1;
 
-  // Around top-right and bottom-left finders. The second copy runs the other
-  // way round from the first: bits 0-7 go UP column 8 from the bottom, and bits
-  // 8-14 go along row 8 to the right edge. These two were swapped, which left a
-  // decoder unable to read the mask and error-correction level and so unable to
-  // read anything at all. See D-081.
+  // Second copy, beside the top-right and bottom-left finders: bits 0-7 run
+  // up column 8 from the bottom, bits 8-14 along row 8 to the right edge.
   for (let i = 0; i < 8; i++) matrix[size - 1 - i][8] = formatBits[i] === 1;
   for (let i = 8; i < 15; i++) matrix[8][size - 15 + i] = formatBits[i] === 1;
 

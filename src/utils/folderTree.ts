@@ -69,7 +69,7 @@ export function getFolderPath(folderId: string, folders: Folder[]): Folder[] {
 export function isSelfOrDescendant(
   folderId: string,
   potentialDescendantId: string | null,
-  folders: Folder[]
+  folders: Folder[],
 ): boolean {
   if (!potentialDescendantId) return false;
   if (folderId === potentialDescendantId) return true;

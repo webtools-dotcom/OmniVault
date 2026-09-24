@@ -3,20 +3,13 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 /**
- * Three steps, then the three ways it goes wrong.
- *
- * The failure cases are written out rather than left to be discovered because
- * every one of them looks identical from the user's side — a list that stays
- * empty — and none of them is something the app can detect and report. Somebody
- * who fails to pair once and is told nothing does not try again. See D-075.
+ * Pairing steps, followed by the common reasons nothing shows up. None of them
+ * can be detected by the app, so they are spelled out.
  */
 export interface PairingGuideProps {
   /**
-   * Whether the device reading this is one that issues a PIN of its own.
-   *
-   * Only the desktop app does. A browser client is deliberately never issued
-   * one (D-051), so telling its reader to type "the PIN from this screen" sends
-   * them looking for something that is not there. See D-083.
+   * Whether this device issues its own PIN. Only the native apps do; a browser
+   * pairs by typing the PIN shown on the desktop.
    */
   showsOwnPin: boolean;
 }
@@ -47,15 +40,15 @@ export const PairingGuide: React.FC<PairingGuideProps> = ({ showsOwnPin }) => {
             {showsOwnPin ? (
               <>
                 Tap <span className="text-vault-primary">Connect</span> next to it, then press{" "}
-                <span className="text-vault-primary">Allow</span> on the other device. Only
-                someone holding that device can let yours in.
+                <span className="text-vault-primary">Allow</span> on the other device. Only someone
+                holding that device can let yours in.
               </>
             ) : (
               <>
-                Read the six-digit PIN off the <span className="text-vault-primary">computer's</span>{" "}
-                screen and type it here. Only the app on the computer issues one — it is never sent
-                over the network, which is what makes typing it proof you are standing in front of
-                that machine.
+                Read the six-digit PIN off the{" "}
+                <span className="text-vault-primary">computer's</span> screen and type it here. Only
+                the app on the computer issues one — it is never sent over the network, which is
+                what makes typing it proof you are standing in front of that machine.
               </>
             )}
           </span>
@@ -79,9 +72,9 @@ export const PairingGuide: React.FC<PairingGuideProps> = ({ showsOwnPin }) => {
               The two devices are on different networks
             </div>
             <p className="mt-1 text-xs leading-relaxed text-vault-muted">
-              The most common one, and easy to miss: a phone quietly on mobile data while the
-              laptop is on Wi-Fi, or two bands of the same router kept separate. Check both, or put
-              them both on one phone's hotspot.
+              The most common one, and easy to miss: a phone quietly on mobile data while the laptop
+              is on Wi-Fi, or two bands of the same router kept separate. Check both, or put them
+              both on one phone's hotspot.
             </p>
           </div>
           <div>
@@ -98,9 +91,10 @@ export const PairingGuide: React.FC<PairingGuideProps> = ({ showsOwnPin }) => {
               The router is keeping devices apart
             </div>
             <p className="mt-1 text-xs leading-relaxed text-vault-muted">
-              Guest networks and some hotel and office Wi-Fi block devices from seeing each other
-              at all, which no app can work around. Use <span className="text-vault-primary">Connect by address</span>{" "}
-              below if you know the other device's address, or use a phone hotspot instead.
+              Guest networks and some hotel and office Wi-Fi block devices from seeing each other at
+              all, which no app can work around. Use{" "}
+              <span className="text-vault-primary">Connect by address</span> below if you know the
+              other device's address, or use a phone hotspot instead.
             </p>
           </div>
         </div>

@@ -4,16 +4,17 @@ use uuid::Uuid;
 
 use crate::db::models::{Folder, VaultItem};
 
-/// A local write must never be older than something this device has already
-/// seen. Wall clocks on phones and laptops drift apart by minutes; with plain
-/// `Utc::now()` a device whose clock runs slow can edit an item and have the
-/// edit silently lose Last-Write-Wins forever against a peer revision that is
-/// merely timestamped ahead. Taking one millisecond past the newest revision we
-/// hold keeps every local edit able to win, without inventing a clock.
+/// Returns a timestamp for a local write that is never older than any revision
+/// already held. Device clocks drift apart; without this a device whose clock
+/// runs slow could make edits that always lose Last-Write-Wins.
 pub fn next_write_timestamp(conn: &Connection) -> i64 {
     let wall = Utc::now().timestamp_millis();
     let seen: i64 = conn
-        .query_row("SELECT COALESCE(MAX(timestamp), 0) FROM revisions", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(timestamp), 0) FROM revisions",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
     wall.max(seen + 1)
 }
@@ -41,11 +42,13 @@ pub fn get_or_create_device_id(conn: &Connection) -> Result<String> {
 
 /// Reads a `device_meta` value, or the supplied default when it is unset.
 pub fn get_meta(conn: &Connection, key: &str, default: &str) -> String {
-    conn.query_row("SELECT value FROM device_meta WHERE key = ?1", [key], |r| r.get(0))
-        .optional()
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| default.to_string())
+    conn.query_row("SELECT value FROM device_meta WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
+    .ok()
+    .flatten()
+    .unwrap_or_else(|| default.to_string())
 }
 
 /// Writes a `device_meta` value. Settings are device-local, so this writes no
@@ -62,10 +65,8 @@ pub fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
 
 /// Serialises an item's current row as a revision payload.
 ///
-/// `apply_remote_revisions` only applies a revision whose payload deserialises
-/// into a complete `VaultItem`, so a partial payload such as `"{}"` is silently
-/// discarded by the peer. Every item revision must therefore carry a full
-/// snapshot taken *after* the mutation. See D-060.
+/// Peers only apply a revision whose payload is a complete `VaultItem`, so every
+/// item revision carries a full snapshot taken after the change.
 fn item_snapshot_tx(tx: &Transaction, item_id: &str) -> String {
     tx.query_row(
         "SELECT id, folder_id, item_type, title, content, metadata, is_pinned, is_archived, is_deleted, created_at, updated_at
@@ -128,7 +129,14 @@ fn record_revision_tx(
     tx.execute(
         "INSERT INTO revisions (entity_type, entity_id, device_id, change_type, payload, timestamp)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![entity_type, entity_id, device_id, change_type, payload, timestamp],
+        params![
+            entity_type,
+            entity_id,
+            device_id,
+            change_type,
+            payload,
+            timestamp
+        ],
     )?;
     Ok(())
 }
@@ -166,7 +174,9 @@ pub fn create_folder(
     };
 
     let payload = serde_json::to_string(&folder).unwrap_or_default();
-    record_revision_tx(&tx, "folder", &folder_id, device_id, "created", &payload, now)?;
+    record_revision_tx(
+        &tx, "folder", &folder_id, device_id, "created", &payload, now,
+    )?;
 
     tx.commit()?;
     Ok(folder)
@@ -204,7 +214,9 @@ pub fn rename_folder(
     )?;
 
     let payload = serde_json::to_string(&folder).unwrap_or_default();
-    record_revision_tx(&tx, "folder", folder_id, device_id, "updated", &payload, now)?;
+    record_revision_tx(
+        &tx, "folder", folder_id, device_id, "updated", &payload, now,
+    )?;
 
     tx.commit()?;
     Ok(folder)
@@ -219,11 +231,8 @@ pub fn move_folder(
     let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
-    // A folder must never become its own ancestor. D-021 described this guard,
-    // but it lived only in the TypeScript layer, so the Tauri command and
-    // POST /api/folders/move could both build a cycle — after which the
-    // recursive descendant walk in delete_folder has no base case. Enforcing it
-    // here means every caller inherits it. See D-061.
+    // A folder must never become its own ancestor. Enforced here so every
+    // caller inherits it; `delete_folder`'s recursive walk relies on it.
     if let Some(target) = new_parent_id {
         if target == folder_id {
             return Err(rusqlite::Error::InvalidParameterName(
@@ -285,11 +294,7 @@ pub fn move_folder(
     Ok(folder)
 }
 
-pub fn delete_folder(
-    conn: &mut Connection,
-    folder_id: &str,
-    device_id: &str,
-) -> Result<()> {
+pub fn delete_folder(conn: &mut Connection, folder_id: &str, device_id: &str) -> Result<()> {
     let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
@@ -328,9 +333,8 @@ pub fn delete_folder(
     // 3. Re-parent child items across all deleted folders to Quick Inbox (folder_id = NULL)
     // so user notes and captures are never orphaned or permanently lost
     for fid in &all_folder_ids {
-        let mut item_stmt = tx.prepare(
-            "SELECT id FROM vault_items WHERE folder_id = ?1 AND is_deleted = 0",
-        )?;
+        let mut item_stmt =
+            tx.prepare("SELECT id FROM vault_items WHERE folder_id = ?1 AND is_deleted = 0")?;
         let item_ids: Vec<String> = item_stmt
             .query_map(params![fid], |row| row.get(0))?
             .filter_map(|r| r.ok())
@@ -425,7 +429,15 @@ pub fn create_item(
     };
 
     let payload = serde_json::to_string(&item).unwrap_or_default();
-    record_revision_tx(&tx, "vault_item", &item_id, device_id, "created", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        &item_id,
+        device_id,
+        "created",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(item)
@@ -470,7 +482,15 @@ pub fn update_item(
     )?;
 
     let payload = serde_json::to_string(&item).unwrap_or_default();
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "updated", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        item_id,
+        device_id,
+        "updated",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(item)
@@ -512,7 +532,15 @@ pub fn move_item(
     )?;
 
     let payload = serde_json::to_string(&item).unwrap_or_default();
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "moved", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        item_id,
+        device_id,
+        "moved",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(item)
@@ -532,7 +560,11 @@ pub fn set_item_archive(
         params![if is_archived { 1 } else { 0 }, now, item_id],
     )?;
 
-    let action = if is_archived { "archived" } else { "unarchived" };
+    let action = if is_archived {
+        "archived"
+    } else {
+        "unarchived"
+    };
     let payload = item_snapshot_tx(&tx, item_id);
     record_revision_tx(&tx, "vault_item", item_id, device_id, action, &payload, now)?;
 
@@ -555,17 +587,21 @@ pub fn set_item_pin(
     )?;
 
     let payload = item_snapshot_tx(&tx, item_id);
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "pinned", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        item_id,
+        device_id,
+        "pinned",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(())
 }
 
-pub fn toggle_pin_item(
-    conn: &mut Connection,
-    item_id: &str,
-    device_id: &str,
-) -> Result<VaultItem> {
+pub fn toggle_pin_item(conn: &mut Connection, item_id: &str, device_id: &str) -> Result<VaultItem> {
     let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
@@ -596,17 +632,21 @@ pub fn toggle_pin_item(
     )?;
 
     let payload = serde_json::to_string(&item).unwrap_or_default();
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "updated", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        item_id,
+        device_id,
+        "updated",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(item)
 }
 
-pub fn delete_item(
-    conn: &mut Connection,
-    item_id: &str,
-    device_id: &str,
-) -> Result<()> {
+pub fn delete_item(conn: &mut Connection, item_id: &str, device_id: &str) -> Result<()> {
     let now = next_write_timestamp(conn);
     let tx = conn.transaction()?;
 
@@ -616,7 +656,15 @@ pub fn delete_item(
     )?;
 
     let payload = item_snapshot_tx(&tx, item_id);
-    record_revision_tx(&tx, "vault_item", item_id, device_id, "deleted", &payload, now)?;
+    record_revision_tx(
+        &tx,
+        "vault_item",
+        item_id,
+        device_id,
+        "deleted",
+        &payload,
+        now,
+    )?;
 
     tx.commit()?;
     Ok(())
@@ -742,7 +790,8 @@ mod tests {
         let dev_id = "test-device-1";
 
         // 1. Create root folder "Product Ideas"
-        let root = create_folder(&mut conn, "Product Ideas", None, Some("#2F81F7"), dev_id).unwrap();
+        let root =
+            create_folder(&mut conn, "Product Ideas", None, Some("#2F81F7"), dev_id).unwrap();
         assert_eq!(root.name, "Product Ideas");
         assert_eq!(root.parent_id, None);
 
@@ -765,11 +814,13 @@ mod tests {
         assert_eq!(active_folders[0].name, "Product Ideas");
 
         // 6. Verify revision log count: created root, created child, updated child, moved child, deleted child = 5
-        let rev_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM revisions WHERE entity_type = 'folder'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let rev_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM revisions WHERE entity_type = 'folder'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(rev_count, 5);
     }
 
@@ -787,7 +838,8 @@ mod tests {
             "Watch 135 breakout",
             Some(r#"{"ticker":"NVDA"}"#),
             dev_id,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(item.folder_id, None);
         assert_eq!(item.title, "$NVDA");
 
@@ -820,7 +872,8 @@ mod tests {
             "Bought 50 shares at 135.20",
             None,
             dev_id,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(updated.title, "$NVDA (Bought)");
 
         // 5. Archive item
@@ -839,11 +892,13 @@ mod tests {
 
         // Verify revisions logged for vault_item:
         // 1: created, 2: moved, 3: updated, 4: archived, 5: deleted = 5
-        let rev_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM revisions WHERE entity_type = 'vault_item'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let rev_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM revisions WHERE entity_type = 'vault_item'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(rev_count, 5);
     }
 
@@ -858,9 +913,36 @@ mod tests {
         let deep = create_folder(&mut conn, "Deep", Some(&sub.id), None, dev_id).unwrap();
 
         // 2. Add notes to each level of the hierarchy
-        let item_parent = create_item(&mut conn, Some(&parent.id), "note", "Note in Parent", "p content", None, dev_id).unwrap();
-        let item_sub = create_item(&mut conn, Some(&sub.id), "note", "Note in Sub", "s content", None, dev_id).unwrap();
-        let item_deep = create_item(&mut conn, Some(&deep.id), "note", "Note in Deep", "d content", None, dev_id).unwrap();
+        let item_parent = create_item(
+            &mut conn,
+            Some(&parent.id),
+            "note",
+            "Note in Parent",
+            "p content",
+            None,
+            dev_id,
+        )
+        .unwrap();
+        let item_sub = create_item(
+            &mut conn,
+            Some(&sub.id),
+            "note",
+            "Note in Sub",
+            "s content",
+            None,
+            dev_id,
+        )
+        .unwrap();
+        let item_deep = create_item(
+            &mut conn,
+            Some(&deep.id),
+            "note",
+            "Note in Deep",
+            "d content",
+            None,
+            dev_id,
+        )
+        .unwrap();
 
         // Quick inbox should currently be empty (all items are filed)
         assert_eq!(list_inbox_items(&conn).unwrap().len(), 0);
@@ -870,11 +952,19 @@ mod tests {
 
         // 4. Assert that ALL 3 folders are soft-deleted (0 active folders remain)
         let active_folders = list_folders(&conn, false).unwrap();
-        assert_eq!(active_folders.len(), 0, "All descendant folders must be soft-deleted");
+        assert_eq!(
+            active_folders.len(),
+            0,
+            "All descendant folders must be soft-deleted"
+        );
 
         // 5. Assert that ALL 3 items are safely re-parented to Quick Inbox (folder_id = NULL)
         let inbox_items = list_inbox_items(&conn).unwrap();
-        assert_eq!(inbox_items.len(), 3, "All child items must be preserved in Quick Inbox");
+        assert_eq!(
+            inbox_items.len(),
+            3,
+            "All child items must be preserved in Quick Inbox"
+        );
 
         let inbox_ids: Vec<String> = inbox_items.into_iter().map(|i| i.id).collect();
         assert!(inbox_ids.contains(&item_parent.id));

@@ -26,17 +26,15 @@ function formatWhen(ms: number): string {
   const then = new Date(ms);
   const days = Math.floor((Date.now() - ms) / 86_400_000);
   const stamp = then.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  if (days <= 0) return `today, ${then.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+  if (days <= 0)
+    return `today, ${then.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
   if (days === 1) return "yesterday";
   return `${stamp} · ${days} days ago`;
 }
 
 /**
- * Tauri rejects a failed command with a plain string, not an Error, so the
- * usual `err instanceof Error` check throws away every message the Rust side
- * took the trouble to write and leaves the person with a generic one. That is
- * how "That zip has no omnivault.db in it" reached the screen as "could not be
- * read". See D-077.
+ * Tauri rejects failed commands with a plain string rather than an Error, so
+ * the message from the Rust side has to be read out explicitly.
  */
 function messageFrom(err: unknown, fallback: string): string {
   if (typeof err === "string" && err.trim()) return err;
@@ -51,7 +49,8 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
   const [done, setDone] = useState<ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
-  const onAndroid = deviceKind(isTauriEnvironment()) === "tablet" || deviceKind(isTauriEnvironment()) === "phone";
+  const onAndroid =
+    deviceKind(isTauriEnvironment()) === "tablet" || deviceKind(isTauriEnvironment()) === "phone";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,12 +65,9 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
   if (!isOpen) return null;
 
   /**
-   * Restores a file the person pointed at, rather than one the app found.
-   *
-   * A plain file input, because the webview turns it into the system picker
-   * and the system picker is the only way an Android app may read a file it
-   * did not write. The bytes are read here and handed over whole; there is no
-   * path involved on that platform. See D-077.
+   * Restores a file the user picked. A plain file input opens the system picker,
+   * the only way an Android app may read a file it did not create; the bytes are
+   * read here and sent whole.
    */
   const handlePicked = async (file: File | undefined) => {
     if (!file || isWorking) return;
@@ -157,9 +153,8 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
                 <p className="mt-2 text-xs leading-relaxed text-vault-muted">
                   The other {done.notes_left_deleted === 1 ? "one" : done.notes_left_deleted}{" "}
                   {done.notes_left_deleted === 1 ? "was" : "were"} deleted on this device after the
-                  backup was taken, so{" "}
-                  {done.notes_left_deleted === 1 ? "it was" : "they were"} left deleted. A restore
-                  never undoes a deletion that came after the backup.
+                  backup was taken, so {done.notes_left_deleted === 1 ? "it was" : "they were"} left
+                  deleted. A restore never undoes a deletion that came after the backup.
                 </p>
               )}
             </div>
@@ -167,22 +162,20 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
             <div className="rounded-xl bg-vault-elevated px-4 py-4 text-xs leading-relaxed text-vault-muted">
               {onAndroid ? (
                 <>
-                  Nothing here this app can list on its own. Android only lets an app see
-                  files in your downloads folder that it created itself, so a backup from
-                  before the app was reinstalled is invisible to it even though the file
-                  is sitting right there.
+                  Nothing here this app can list on its own. Android only lets an app see files in
+                  your downloads folder that it created itself, so a backup from before the app was
+                  reinstalled is invisible to it even though the file is sitting right there.
                   <span className="block mt-2 text-vault-secondary">
-                    Use <strong className="font-medium">Choose a file</strong> below and
-                    point at it — handing it over yourself is what gives the app
-                    permission to read it.
+                    Use <strong className="font-medium">Choose a file</strong> below and point at it
+                    — handing it over yourself is what gives the app permission to read it.
                   </span>
                 </>
               ) : (
                 <>
                   No backups found in your downloads folder. Use{" "}
-                  <strong className="text-vault-secondary font-medium">Back up</strong> first,
-                  or <strong className="text-vault-secondary font-medium">Choose a file</strong>{" "}
-                  to point at one kept somewhere else.
+                  <strong className="text-vault-secondary font-medium">Back up</strong> first, or{" "}
+                  <strong className="text-vault-secondary font-medium">Choose a file</strong> to
+                  point at one kept somewhere else.
                 </>
               )}
             </div>
@@ -197,7 +190,7 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, onR
                     "text-left rounded-xl px-3.5 py-3 transition-colors cursor-pointer",
                     selected === b.path
                       ? "bg-vault-overlay text-vault-primary"
-                      : "bg-vault-elevated text-vault-secondary hover:bg-vault-overlay"
+                      : "bg-vault-elevated text-vault-secondary hover:bg-vault-overlay",
                   )}
                 >
                   <div className="text-[0.8125rem] font-medium text-vault-primary truncate">

@@ -8,7 +8,13 @@ const DEFAULT_FOLDERS: Folder[] = [];
 const DEFAULT_ITEMS: VaultItem[] = [];
 
 const DUMMY_ITEM_IDS = new Set(["item-init-1", "item-init-2", "item-init-3"]);
-const DUMMY_FOLDER_IDS = new Set(["fld-research", "fld-sub-saas", "fld-trading", "fld-crypto", "fld-ideas"]);
+const DUMMY_FOLDER_IDS = new Set([
+  "fld-research",
+  "fld-sub-saas",
+  "fld-trading",
+  "fld-crypto",
+  "fld-ideas",
+]);
 const DUMMY_TITLES = new Set([
   "OmniVault Offline Mesh Architecture",
   "OmniVault Local Mesh Architecture",
@@ -44,8 +50,7 @@ let cachedServerPort: number = 42420;
 // Helper to check if Tauri runtime is present
 export function isTauriEnvironment(): boolean {
   return (
-    typeof window !== "undefined" &&
-    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
+    typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
   );
 }
 
@@ -75,7 +80,10 @@ export function cacheLocalMedia(key: string, dataUrl: string): void {
   localMediaCache.set(clean, dataUrl);
   const withoutExt = clean.replace(/\.webp$/i, "");
   localMediaCache.set(withoutExt, dataUrl);
-  const justHash = clean.split("/").pop()?.replace(/\.webp$/i, "");
+  const justHash = clean
+    .split("/")
+    .pop()
+    ?.replace(/\.webp$/i, "");
   if (justHash) {
     localMediaCache.set(justHash, dataUrl);
     localMediaCache.set(`/api/media/${justHash}.webp`, dataUrl);
@@ -83,9 +91,9 @@ export function cacheLocalMedia(key: string, dataUrl: string): void {
 }
 
 /**
- * Resolves a media URL to an absolute or relative URL accessible by the current runtime.
- * Handles fast local memory cache, desktop Tauri (translates /api/media/... to http://127.0.0.1:42420/api/media/...),
- * tablet/mobile web (relative to current origin), and raw data URLs.
+ * Resolves a stored media URL for the current runtime: the in-memory cache,
+ * the loopback server inside the app, or a same-origin URL with the pairing
+ * token in a browser.
  */
 export function resolveMediaUrl(url: string | null | undefined): string {
   if (!url) return "";
@@ -101,7 +109,10 @@ export function resolveMediaUrl(url: string | null | undefined): string {
   if (localMediaCache.has(clean)) {
     return localMediaCache.get(clean)!;
   }
-  const justHash = clean.split("/").pop()?.replace(/\.webp$/i, "");
+  const justHash = clean
+    .split("/")
+    .pop()
+    ?.replace(/\.webp$/i, "");
   if (justHash && localMediaCache.has(justHash)) {
     return localMediaCache.get(justHash)!;
   }
@@ -136,10 +147,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
     if (!res.ok) {
       console.warn(`HTTP ${res.status} from ${path}`);
       if (res.status === 401) {
-        // The server no longer accepts this device. Without saying so, the app
-        // would fall back to empty local storage and present an empty vault as
-        // though the notes were gone. Drop the stale credential and ask the
-        // app to prompt for re-pairing. See D-061.
+        // The server no longer accepts this device. Drop the stale credential and
+        // ask the app to prompt for re-pairing instead of showing an empty vault.
         try {
           localStorage.removeItem(STORAGE_KEY_PAIRED);
           localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
@@ -159,10 +168,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | nul
 }
 
 /**
- * Thrown when the server rejected or could not receive a write and this client
- * is paired, meaning the desktop vault — not this browser — is the source of
- * truth. Falling back to localStorage here would look like success while the
- * note silently failed to leave the device.
+ * Thrown when a paired client's write did not reach the server. The server
+ * holds the vault, so falling back to localStorage would hide the failure.
  */
 export interface BackupFile {
   path: string;
@@ -199,7 +206,7 @@ function assertServerWrite<T>(result: T | null, operation: string): T {
     if (StorageService.isPaired()) {
       throw new VaultWriteError(operation);
     }
-    // Unpaired "Browse Local" session: local-only is the intended mode (D-021).
+    // An unpaired browser session is intentionally local-only.
     return null as unknown as T;
   }
   return result;
@@ -225,7 +232,7 @@ function getLocalFolders(): Folder[] {
           "Crypto Trends",
           "Product Ideas",
           "Product Roadmaps",
-        ].includes(f.name)
+        ].includes(f.name),
     );
     if (cleaned.length !== parsed.length) {
       // Best-effort tidy-up of legacy demo rows; failing to persist it
@@ -261,7 +268,7 @@ function getLocalItems(): VaultItem[] {
     }
     const parsed = JSON.parse(raw) as VaultItem[];
     const cleaned = parsed.filter(
-      (item) => !DUMMY_ITEM_IDS.has(item.id) && !DUMMY_TITLES.has(item.title)
+      (item) => !DUMMY_ITEM_IDS.has(item.id) && !DUMMY_TITLES.has(item.title),
     );
     if (cleaned.length !== parsed.length) {
       // Best-effort tidy-up of legacy demo rows; failing to persist it
@@ -300,7 +307,10 @@ export const StorageService = {
     }
   },
 
-  async pairDevice(pin: string, deviceName?: string): Promise<{ success: boolean; error?: string }> {
+  async pairDevice(
+    pin: string,
+    deviceName?: string,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const cleanPin = pin.trim().replace(/\s+/g, "");
       if (cleanPin.length < 4) {
@@ -324,7 +334,10 @@ export const StorageService = {
       if (data.device_id) localStorage.setItem(STORAGE_KEY_PEER_ID, data.device_id);
       return { success: true };
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : "Network request failed" };
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Network request failed",
+      };
     }
   },
 
@@ -359,9 +372,7 @@ export const StorageService = {
   },
 
   async getPairingSession(): Promise<{ pin: string; expires_in: number } | null> {
-    // The PIN is only ever issued locally, over IPC. A browser client never
-    // displays a PIN — it types one the user read off the desktop screen — so
-    // there is deliberately no network path here. See D-051.
+    // A PIN is only issued locally over IPC; browsers never display one.
     if (!isTauriEnvironment()) return null;
     try {
       const session = await invoke<{ pin: string; expires_at: number }>("get_pairing_session_cmd");
@@ -419,10 +430,7 @@ export const StorageService = {
       }>("/api/sync/status");
       const peersRes = await apiFetch<{ peers: PeerInfo[]; count: number }>("/api/sync/peers");
       const peers = peersRes?.peers || [];
-      // `paired_devices_count` counts every pairing this vault has ever made.
-      // Falling back to it when no peer was visible reported weeks of test
-      // pairings as devices in the room — the "Synced (5)" on a tablet whose
-      // desktop was simultaneously saying "No devices yet". See D-082.
+      // Count devices present now, not every device ever paired.
       const present = res?.present_device_ids ?? [];
       return {
         status: present.length > 0 ? "synced" : "standby",
@@ -446,7 +454,11 @@ export const StorageService = {
     return 0;
   },
 
-  async pairWithPeer(ip: string, port: number, pin: string): Promise<{ success: boolean; error?: string }> {
+  async pairWithPeer(
+    ip: string,
+    port: number,
+    pin: string,
+  ): Promise<{ success: boolean; error?: string }> {
     if (isTauriEnvironment()) {
       try {
         await invoke("pair_with_peer_cmd", { peerIp: ip, peerPort: port, pin });
@@ -460,9 +472,17 @@ export const StorageService = {
   },
 
   /** Pairs by asking the other device, which shows Allow / Deny. Native apps only. */
-  async requestPairApproval(ip: string, port: number, peerName?: string): Promise<{ success: boolean; error?: string }> {
+  async requestPairApproval(
+    ip: string,
+    port: number,
+    peerName?: string,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      await invoke("request_pair_approval_cmd", { peerIp: ip, peerPort: port, peerName: peerName ?? null });
+      await invoke("request_pair_approval_cmd", {
+        peerIp: ip,
+        peerPort: port,
+        peerName: peerName ?? null,
+      });
       return { success: true };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -470,7 +490,11 @@ export const StorageService = {
   },
 
   /** A device waiting for someone here to allow it, if any. */
-  async getPendingPairRequest(): Promise<{ request_id: string; device_id: string; device_name: string } | null> {
+  async getPendingPairRequest(): Promise<{
+    request_id: string;
+    device_id: string;
+    device_name: string;
+  } | null> {
     if (!isTauriEnvironment()) return null;
     try {
       return await invoke("get_pending_pair_request_cmd");
@@ -506,7 +530,7 @@ export const StorageService = {
   async createFolder(
     name: string,
     parentId: string | null = null,
-    color: string | null = "#2F81F7"
+    color: string | null = "#2F81F7",
   ): Promise<Folder> {
     if (isTauriEnvironment()) {
       try {
@@ -519,11 +543,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), parent_id: parentId, color }),
-      }), "create folder");
+      const serverFolder = assertServerWrite(
+        await apiFetch<Folder>("/api/folders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim(), parent_id: parentId, color }),
+        }),
+        "create folder",
+      );
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().filter((f) => f.id !== serverFolder.id);
         folders.push(serverFolder);
@@ -559,11 +586,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: folderId, name: newName.trim() }),
-      }), "rename folder");
+      const serverFolder = assertServerWrite(
+        await apiFetch<Folder>("/api/folders/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: folderId, name: newName.trim() }),
+        }),
+        "rename folder",
+      );
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().map((f) => (f.id === folderId ? serverFolder : f));
         saveLocalFolders(folders);
@@ -581,10 +611,7 @@ export const StorageService = {
     return folder;
   },
 
-  async moveFolder(
-    folderId: string,
-    newParentId: string | null
-  ): Promise<Folder> {
+  async moveFolder(folderId: string, newParentId: string | null): Promise<Folder> {
     if (isTauriEnvironment()) {
       try {
         return await invoke<Folder>("move_folder_cmd", {
@@ -595,11 +622,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverFolder = assertServerWrite(await apiFetch<Folder>("/api/folders/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: folderId, parent_id: newParentId }),
-      }), "move folder");
+      const serverFolder = assertServerWrite(
+        await apiFetch<Folder>("/api/folders/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: folderId, parent_id: newParentId }),
+        }),
+        "move folder",
+      );
       if (serverFolder && serverFolder.id) {
         const folders = getLocalFolders().map((f) => (f.id === folderId ? serverFolder : f));
         saveLocalFolders(folders);
@@ -632,7 +662,7 @@ export const StorageService = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: folderId }),
         }),
-        "delete folder"
+        "delete folder",
       );
     }
 
@@ -675,11 +705,11 @@ export const StorageService = {
   },
 
   // -------------------------------------------------------------------------
-  // Media Upload & Attachment Handling
+  // Media
   // -------------------------------------------------------------------------
   /**
-   * Uploads an image (File, Blob, or base64/dataURL string) to the local backend.
-   * Compresses the image to WebP on disk and returns its relative media URL.
+   * Uploads an image (stored as WebP) or, with `fileName`, a document (stored
+   * verbatim) and returns its media URL.
    */
   async uploadMedia(
     data: File | Blob | string,
@@ -689,7 +719,7 @@ export const StorageService = {
       title?: string;
       /** Set for a document: stored as-is under this name's extension, not transcoded. */
       fileName?: string;
-    }
+    },
   ): Promise<{ url: string; file_hash: string; item?: VaultItem } | null> {
     const what = options?.fileName ? "store this file" : "store this image";
     try {
@@ -709,7 +739,8 @@ export const StorageService = {
       const payload = {
         item_id: options?.itemId,
         folder_id: options?.folderId,
-        title: options?.title || (data instanceof File ? data.name.replace(/\.[^/.]+$/, "") : undefined),
+        title:
+          options?.title || (data instanceof File ? data.name.replace(/\.[^/.]+$/, "") : undefined),
         file_name: options?.fileName,
         data: b64Data,
       };
@@ -725,10 +756,8 @@ export const StorageService = {
       });
 
       if (!res.ok) {
-        // Returning null here sends the caller down the inline-data-URL path,
-        // which is exactly the base64-in-the-database bloat D-035 removed - and
-        // it says nothing while doing it. Local-only mode still wants that
-        // fallback; a device with somewhere to put the file does not.
+        // Falling back to an inline data URL would put the file in the database;
+        // that is only acceptable in local-only mode.
         console.warn(`Failed to upload media, status: ${res.status}`);
         if (isTauriEnvironment() || StorageService.isPaired()) {
           throw new VaultWriteError(what);
@@ -776,12 +805,14 @@ export const StorageService = {
                 itemId: item.id,
                 folderId: item.folder_id,
                 title: item.title,
-              }).then((res) => {
-                if (res && res.url) {
-                  item.content = res.url;
-                  saveLocalItems(items);
-                }
-              }).catch(() => {});
+              })
+                .then((res) => {
+                  if (res && res.url) {
+                    item.content = res.url;
+                    saveLocalItems(items);
+                  }
+                })
+                .catch(() => {});
             }
           }
         } catch {
@@ -820,7 +851,9 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItems = await apiFetch<VaultItem[]>(`/api/items?folder_id=${encodeURIComponent(folderId)}`);
+      const serverItems = await apiFetch<VaultItem[]>(
+        `/api/items?folder_id=${encodeURIComponent(folderId)}`,
+      );
       if (serverItems && Array.isArray(serverItems)) {
         return serverItems;
       }
@@ -839,7 +872,7 @@ export const StorageService = {
     itemType: ItemType,
     title: string,
     content: string,
-    metadata: string | null = null
+    metadata: string | null = null,
   ): Promise<VaultItem> {
     // If it's an image and contains a raw base64 data URL, upload to disk storage first
     if (itemType === "image" && content.startsWith("data:")) {
@@ -885,7 +918,7 @@ export const StorageService = {
             metadata,
           }),
         }),
-        "create note"
+        "create note",
       );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().filter((i) => i.id !== serverItem.id);
@@ -920,7 +953,7 @@ export const StorageService = {
     itemId: string,
     title: string,
     content: string,
-    metadata: string | null = null
+    metadata: string | null = null,
   ): Promise<VaultItem> {
     if (isTauriEnvironment()) {
       try {
@@ -945,7 +978,7 @@ export const StorageService = {
             metadata,
           }),
         }),
-        "update note"
+        "update note",
       );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
@@ -986,7 +1019,7 @@ export const StorageService = {
             folder_id: newFolderId,
           }),
         }),
-        "move note"
+        "move note",
       );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
@@ -1013,11 +1046,14 @@ export const StorageService = {
         console.warn("Tauri invoke failed, falling back to local storage:", err);
       }
     } else {
-      const serverItem = assertServerWrite(await apiFetch<VaultItem>("/api/items/toggle-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: itemId }),
-      }), "pin note");
+      const serverItem = assertServerWrite(
+        await apiFetch<VaultItem>("/api/items/toggle-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: itemId }),
+        }),
+        "pin note",
+      );
       if (serverItem && serverItem.id) {
         const items = getLocalItems().map((i) => (i.id === itemId ? serverItem : i));
         saveLocalItems(items);
@@ -1050,7 +1086,7 @@ export const StorageService = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: itemId }),
         }),
-        "delete note"
+        "delete note",
       );
     }
 
@@ -1073,7 +1109,7 @@ export const StorageService = {
     if (isTauriEnvironment()) {
       try {
         return await invoke<{ ip: string; port: number; url: string; reachable: boolean }>(
-          "get_lan_connection_info_cmd"
+          "get_lan_connection_info_cmd",
         );
       } catch (err) {
         console.warn("Tauri invoke failed, falling back to window host:", err);
@@ -1081,12 +1117,18 @@ export const StorageService = {
     }
 
     const host = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1";
-    const port = typeof window !== "undefined" && window.location.port ? parseInt(window.location.port, 10) : 42420;
+    const port =
+      typeof window !== "undefined" && window.location.port
+        ? parseInt(window.location.port, 10)
+        : 42420;
     const ip = host === "localhost" || host === "127.0.0.1" ? "127.0.0.1" : host;
     return {
       ip,
       port,
-      url: typeof window !== "undefined" && window.location.origin ? window.location.origin : `http://${ip}:${port}`,
+      url:
+        typeof window !== "undefined" && window.location.origin
+          ? window.location.origin
+          : `http://${ip}:${port}`,
       // Reached over the network already, since this branch only runs in a
       // browser that loaded the page from somewhere.
       reachable: ip !== "127.0.0.1",
@@ -1095,7 +1137,7 @@ export const StorageService = {
 
   async saveMediaToDownloads(
     mediaUrlOrHash: string,
-    suggestedFilename?: string
+    suggestedFilename?: string,
   ): Promise<{ success: boolean; filePath?: string; error?: string }> {
     if (isTauriEnvironment()) {
       try {
@@ -1105,7 +1147,10 @@ export const StorageService = {
         });
         return { success: true, filePath };
       } catch (err) {
-        console.warn("Tauri save_media_to_downloads_cmd failed, falling back to browser download:", err);
+        console.warn(
+          "Tauri save_media_to_downloads_cmd failed, falling back to browser download:",
+          err,
+        );
       }
     }
 
@@ -1133,10 +1178,8 @@ export const StorageService = {
   },
 
   /**
-   * Writes the whole vault to one archive in the downloads folder.
-   *
-   * Only the devices that hold a vault can do this — a paired browser is a
-   * window onto someone else's, not a copy of it.
+   * Writes the whole vault to one archive in the downloads folder. Only devices
+   * that hold a vault can export; a paired browser cannot.
    */
   async exportVault(): Promise<ExportSummary> {
     if (!isTauriEnvironment()) {
@@ -1151,9 +1194,8 @@ export const StorageService = {
   },
 
   /**
-   * Merges a backup into this vault. A restore is never a mirror — see D-073:
-   * nothing already here is deleted, and anything edited since the backup was
-   * taken keeps the newer version.
+   * Merges a backup into this vault. Nothing present is deleted, and anything
+   * edited since the backup keeps its newer version.
    */
   async importVault(path: string): Promise<ImportSummary> {
     if (!isTauriEnvironment()) {
@@ -1163,10 +1205,8 @@ export const StorageService = {
   },
 
   /**
-   * The same restore, from a file the person picked rather than one the app
-   * found. Android will not let an app read a file in shared storage it did
-   * not create, so after a reinstall its own backups are invisible to it; the
-   * system picker hands over the one chosen file as bytes. See D-077.
+   * Restores from a file the user picked. Android apps cannot read files in
+   * shared storage they did not create, so the picker hands over the bytes.
    */
   async importVaultBytes(file: Blob): Promise<ImportSummary> {
     const endpoint = isTauriEnvironment()
@@ -1182,7 +1222,7 @@ export const StorageService = {
     if (!res.ok) {
       const detail = await res.json().catch(() => null);
       throw new Error(
-        (detail && detail.error) || `The restore did not finish (HTTP ${res.status}).`
+        (detail && detail.error) || `The restore did not finish (HTTP ${res.status}).`,
       );
     }
     return res.json();
@@ -1201,7 +1241,9 @@ export const StorageService = {
   async checkPendingShares(): Promise<VaultItem[]> {
     if (isTauriEnvironment()) {
       try {
-        const res = await invoke<{ count: number; items: VaultItem[] }>("check_and_process_pending_shares_cmd");
+        const res = await invoke<{ count: number; items: VaultItem[] }>(
+          "check_and_process_pending_shares_cmd",
+        );
         if (res && res.count > 0 && Array.isArray(res.items)) {
           return res.items;
         }

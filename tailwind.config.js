@@ -1,21 +1,18 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       // Half-step spacing and `xs` scales used across the UI are Tailwind v4
       // names; v3.4 drops them silently, so they are defined here instead of
       // being rewritten at ~40 call sites.
       spacing: {
-        "0.2": "0.05rem",
-        "4.5": "1.125rem",
-        "6.5": "1.625rem",
-        "7.5": "1.875rem",
-        "8.5": "2.125rem",
-        "9.5": "2.375rem",
+        0.2: "0.05rem",
+        4.5: "1.125rem",
+        6.5: "1.625rem",
+        7.5: "1.875rem",
+        8.5: "2.125rem",
+        9.5: "2.375rem",
       },
       fontFamily: {
         // Archivo for the interface, Fraunces for titles. Both are self-hosted
@@ -33,8 +30,7 @@ export default {
       },
       colors: {
         vault: {
-          // Every neutral carries the same cool hue, so nothing reads as dead
-          // grey. D-070.
+          // Every neutral carries the same cool hue.
           bg: "#0D0E11",
           sidebar: "#101116",
           panel: "#101116",
@@ -63,9 +59,9 @@ export default {
           moss: "#7E9E86",
           slate: "#7D8CA8",
           plum: "#9E86A0",
-        }
-      }
+        },
+      },
     },
   },
   plugins: [],
-}
+};

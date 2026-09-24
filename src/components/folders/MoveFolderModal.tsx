@@ -101,11 +101,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
               {activeFolders.map((target) => {
                 const isInvalid = isSelfOrDescendant(folder.id, target.id, folders);
                 return (
-                  <option
-                    key={target.id}
-                    value={target.id}
-                    disabled={isInvalid}
-                  >
+                  <option key={target.id} value={target.id} disabled={isInvalid}>
                     {target.name} {isInvalid ? "— cannot move inside itself" : ""}
                   </option>
                 );

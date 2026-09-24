@@ -168,11 +168,13 @@ mod tests {
         ).unwrap();
 
         // Verify item is linked to f3
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM vault_items WHERE folder_id = 'f3'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vault_items WHERE folder_id = 'f3'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
 
         // 5. Test Quick Inbox item (folder_id IS NULL)
@@ -182,11 +184,13 @@ mod tests {
             [],
         ).unwrap();
 
-        let inbox_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM vault_items WHERE folder_id IS NULL",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let inbox_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vault_items WHERE folder_id IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(inbox_count, 1);
     }
 }

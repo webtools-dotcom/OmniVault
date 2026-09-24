@@ -1,3 +1,6 @@
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -5,25 +8,19 @@ use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::db::models::Revision;
 use crate::sync::discovery::{PeerInfo, PeerRegistry};
-use crate::sync::pairing::{is_device_paired, store_paired_device, update_peer_last_sync, PairedDevice};
+use crate::sync::pairing::{
+    is_device_paired, store_paired_device, update_peer_last_sync, PairedDevice,
+};
 use crate::sync::protocol::{apply_remote_revisions, query_revisions_since};
 
-/// Upper bound on blobs pulled in a single sync pass so a large backlog cannot
-/// stall one cycle; the remainder is picked up by the next pass.
-// ponytail: fixed cap, make it adaptive only if cold-start catchup feels slow.
+/// Maximum media files fetched per sync pass; the rest follow on the next pass.
 const MAX_MEDIA_FETCH_PER_SYNC: usize = 25;
 
-/// Nothing this app serves is larger than a 50 MB media upload, so anything
-/// past this is either a broken peer or something on the LAN pretending to be
-/// one. Without it a peer could declare a four-gigabyte body and have us
-/// reserve it up front - and with `panic = "abort"` a failed allocation takes
-/// the whole app down, not just the sync thread.
+/// Largest response accepted from a peer. Nothing legitimate exceeds a 50 MB
+/// upload; the cap stops a peer from making us reserve a huge declared body.
 const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_RESPONSE_HEADERS: usize = 100;
 const MAX_HEADER_LINE: u64 = 8 * 1024;
@@ -47,21 +44,14 @@ fn extract_media_name(content: &str) -> Option<String> {
     }
 }
 
-/// Every media file (`<hash>.<ext>`) this vault references but has none on
-/// disk for. Reading from local state (rather than the current delta batch)
-/// makes media sync self-healing: a blob missed on an earlier pass is retried
-/// every cycle until it lands.
-fn collect_missing_media_hashes(
-    conn: &Connection,
-    media_dir: &Path,
-    limit: usize,
-) -> Vec<String> {
+/// Every media file (`<hash>.<ext>`) a live item references that is missing on
+/// disk. Derived from local state rather than the current batch, so a failed
+/// fetch is retried on every pass until it succeeds.
+fn collect_missing_media_hashes(conn: &Connection, media_dir: &Path, limit: usize) -> Vec<String> {
     let mut hashes: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
 
-    // Only media belonging to a live item. Without the join this asked for every
-    // blob the vault had ever heard of, including those of deleted items - which
-    // the startup sweep then removed again, so a deleted photo was re-downloaded
-    // from the peer on every sync and deleted on every launch, forever.
+    // Only media of live items: deleted items' files are swept at start-up
+    // and must not be fetched again.
     if let Ok(mut stmt) = conn.prepare(
         "SELECT m.relative_path FROM media_files m
          JOIN vault_items i ON i.id = m.item_id
@@ -69,7 +59,9 @@ fn collect_missing_media_hashes(
     ) {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for path in rows.flatten() {
-                if let Some(name) = extract_media_name(&format!("/api/media/{}", path.trim_start_matches("media/"))) {
+                if let Some(name) =
+                    extract_media_name(&format!("/api/media/{}", path.trim_start_matches("media/")))
+                {
                     hashes.insert(name);
                 }
             }
@@ -226,12 +218,12 @@ struct PushDeltasRequest<'a> {
     pub revisions: &'a [Revision],
 }
 
-/// Performs a full bidirectional store-and-forward synchronization round with an active peer.
-/// 1. Pulls new remote revisions since last sync timestamp.
-/// 2. Applies remote revisions via Last-Write-Wins (LWW).
-/// 3. Streams down any missing WebP media attachments referenced in revisions.
-/// 4. Pushes local revisions to the peer.
-/// 5. Updates peer sync timestamp.
+/// Runs one full sync round with a peer:
+/// 1. pull remote revisions since the last sync;
+/// 2. apply them with Last-Write-Wins;
+/// 3. fetch missing media files;
+/// 4. push local revisions to the peer;
+/// 5. record the sync time.
 pub fn sync_with_peer(
     db: Arc<Mutex<Connection>>,
     self_device_id: &str,
@@ -273,10 +265,19 @@ pub fn sync_with_peer(
         None,
         timeout,
     )
-    .map_err(|e| format!("Failed to reach peer {} at {}: {}", peer.device_name, peer_addr, e))?;
+    .map_err(|e| {
+        format!(
+            "Failed to reach peer {} at {}: {}",
+            peer.device_name, peer_addr, e
+        )
+    })?;
 
     if resp.status != 200 {
-        return Err(format!("Peer returned status {}: {}", resp.status, String::from_utf8_lossy(&resp.body)));
+        return Err(format!(
+            "Peer returned status {}: {}",
+            resp.status,
+            String::from_utf8_lossy(&resp.body)
+        ));
     }
 
     let deltas_resp: DeltasResponse = serde_json::from_slice(&resp.body)
@@ -290,11 +291,9 @@ pub fn sync_with_peer(
             .map_err(|e| format!("Failed to apply remote revisions: {}", e))?;
     }
 
-    // Step 3: Stream missing WebP media files from peer.
-    // The set is derived from local state, never from this batch's revisions:
-    // a blob whose fetch failed (peer asleep, timeout, truncated body) must be
-    // retried later, but `since_ts` has already moved past its `media_file`
-    // revision, so a batch-derived list would strand it as a permanent 404.
+    // Step 3: fetch missing media. The list comes from local state, not this
+    // batch, because `since_ts` has already moved past the revision of any file
+    // whose earlier fetch failed.
     let media_dir = base_dir.join("media");
     let _ = fs::create_dir_all(&media_dir);
 
@@ -311,7 +310,10 @@ pub fn sync_with_peer(
             peer_addr,
             "GET",
             &media_path,
-            &[("x-auth-token", auth_token.as_str()), ("x-device-id", self_device_id)],
+            &[
+                ("x-auth-token", auth_token.as_str()),
+                ("x-device-id", self_device_id),
+            ],
             None,
             Duration::from_secs(10),
         ) {
@@ -320,7 +322,8 @@ pub fn sync_with_peer(
                 hasher.update(&media_resp.body);
                 let computed_hash = format!("{:x}", hasher.finalize());
                 if computed_hash == hash {
-                    let temp_path = media_dir.join(format!("{}.tmp.{}", hash, uuid::Uuid::new_v4()));
+                    let temp_path =
+                        media_dir.join(format!("{}.tmp.{}", hash, uuid::Uuid::new_v4()));
                     if let Ok(mut f) = File::create(&temp_path) {
                         if f.write_all(&media_resp.body).is_ok() {
                             let _ = fs::rename(&temp_path, &local_path);
@@ -425,7 +428,10 @@ pub fn pair_with_remote_peer(
 
     if resp.status != 200 {
         let err_msg = String::from_utf8_lossy(&resp.body);
-        return Err(format!("Pairing failed (status {}): {}", resp.status, err_msg));
+        return Err(format!(
+            "Pairing failed (status {}): {}",
+            resp.status, err_msg
+        ));
     }
 
     #[derive(Deserialize)]
@@ -444,16 +450,18 @@ pub fn pair_with_remote_peer(
         .ok_or_else(|| "Pairing response missing peer device ID".to_string())?;
 
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let peer_name = format!("OmniVault Peer ({})", &peer_device_id[..6.min(peer_device_id.len())]);
+    let peer_name = format!(
+        "OmniVault Peer ({})",
+        &peer_device_id[..6.min(peer_device_id.len())]
+    );
     let paired = store_paired_device(&conn, &peer_device_id, &peer_name, &pair_resp.auth_token)
         .map_err(|e| format!("Failed to store paired device: {}", e))?;
 
     Ok(paired)
 }
 
-/// Pairs with a peer by asking it, and waiting up to a minute for someone at
-/// that device to press Allow. Ends with the same stored pairing as the PIN
-/// route. See D-090.
+/// Pairs with a peer by asking it and waiting up to a minute for someone there
+/// to press Allow. Stores the same pairing as the PIN route.
 pub fn request_pairing_approval(
     db: Arc<Mutex<Connection>>,
     self_device_id: &str,
@@ -524,7 +532,10 @@ pub fn request_pairing_approval(
             _ => break,
         }
     }
-    Err("Nobody allowed the request in time. Try again, and press Allow on the other device.".into())
+    Err(
+        "Nobody allowed the request in time. Try again, and press Allow on the other device."
+            .into(),
+    )
 }
 
 /// Runs the continuous mesh synchronization loop on a background Tokio runtime.
@@ -581,7 +592,10 @@ mod tests {
         );
         assert_eq!(extract_media_name("just a plain note"), None);
         assert_eq!(extract_media_name("/api/media/not-a-hash.webp"), None);
-        assert_eq!(extract_media_name(&format!("/api/media/{}.x/../y", hash)), None);
+        assert_eq!(
+            extract_media_name(&format!("/api/media/{}.x/../y", hash)),
+            None
+        );
     }
 
     #[test]
@@ -608,7 +622,11 @@ mod tests {
         }
 
         let missing = collect_missing_media_hashes(&conn, &dir, 25);
-        assert_eq!(missing, vec![format!("{absent}.webp")], "only the blob absent from disk is refetched");
+        assert_eq!(
+            missing,
+            vec![format!("{absent}.webp")],
+            "only the blob absent from disk is refetched"
+        );
 
         // Once it lands it must drop out of the repair set.
         std::fs::write(dir.join(format!("{}.webp", absent)), b"blob").unwrap();
@@ -622,7 +640,8 @@ mod tests {
             rusqlite::params![absent, format!("media/{}.webp", absent)],
         )
         .unwrap();
-        conn.execute("UPDATE vault_items SET is_deleted = 1", []).unwrap();
+        conn.execute("UPDATE vault_items SET is_deleted = 1", [])
+            .unwrap();
         std::fs::remove_file(dir.join(format!("{absent}.webp"))).unwrap();
         assert!(
             collect_missing_media_hashes(&conn, &dir, 25).is_empty(),

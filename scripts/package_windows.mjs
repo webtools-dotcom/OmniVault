@@ -4,10 +4,7 @@ import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 
 const rootDir = process.cwd();
-// The version comes from package.json and nowhere else. It used to be typed
-// into artifact filenames in three scripts, so a release meant editing ten
-// hardcoded strings by hand and the version guard only ever checked three
-// files. See D-085.
+// Artifact names derive from the version in package.json.
 const VERSION = JSON.parse(fs.readFileSync(path.resolve(rootDir, "package.json"), "utf-8")).version;
 
 const releaseExePath = path.resolve(rootDir, "src-tauri/target/release/omnivault.exe");
@@ -33,7 +30,7 @@ const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 console.log(`[1/5] Found release binary: ${releaseExePath}`);
 console.log(`      Binary size: ${stats.size.toLocaleString()} bytes (${sizeMB} MB)`);
 
-// 2. Size budget check (< 15MB target from APP.md / DECISIONS.md)
+// 2. Size budget: the binary must stay under 15 MB.
 const MAX_BUDGET_MB = 15;
 if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
   console.error(`❌ Binary size exceeds ${MAX_BUDGET_MB} MB budget! Actual: ${sizeMB} MB`);
@@ -41,13 +38,8 @@ if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
 }
 console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ PASS`);
 
-// 3. Create release directory & copy standalone binary and web dist assets
-//
-// The staging directory is emptied first. Vite names its output by content
-// hash, so copying a fresh dist/ into a directory that already held earlier
-// ones only ever adds: the package had accumulated 74 asset files and 16 MB
-// where a single build produces four. Every stale bundle was shipped to
-// whoever downloaded the release. See D-084.
+// 3. Stage the binary and web assets. The staging directory is emptied
+// first: Vite names output by content hash, so old bundles would pile up.
 const staleAssets = path.resolve(releaseDistDir, "dist");
 fs.rmSync(staleAssets, { recursive: true, force: true });
 fs.rmSync(path.resolve(rootDir, "release/dist"), { recursive: true, force: true });
@@ -56,7 +48,9 @@ try {
   fs.copyFileSync(releaseExePath, targetExePath);
 } catch (err) {
   if (err && err.code === "EBUSY") {
-    console.warn("⚠️ Notice: Target release executable is currently running and locked. Preserved running binary.");
+    console.warn(
+      "⚠️ Notice: Target release executable is currently running and locked. Preserved running binary.",
+    );
   } else {
     throw err;
   }
@@ -66,7 +60,9 @@ try {
   fs.copyFileSync(releaseExePath, path.resolve(rootDir, "release/omnivault.exe"));
 } catch (err) {
   if (err && err.code === "EBUSY") {
-    console.warn("⚠️ Notice: release/omnivault.exe is currently running and locked. Preserved running binary.");
+    console.warn(
+      "⚠️ Notice: release/omnivault.exe is currently running and locked. Preserved running binary.",
+    );
   } else {
     throw err;
   }
@@ -132,12 +128,8 @@ if (fs.existsSync(zipPath)) {
 
 fs.writeFileSync(shaSumsPath, checksumLines, "utf-8");
 
-// The notes that go out with a release say what the app is, in the same voice
-// and with the same restraint as the README. This template previously claimed
-// support for iPhones and iPads that does not exist, named mDNS for what is
-// UDP multicast, and quoted a binary size that had drifted — the same untruths
-// removed from the README in D-080, living on in a script that regenerates
-// them. See D-084.
+// Release notes. Keep them consistent with the README: no platform or
+// security claims the app does not meet.
 const releaseNotesContent = `# OmniVault v${VERSION}
 
 Send yourself a note from your phone and find it on your laptop, without

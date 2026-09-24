@@ -27,7 +27,11 @@ export interface SidebarProps {
   activeView: ActiveView;
   onSelectInbox: () => void;
   onSelectFolder: (folderId: string) => void;
-  onCreateFolder: (name: string, parentId: string | null, color: string | null) => Promise<void> | void;
+  onCreateFolder: (
+    name: string,
+    parentId: string | null,
+    color: string | null,
+  ) => Promise<void> | void;
   onRenameFolder: (folderId: string, newName: string) => Promise<void> | void;
   onMoveFolder: (folderId: string, newParentId: string | null) => Promise<void> | void;
   onDeleteFolder: (folderId: string) => Promise<void> | void;
@@ -69,8 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [update, setUpdate] = useState<UpdateCheck | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
-  // The only outbound request the app makes, and only because someone asked:
-  // no background poll, no stored preference quietly checking. D-074.
+  // The app's only outbound request, made only when the user asks.
   const handleCheckForUpdate = async () => {
     if (isCheckingUpdate) return;
     setIsCheckingUpdate(true);
@@ -89,8 +92,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     try {
       const summary = await StorageService.exportVault();
       const mb = summary.bytes / (1024 * 1024);
-      const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(summary.bytes / 1024))} KB`;
-      setExportNote(`${summary.notes} note${summary.notes === 1 ? "" : "s"} saved to Downloads · ${size}`);
+      const size =
+        mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(summary.bytes / 1024))} KB`;
+      setExportNote(
+        `${summary.notes} note${summary.notes === 1 ? "" : "s"} saved to Downloads · ${size}`,
+      );
       setExportState("done");
       window.setTimeout(() => {
         setExportState("idle");
@@ -111,14 +117,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         "flex flex-col bg-vault-sidebar h-full transition-transform duration-200 select-none",
         isMobile
           ? cn(
-              // The drawer is fixed to the screen edges, so the body's
-              // safe-area padding never reaches it: without its own, the
-              // header sat under the status bar and the device panel under
-              // the navigation buttons.
+              // The drawer is fixed to the screen edges, so it needs its own
+              // safe-area padding to stay clear of the status and navigation bars.
               "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
-              isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+              isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none",
             )
-          : "w-56 shrink-0"
+          : "w-56 shrink-0",
       )}
     >
       {/* Brand & App Header */}
@@ -155,9 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2.5 scrollbar-none">
         {/* Workspaces Header & Quick Inbox */}
         <div>
-          <div className="px-2 py-1 text-xs text-vault-subtle">
-            Workspaces
-          </div>
+          <div className="px-2 py-1 text-xs text-vault-subtle">Workspaces</div>
           <button
             onClick={onSelectInbox}
             onDragOver={(e) => {
@@ -190,14 +192,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isInboxDragOver
                 ? "bg-vault-accent/20 text-vault-primary font-medium ring-1 ring-vault-border-active/50"
                 : isInboxActive
-                ? "bg-vault-card-hover text-vault-primary font-medium shadow-xs"
-                : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]"
+                  ? "bg-vault-card-hover text-vault-primary font-medium shadow-xs"
+                  : "text-vault-secondary hover:text-vault-primary hover:bg-vault-primary/[0.04]",
             )}
           >
             <Inbox
               className={cn(
                 "w-3.5 h-3.5 shrink-0 transition-colors",
-                isInboxActive ? "text-vault-secondary" : "text-vault-muted"
+                isInboxActive ? "text-vault-secondary" : "text-vault-muted",
               )}
             />
             <span className="flex-1 truncate">
@@ -212,9 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Folders Section with Hierarchical Tree */}
         <div>
           <div className="flex items-center justify-between px-2 py-1 mb-0.5">
-            <span className="text-xs text-vault-subtle">
-              Folders
-            </span>
+            <span className="text-xs text-vault-subtle">Folders</span>
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
@@ -244,7 +244,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="px-3 py-2.5 bg-vault-sidebar shrink-0 flex flex-col gap-2 text-xs select-none">
         <div
           onClick={onOpenPairing}
-          className={cn("flex items-center gap-2.5 min-w-0 w-full", onOpenPairing && "cursor-pointer hover:opacity-90")}
+          className={cn(
+            "flex items-center gap-2.5 min-w-0 w-full",
+            onOpenPairing && "cursor-pointer hover:opacity-90",
+          )}
           title={onOpenPairing ? "Connect a device" : undefined}
         >
           <div className="w-6.5 h-6.5 rounded-lg bg-vault-elevated flex items-center justify-center text-vault-secondary shrink-0">
@@ -258,9 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span
                 className={cn(
                   "w-1.5 h-1.5 rounded-full shrink-0",
-                  meshState.peerCount > 0
-                    ? "bg-vault-success"
-                    : "bg-vault-muted"
+                  meshState.peerCount > 0 ? "bg-vault-success" : "bg-vault-muted",
                 )}
               />
               <span className="text-[0.741rem] text-vault-secondary truncate">
@@ -293,7 +294,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="h-6 px-2 flex items-center gap-1.5 rounded-md bg-vault-elevated hover:bg-vault-overlay text-[0.6875rem] text-vault-secondary hover:text-vault-primary transition-colors cursor-pointer disabled:opacity-60"
             >
               <Download className="w-3 h-3" />
-              <span className="whitespace-nowrap">{exportState === "working" ? "Saving…" : exportState === "done" ? "Saved" : "Back up"}</span>
+              <span className="whitespace-nowrap">
+                {exportState === "working"
+                  ? "Saving…"
+                  : exportState === "done"
+                    ? "Saved"
+                    : "Back up"}
+              </span>
             </button>
           )}
 
@@ -373,7 +380,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p
             className={cn(
               "text-[0.6875rem] leading-relaxed pl-9",
-              exportState === "failed" ? "text-vault-error" : "text-vault-muted"
+              exportState === "failed" ? "text-vault-error" : "text-vault-muted",
             )}
           >
             {exportNote}

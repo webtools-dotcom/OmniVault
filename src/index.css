@@ -25,25 +25,16 @@
   color-scheme: dark;
 }
 
-/* UI density scales the root rem, never CSS zoom: `zoom` does not compensate
-   viewport units, so h-screen/w-screen would leave dead strips at the edges.
-   The 16px base is what the layout was authored against — `h-9.5` is the 38px
-   toolbar of D-046 only at a 16px root — so 1.0 renders the design at 1:1. */
+/* UI density scales the root font size rather than using CSS zoom, which does
+   not compensate viewport units. 1.0 is the 16px root the design targets. */
 html {
   font-size: calc(16px * var(--ui-scale, 1));
   -webkit-text-size-adjust: 100%;
 }
 
-/* The app fills the window that exists, not the theoretical one.
-   `100vh` on a mobile browser is the height the page would have if the address
-   bar were hidden, so a shell sized to it pushes its own last row underneath
-   the browser chrome — and because that shell is `overflow-hidden`, there is no
-   way to scroll down and find it. On a tablet reading the vault through a
-   browser this hid the whole device panel: the name of the device, Back up,
-   the version and the update check were simply not on screen.
-   `100dvh` follows the space actually visible. Browsers without it keep the
-   first declaration, so this degrades to today's behaviour rather than to
-   nothing. See D-082. */
+/* Size the shell to the visible viewport. On mobile browsers 100vh includes
+   the hidden address bar, pushing the last row off-screen; 100dvh does not.
+   The 100vh line is the fallback for browsers without dvh. */
 .app-viewport {
   height: 100vh;
   height: 100dvh;
@@ -51,8 +42,8 @@ html {
 
 /* Browser surfaces are part of the palette, not the browser's to choose. */
 ::selection {
-  background-color: #2E3039;
-  color: #E9EAEF;
+  background-color: #2e3039;
+  color: #e9eaef;
 }
 
 ::-webkit-scrollbar {
@@ -72,12 +63,12 @@ html {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #33353F;
+  background: #33353f;
   background-clip: padding-box;
 }
 
 :focus-visible {
-  outline: 2px solid #9AA0B4;
+  outline: 2px solid #9aa0b4;
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -86,11 +77,11 @@ body {
   margin: 0;
   padding: 0;
   font-family: "Archivo", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  /* Times, counts and prices line up without a monospace costume. */
+  /* Tabular figures so times, counts and prices line up. */
   font-variant-numeric: tabular-nums;
-  background-color: #0D0E11;
-  color: #E9EAEF;
-  caret-color: #E9EAEF;
+  background-color: #0d0e11;
+  color: #e9eaef;
+  caret-color: #e9eaef;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation;
@@ -105,15 +96,15 @@ body {
    link without adding a hue the palette does not have. */
 .prose a,
 .vault-prose a {
-  color: #E9EAEF;
+  color: #e9eaef;
   text-decoration: underline;
-  text-decoration-color: #4A4D5A;
+  text-decoration-color: #4a4d5a;
   text-underline-offset: 3px;
 }
 
 .prose a:hover,
 .vault-prose a:hover {
-  text-decoration-color: #9AA0B4;
+  text-decoration-color: #9aa0b4;
 }
 
 /* Fluid responsive helpers */

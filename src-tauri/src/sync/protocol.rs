@@ -71,13 +71,11 @@ pub fn query_revisions_since(
     Ok(revisions)
 }
 
-/// A revision can name a parent that has not reached this device yet - clock
-/// skew reorders a batch, or the parent predates the window the peer sent. The
-/// schema enforces foreign keys, so inserting one aborted the whole
-/// transaction, and since the peer resends the same batch every round sync
-/// stalled permanently. Dropping just the unresolvable link keeps the row (an
-/// item lands in Quick Inbox, a folder at the root) and lets a later revision
-/// put it back where it belongs.
+/// A revision may reference a parent this device has not received yet (clock
+/// skew, or the parent predates the batch). Foreign keys would abort the whole
+/// transaction and stall sync, so the unresolvable link is dropped instead: the
+/// item lands in the Quick Inbox or the folder at the root until a later
+/// revision moves it.
 fn resolve_parent(tx: &rusqlite::Transaction, table: &str, id: Option<&str>) -> Option<String> {
     let id = id?;
     let exists: i64 = tx
@@ -96,12 +94,8 @@ fn resolve_parent(tx: &rusqlite::Transaction, table: &str, id: Option<&str>) -> 
 
 /// Deterministic Last-Write-Wins.
 ///
-/// Wall-clock timestamps do tie: two devices editing the same row inside the
-/// same millisecond both accepted the other version under a plain `>=`, so each
-/// ended up holding the *other* device's row and the vault diverged with no
-/// further revision left to heal it. On a tie we compare the row contents
-/// themselves - both devices run the identical comparison, so both pick the
-/// same winner and converge.
+/// Timestamps can tie. On a tie the row contents are compared, so both devices
+/// pick the same winner and converge.
 fn remote_wins(local: Option<(i64, String)>, remote_ts: i64, remote_key: &str) -> bool {
     match local {
         None => true,
@@ -139,10 +133,7 @@ fn item_key(i: &VaultItem) -> String {
 
 /// Applies a sequence of remote revisions from a peer into the local SQLite database.
 /// Uses Last-Write-Wins based on timestamps to guarantee convergence.
-pub fn apply_remote_revisions(
-    conn: &mut Connection,
-    revisions: &[Revision],
-) -> Result<usize> {
+pub fn apply_remote_revisions(conn: &mut Connection, revisions: &[Revision]) -> Result<usize> {
     let tx = conn.transaction()?;
     let mut applied_count = 0;
 
@@ -310,7 +301,9 @@ pub fn apply_remote_revisions(
 mod tests {
     use super::*;
     use crate::db::schema::initialize_schema;
-    use crate::db::storage::{create_folder, create_item, list_folders, list_inbox_items, list_items_by_folder};
+    use crate::db::storage::{
+        create_folder, create_item, list_folders, list_inbox_items, list_items_by_folder,
+    };
 
     fn setup_node_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -327,7 +320,8 @@ mod tests {
         let _dev_b = "device-laptop-b";
 
         // 1. On Node A (Phone while outside): User creates folder and items
-        let folder = create_folder(&mut node_a, "Stock Research", None, Some("#2F81F7"), dev_a).unwrap();
+        let folder =
+            create_folder(&mut node_a, "Stock Research", None, Some("#2F81F7"), dev_a).unwrap();
         let _item_in_folder = create_item(
             &mut node_a,
             Some(&folder.id),
@@ -336,7 +330,8 @@ mod tests {
             "Target entry at 132.50",
             Some(r#"{"ticker":"NVDA"}"#),
             dev_a,
-        ).unwrap();
+        )
+        .unwrap();
         let _inbox_item = create_item(
             &mut node_a,
             None,
@@ -345,7 +340,8 @@ mod tests {
             "Smart timer with bluetooth",
             None,
             dev_a,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Node B initially has 0 folders and 0 items
         assert_eq!(list_folders(&node_b, false).unwrap().len(), 0);
@@ -420,19 +416,23 @@ mod tests {
         apply_remote_revisions(&mut node_b, &[rev("a", &from_a)]).unwrap();
 
         let read = |c: &Connection| -> String {
-            c.query_row("SELECT content FROM vault_items WHERE id = ?1", ["item-1"], |r| {
-                r.get(0)
-            })
+            c.query_row(
+                "SELECT content FROM vault_items WHERE id = ?1",
+                ["item-1"],
+                |r| r.get(0),
+            )
             .unwrap()
         };
-        assert_eq!(read(&node_a), read(&node_b), "devices diverged on a timestamp tie");
+        assert_eq!(
+            read(&node_a),
+            read(&node_b),
+            "devices diverged on a timestamp tie"
+        );
         // Deterministic winner: the lexicographically greater row.
         assert_eq!(read(&node_a), "edit made on the tablet");
     }
 
-    /// Foreign keys are on, so a revision naming a folder this device has never
-    /// seen used to abort the whole batch - and the peer resends the same batch
-    /// every round, so sync stopped for good.
+    /// A revision naming an unknown folder must not abort the batch.
     #[test]
     fn an_item_in_an_unknown_folder_still_lands_and_does_not_stall_the_batch() {
         let mut conn = setup_node_db();
@@ -483,7 +483,10 @@ mod tests {
 
         let applied = apply_remote_revisions(&mut conn, &revs)
             .expect("an unresolvable folder must not fail the batch");
-        assert_eq!(applied, 2, "the revision behind the orphan must still apply");
+        assert_eq!(
+            applied, 2,
+            "the revision behind the orphan must still apply"
+        );
 
         let folder_id: Option<String> = conn
             .query_row(

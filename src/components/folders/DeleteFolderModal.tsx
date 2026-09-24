@@ -60,22 +60,18 @@ export const DeleteFolderModal: React.FC<DeleteFolderModalProps> = ({
 
         <div className="p-5 space-y-3">
           <p className="text-xs text-vault-primary leading-relaxed">
-            Are you sure you want to delete <span className="font-semibold text-vault-primary">"{folder.name}"</span>?
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-vault-primary">"{folder.name}"</span>?
           </p>
           <p className="text-xs text-vault-muted leading-relaxed">
-            Subfolders and items inside this folder will be soft-deleted. Changes will be synced across your local mesh network.
+            Subfolders and items inside this folder will be soft-deleted. Changes will be synced
+            across your local mesh network.
           </p>
           {error && <p className="text-xs text-vault-error mt-2">{error}</p>}
         </div>
 
         <div className="px-5 py-3.5 bg-vault-bg/60 border-t border-vault-border flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            disabled={isDeleting}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isDeleting}>
             Cancel
           </Button>
           <Button

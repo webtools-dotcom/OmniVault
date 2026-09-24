@@ -12,14 +12,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vault-accent/50 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer";
 
     const variantStyles = {
-      primary:
-        "bg-vault-accent text-vault-ink hover:bg-vault-accent-hover",
+      primary: "bg-vault-accent text-vault-ink hover:bg-vault-accent-hover",
       secondary:
         "bg-vault-elevated text-vault-primary hover:bg-vault-card border border-vault-border hover:border-vault-border-active shadow-xs",
       ghost:
         "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/80 border border-transparent",
-      danger:
-        "bg-transparent text-vault-error hover:bg-vault-error hover:text-vault-ink",
+      danger: "bg-transparent text-vault-error hover:bg-vault-error hover:text-vault-ink",
       outline:
         "bg-transparent text-vault-secondary hover:text-vault-primary border border-vault-border hover:border-vault-border-active hover:bg-vault-elevated/40",
     };
@@ -41,7 +39,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {children}
       </button>
     );
-  }
+  },
 );
 
 Button.displayName = "Button";

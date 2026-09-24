@@ -33,7 +33,7 @@ export function useClipboardPaste({ onPasteImage, enabled = true }: UseClipboard
         }
       }
     },
-    [enabled, onPasteImage]
+    [enabled, onPasteImage],
   );
 
   useEffect(() => {

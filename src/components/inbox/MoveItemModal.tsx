@@ -34,10 +34,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
     }
   }, [isOpen, item]);
 
-  const activeFolders = useMemo(
-    () => folders.filter((f) => !f.is_deleted),
-    [folders]
-  );
+  const activeFolders = useMemo(() => folders.filter((f) => !f.is_deleted), [folders]);
 
   // Compute full hierarchical path name for each folder: e.g. "Work / Projects / OmniVault"
   const folderPaths = useMemo(() => {
@@ -113,7 +110,8 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
         {/* Item Summary Pill */}
         <div className="px-5 py-3 bg-vault-bg/60 border-b border-vault-border/60 flex items-center justify-between text-xs">
           <div className="truncate text-vault-secondary pr-2">
-            Filing: <span className="font-semibold text-vault-primary">{item.title || "Untitled"}</span>
+            Filing:{" "}
+            <span className="font-semibold text-vault-primary">{item.title || "Untitled"}</span>
           </div>
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[0.815rem] font-medium bg-vault-elevated text-vault-secondary border border-vault-border shrink-0">
             {item.folder_id ? "Filed" : "Inbox"}
@@ -145,7 +143,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
               "w-full flex items-center justify-between p-2.5 rounded-xl text-xs transition-all text-left cursor-pointer",
               item.folder_id === null
                 ? "bg-vault-accent/15 text-vault-accent font-medium border border-vault-accent/30 shadow-xs"
-                : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/70"
+                : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/70",
             )}
           >
             <div className="flex items-center gap-2.5 min-w-0">
@@ -153,7 +151,9 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
               <span className="truncate font-medium">Quick Inbox</span>
             </div>
             {item.folder_id === null && (
-              <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
+              <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">
+                Current
+              </span>
             )}
           </button>
 
@@ -172,7 +172,7 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
                   "w-full flex items-center justify-between p-2.5 rounded-xl text-xs transition-all text-left cursor-pointer",
                   isCurrent
                     ? "bg-vault-accent/15 text-vault-accent font-medium border border-vault-accent/30 shadow-xs"
-                    : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/70"
+                    : "text-vault-secondary hover:text-vault-primary hover:bg-vault-elevated/70",
                 )}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -185,16 +185,16 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
                   </span>
                 </div>
                 {isCurrent && (
-                  <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">Current</span>
+                  <span className="text-[0.741rem] text-vault-accent font-semibold px-1.5 py-0.5 rounded bg-vault-accent/10">
+                    Current
+                  </span>
                 )}
               </button>
             );
           })}
 
           {filteredFolders.length === 0 && searchFilter && (
-            <p className="text-center py-6 text-xs text-vault-muted">
-              No matching folders found
-            </p>
+            <p className="text-center py-6 text-xs text-vault-muted">No matching folders found</p>
           )}
         </div>
 
@@ -205,17 +205,14 @@ export const MoveItemModal: React.FC<MoveItemModalProps> = ({
         )}
 
         {/* Modal Footer */}
-        <form onSubmit={handleSubmit} className="px-5 py-3.5 border-t border-vault-border flex items-center justify-between bg-vault-bg/40">
+        <form
+          onSubmit={handleSubmit}
+          className="px-5 py-3.5 border-t border-vault-border flex items-center justify-between bg-vault-bg/40"
+        >
           <span className="text-[0.815rem] text-vault-muted">
             Click any folder to file instantly
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
         </form>

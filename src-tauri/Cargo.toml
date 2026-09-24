@@ -25,8 +25,8 @@ tracing-subscriber = "0.3"
 sha2 = "0.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 socket2 = "0.5"
-# Already in the tree via image/png and already cross-compiled for Android;
-# declared so a restore can read a backup somebody unzipped and rezipped.
+# Already a transitive dependency of `image`; used directly so a restore can
+# read backups that were re-zipped with deflate compression.
 flate2 = "1"
 
 [profile.release]

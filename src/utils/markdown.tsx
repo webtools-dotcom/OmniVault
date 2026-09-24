@@ -2,9 +2,8 @@ import { safeHref } from "./safeUrl";
 import React from "react";
 
 /**
- * Lightweight, zero-dependency Markdown parser tailored for OmniVault notes.
- * Parses headers, bold, italics, code blocks, bullet/numbered lists, task checkboxes,
- * links, and automatically links stock/crypto tickers ($TICKER).
+ * A small Markdown renderer for notes: headings, emphasis, code, lists, task
+ * boxes, links and $TICKER symbols.
  */
 export function renderMarkdown(content: string): React.ReactNode[] {
   if (!content) return [];
@@ -24,7 +23,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
             className="p-3 my-2 rounded-lg bg-vault-bg border border-vault-border text-xs text-vault-primary overflow-x-auto"
           >
             <code>{codeBlockLines.join("\n")}</code>
-          </pre>
+          </pre>,
         );
         codeBlockLines = [];
         inCodeBlock = false;
@@ -47,7 +46,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           className="text-lg font-bold text-vault-primary mt-3 mb-1 tracking-tight"
         >
           {parseInline(line.slice(2))}
-        </h1>
+        </h1>,
       );
       return;
     }
@@ -58,18 +57,15 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           className="text-base font-semibold text-vault-primary mt-2.5 mb-1 tracking-tight"
         >
           {parseInline(line.slice(3))}
-        </h2>
+        </h2>,
       );
       return;
     }
     if (line.startsWith("### ")) {
       elements.push(
-        <h3
-          key={`h3-${index}`}
-          className="text-sm font-semibold text-vault-primary mt-2 mb-0.5"
-        >
+        <h3 key={`h3-${index}`} className="text-sm font-semibold text-vault-primary mt-2 mb-0.5">
           {parseInline(line.slice(4))}
-        </h3>
+        </h3>,
       );
       return;
     }
@@ -82,7 +78,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           className="pl-3 py-1 my-1.5 border-l border-vault-border text-xs text-vault-secondary italic bg-vault-card/20 rounded-r"
         >
           {parseInline(line.slice(2))}
-        </blockquote>
+        </blockquote>,
       );
       return;
     }
@@ -101,16 +97,10 @@ export function renderMarkdown(content: string): React.ReactNode[] {
               readOnly
               className="mt-0.5 rounded border-vault-border text-vault-accent focus:ring-0"
             />
-            <span
-              className={
-                isChecked
-                  ? "line-through text-vault-muted"
-                  : "text-vault-primary"
-              }
-            >
+            <span className={isChecked ? "line-through text-vault-muted" : "text-vault-primary"}>
               {parseInline(taskText)}
             </span>
-          </div>
+          </div>,
         );
         return;
       }
@@ -124,7 +114,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           className="list-disc list-inside text-xs text-vault-secondary my-0.5"
         >
           {parseInline(line.slice(2))}
-        </li>
+        </li>,
       );
       return;
     }
@@ -139,7 +129,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
     elements.push(
       <p key={`p-${index}`} className="text-xs text-vault-secondary leading-relaxed my-1">
         {parseInline(line)}
-      </p>
+      </p>,
     );
   });
 
@@ -151,7 +141,8 @@ export function renderMarkdown(content: string): React.ReactNode[] {
  */
 function parseInline(text: string): React.ReactNode {
   // Regex to match $TICKERS, links [title](url), bold **bold**, code `code`, italic *italic*
-  const tokenRegex = /(\$[A-Z0-9]{2,6}\b)|(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(`([^`]+)`)|(\*([^*]+)\*)/g;
+  const tokenRegex =
+    /(\$[A-Z0-9]{2,6}\b)|(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(`([^`]+)`)|(\*([^*]+)\*)/g;
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -175,7 +166,7 @@ function parseInline(text: string): React.ReactNode {
           onClick={(e) => e.stopPropagation()}
         >
           {match[1]}
-        </a>
+        </a>,
       );
     }
     // Link [title](url)
@@ -184,23 +175,22 @@ function parseInline(text: string): React.ReactNode {
       const safeLinkUrl = safeHref(match[4]);
       nodes.push(
         safeLinkUrl === null ? (
-          // Not a scheme we will link. Show the text so nothing is lost, but
-          // give the reader nothing to click. See D-061.
+          // Unsupported scheme: show the text, but not as a link.
           <span key={`inline-link-${match.index}`} title={`Blocked link: ${match[4]}`}>
             {linkTitle}
           </span>
         ) : (
-        <a
-          key={`inline-link-${match.index}`}
-          href={safeLinkUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-vault-accent underline hover:text-vault-accent-hover transition-colors"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {linkTitle}
-        </a>
-        )
+          <a
+            key={`inline-link-${match.index}`}
+            href={safeLinkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-vault-accent underline hover:text-vault-accent-hover transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {linkTitle}
+          </a>
+        ),
       );
     }
     // Bold **text**
@@ -208,7 +198,7 @@ function parseInline(text: string): React.ReactNode {
       nodes.push(
         <strong key={`inline-bold-${match.index}`} className="font-semibold text-vault-primary">
           {match[6]}
-        </strong>
+        </strong>,
       );
     }
     // Code `code`
@@ -219,7 +209,7 @@ function parseInline(text: string): React.ReactNode {
           className="px-1 py-0.5 mx-0.5 rounded bg-vault-bg text-vault-primary text-[0.815rem] border border-vault-border"
         >
           {match[8]}
-        </code>
+        </code>,
       );
     }
     // Italic *text*
@@ -227,7 +217,7 @@ function parseInline(text: string): React.ReactNode {
       nodes.push(
         <em key={`inline-italic-${match.index}`} className="italic text-vault-secondary">
           {match[10]}
-        </em>
+        </em>,
       );
     }
 

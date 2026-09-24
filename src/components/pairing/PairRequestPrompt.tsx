@@ -6,19 +6,15 @@ import { StorageService } from "../../services/storageService";
 type PendingRequest = { request_id: string; device_id: string; device_name: string };
 
 /**
- * Asks the person at this device whether another device may connect.
- *
- * This replaces reading a PIN off one screen and typing it into the other:
- * pressing Allow here is the same proof that someone is standing at this
- * device. Native apps only — a browser never receives pairing requests.
- * See D-090.
+ * Asks whether another device may connect to this vault. Pressing Allow is the
+ * proof that someone is at this device. Only native apps receive requests.
  */
 export const PairRequestPrompt: React.FC<{ onPaired?: () => void }> = ({ onPaired }) => {
   const [request, setRequest] = useState<PendingRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // ponytail: polls every 1.5 s; an event from Rust if this ever shows up in a profile.
+    // Polled; cheap enough at this interval to not need an event from Rust.
     const timer = setInterval(async () => {
       const pending = await StorageService.getPendingPairRequest();
       setRequest((current) => (current?.request_id === pending?.request_id ? current : pending));
@@ -57,8 +53,9 @@ export const PairRequestPrompt: React.FC<{ onPaired?: () => void }> = ({ onPaire
             </h2>
           </div>
           <p className="text-[0.8125rem] text-vault-secondary leading-relaxed">
-            <span className="font-semibold text-vault-primary">{request.device_name}</span> wants to sync with
-            this vault. Allow it only if it is your own device — it will be able to read and change everything here.
+            <span className="font-semibold text-vault-primary">{request.device_name}</span> wants to
+            sync with this vault. Allow it only if it is your own device — it will be able to read
+            and change everything here.
           </p>
           {error && <p className="text-xs text-vault-error">{error}</p>}
         </div>

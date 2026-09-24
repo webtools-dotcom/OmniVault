@@ -12,35 +12,6 @@ pub struct Folder {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ItemType {
-    Note,
-    Image,
-    Link,
-    Ticker,
-}
-
-impl ItemType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ItemType::Note => "note",
-            ItemType::Image => "image",
-            ItemType::Link => "link",
-            ItemType::Ticker => "ticker",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "note" => Some(ItemType::Note),
-            "image" => Some(ItemType::Image),
-            "link" => Some(ItemType::Link),
-            "ticker" => Some(ItemType::Ticker),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VaultItem {
     pub id: String,
     pub folder_id: Option<String>, // None = Quick Inbox

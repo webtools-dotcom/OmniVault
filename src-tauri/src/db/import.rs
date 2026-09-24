@@ -1,11 +1,8 @@
-//! Reading a vault back in from an archive written by `export`.
+//! Restores a vault from an archive written by `export`.
 //!
-//! The rules this implements are settled in P12-T02 and D-073, and the one
-//! that shapes the code is the second: **a restore is not a file copy.** Every
-//! row in the archive is offered to the vault the way a paired device offers a
-//! revision, so Last-Write-Wins decides each collision and a restore can never
-//! overwrite work done after the backup was taken. That also means the
-//! convergence rules are tested in one place rather than two.
+//! A restore is a merge, not a file copy: every row in the archive is applied
+//! the way a peer's revision is, so Last-Write-Wins resolves each collision and
+//! a restore never overwrites work done after the backup was taken.
 
 use std::collections::HashSet;
 use std::fs;
@@ -69,13 +66,9 @@ pub struct ImportSummary {
     /// the merge, so it answers the question a person is actually asking —
     /// "are my notes back" — rather than how many rows changed hands.
     pub notes_present: usize,
-    /// Notes from the backup that this device deleted after the backup was
-    /// taken, and which a restore therefore did not bring back.
-    ///
-    /// Without this number the summary is true and useless: restoring 18 notes
-    /// into a vault that has since deleted 16 of them reports "8 records taken
-    /// from a backup holding 18 notes" and leaves the person to guess whether
-    /// that is success, partial failure, or a bug. See D-078.
+    /// Notes in the backup that were deleted on this device after the backup was
+    /// taken, and so were not restored. Reported so the summary explains why fewer
+    /// notes came back than the archive holds.
     pub notes_left_deleted: usize,
 }
 
@@ -112,7 +105,9 @@ fn u32_at(b: &[u8], i: usize) -> u32 {
 /// happen to contain the signature.
 fn read_directory(bytes: &[u8]) -> Result<Vec<Entry>, ImportError> {
     if bytes.len() < 22 {
-        return Err(ImportError::Archive("That file is too small to be a backup.".into()));
+        return Err(ImportError::Archive(
+            "That file is too small to be a backup.".into(),
+        ));
     }
     // The end-of-central-directory record sits at the very end, after a comment
     // of up to 64 KB, so it is found by scanning backwards.
@@ -130,7 +125,9 @@ fn read_directory(bytes: &[u8]) -> Result<Vec<Entry>, ImportError> {
 
     for _ in 0..count {
         if pos + 46 > bytes.len() || u32_at(bytes, pos) != 0x0201_4b50 {
-            return Err(ImportError::Archive("The backup's index is damaged.".into()));
+            return Err(ImportError::Archive(
+                "The backup's index is damaged.".into(),
+            ));
         }
         let method = u16_at(bytes, pos + 10);
         let compressed = u32_at(bytes, pos + 20) as usize;
@@ -142,13 +139,21 @@ fn read_directory(bytes: &[u8]) -> Result<Vec<Entry>, ImportError> {
         let name = String::from_utf8_lossy(&bytes[pos + 46..pos + 46 + name_len]).to_string();
 
         if local_offset + 30 > bytes.len() || u32_at(bytes, local_offset) != 0x0403_4b50 {
-            return Err(ImportError::Archive(format!("The entry '{name}' is damaged.")));
+            return Err(ImportError::Archive(format!(
+                "The entry '{name}' is damaged."
+            )));
         }
         let l_name = u16_at(bytes, local_offset + 26) as usize;
         let l_extra = u16_at(bytes, local_offset + 28) as usize;
         let data_offset = local_offset + 30 + l_name + l_extra;
 
-        entries.push(Entry { name, method, data_offset, compressed, uncompressed });
+        entries.push(Entry {
+            name,
+            method,
+            data_offset,
+            compressed,
+            uncompressed,
+        });
         pos += 46 + name_len + extra_len + comment_len;
     }
     Ok(entries)
@@ -157,7 +162,10 @@ fn read_directory(bytes: &[u8]) -> Result<Vec<Entry>, ImportError> {
 fn read_entry(bytes: &[u8], e: &Entry) -> Result<Vec<u8>, ImportError> {
     let end = e.data_offset + e.compressed;
     if end > bytes.len() {
-        return Err(ImportError::Archive(format!("'{}' runs past the end of the file.", e.name)));
+        return Err(ImportError::Archive(format!(
+            "'{}' runs past the end of the file.",
+            e.name
+        )));
     }
     let raw = &bytes[e.data_offset..end];
     match e.method {
@@ -168,7 +176,9 @@ fn read_entry(bytes: &[u8], e: &Entry) -> Result<Vec<u8>, ImportError> {
             let mut out = Vec::with_capacity(e.uncompressed);
             flate2::read::DeflateDecoder::new(raw)
                 .read_to_end(&mut out)
-                .map_err(|_| ImportError::Archive(format!("'{}' could not be unpacked.", e.name)))?;
+                .map_err(|_| {
+                    ImportError::Archive(format!("'{}' could not be unpacked.", e.name))
+                })?;
             Ok(out)
         }
         other => Err(ImportError::Archive(format!(
@@ -191,12 +201,9 @@ pub fn import_vault(
     import_vault_bytes(conn, base_dir, &fs::read(archive)?)
 }
 
-/// The same restore, from an archive already in memory.
-///
-/// Android hands a chosen file over as a stream rather than a path — scoped
-/// storage does not give the app a readable path to a file it did not write —
-/// so the bytes arrive without ever having a name on this filesystem. Taking
-/// bytes rather than a path is what lets the same restore serve both.
+/// Restores from an archive already in memory. Android's document picker
+/// provides a stream rather than a readable path, so the bytes arrive without a
+/// file name on this filesystem.
 pub fn import_vault_bytes(
     conn: &mut Connection,
     base_dir: &Path,
@@ -252,7 +259,11 @@ pub fn import_vault_bytes(
                 entity_type: "vault_item".into(),
                 entity_id: i.id.clone(),
                 device_id: "restore".into(),
-                change_type: if i.is_deleted { "deleted".into() } else { "updated".into() },
+                change_type: if i.is_deleted {
+                    "deleted".into()
+                } else {
+                    "updated".into()
+                },
                 payload: Some(serde_json::to_string(i).unwrap_or_default()),
                 timestamp: now,
             });
@@ -427,6 +438,6 @@ pub fn list_backups(dirs: &[PathBuf]) -> Vec<BackupFile> {
             });
         }
     }
-    found.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+    found.sort_by_key(|b| std::cmp::Reverse(b.modified_ms));
     found
 }

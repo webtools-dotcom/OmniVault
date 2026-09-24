@@ -16,7 +16,7 @@ export interface FolderTreeNode {
   depth: number;
 }
 
-export type ItemType = 'note' | 'image' | 'link' | 'ticker' | 'file';
+export type ItemType = "note" | "image" | "link" | "ticker" | "file";
 
 export interface VaultItem {
   id: string;
@@ -44,11 +44,11 @@ export interface MediaFile {
   created_at: number;
 }
 
-export type ActiveView = 
-  | { type: 'inbox' }
-  | { type: 'folder'; folderId: string }
-  | { type: 'trash' }
-  | { type: 'settings' };
+export type ActiveView =
+  | { type: "inbox" }
+  | { type: "folder"; folderId: string }
+  | { type: "trash" }
+  | { type: "settings" };
 
 export interface BreadcrumbItem {
   id: string;
@@ -57,7 +57,7 @@ export interface BreadcrumbItem {
   active?: boolean;
 }
 
-export type MeshSyncStatus = 'standby' | 'discovering' | 'syncing' | 'synced' | 'error';
+export type MeshSyncStatus = "standby" | "discovering" | "syncing" | "synced" | "error";
 
 export interface PeerInfo {
   device_id: string;
@@ -75,10 +75,6 @@ export interface MeshSyncState {
   peers?: PeerInfo[];
   /** Every device this vault has ever paired with. Not who is here now. */
   pairedDeviceIds?: string[];
-  /**
-   * Devices present right now: mesh peers plus paired devices that have made a
-   * request recently. This is what the interface should count. See D-082.
-   */
+  /** Devices present now: mesh peers plus paired devices seen recently. */
   presentDeviceIds?: string[];
 }
-
