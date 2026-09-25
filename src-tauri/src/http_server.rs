@@ -24,6 +24,9 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+/// Most revisions returned by one sync request; the rest follow on the next pass.
+pub const SYNC_BATCH_LIMIT: usize = 1000;
+
 /// Maximum number of connections handled at once. The listener binds
 /// 0.0.0.0, so without a cap anyone on the LAN could exhaust threads by opening
 /// sockets faster than they close. Excess connections are dropped.
@@ -1629,46 +1632,57 @@ fn handle_connection(
     }
 
     // Delta Sync Query: GET /api/sync/deltas?since=...&device_id=...&auth_token=...
+    // GET /api/sync/deltas: revisions the caller has not seen. Current clients
+    // send `since_id` (a cursor in this device's revision numbering); older
+    // ones send only `since`, a timestamp.
     if path == "/api/sync/deltas" && method == "GET" {
-        let since: i64 = query
-            .and_then(|q| {
-                for pair in q.split('&') {
-                    if let Some((k, v)) = pair.split_once('=') {
-                        if k == "since" {
-                            return v.parse::<i64>().ok();
-                        }
-                    }
-                }
-                None
+        let param = |name: &str| {
+            query.and_then(|q| {
+                q.split('&')
+                    .filter_map(|pair| pair.split_once('='))
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| v.to_string())
             })
-            .unwrap_or(0);
-
-        let caller_device_id = query
-            .and_then(|q| {
-                for pair in q.split('&') {
-                    if let Some((k, v)) = pair.split_once('=') {
-                        if k == "device_id" {
-                            return Some(v.to_string());
-                        }
-                    }
-                }
-                None
-            })
-            .or_else(|| headers.get("x-device-id").cloned());
+        };
+        let caller_device_id = param("device_id").or_else(|| headers.get("x-device-id").cloned());
 
         // Authorization already happened in the central gate above.
         let conn = lock_recover(&db);
 
-        let revisions =
-            crate::sync::protocol::query_revisions_since(&conn, since, caller_device_id.as_deref())
+        let resp = match param("since_id").and_then(|v| v.parse::<i64>().ok()) {
+            Some(since_id) => {
+                let revisions = crate::sync::protocol::query_revisions_after_id(
+                    &conn,
+                    since_id,
+                    caller_device_id.as_deref().unwrap_or_default(),
+                    SYNC_BATCH_LIMIT,
+                )
                 .unwrap_or_default();
-        let latest_ts = revisions.last().map(|r| r.timestamp).unwrap_or(since);
-
-        let resp = serde_json::json!({
-            "device_id": device_id,
-            "revisions": revisions,
-            "latest_timestamp": latest_ts,
-        });
+                let latest_id = revisions.last().map(|r| r.id).unwrap_or(since_id);
+                serde_json::json!({
+                    "device_id": device_id,
+                    "revisions": revisions,
+                    "latest_id": latest_id,
+                })
+            }
+            None => {
+                let since = param("since")
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .unwrap_or(0);
+                let revisions = crate::sync::protocol::query_revisions_since(
+                    &conn,
+                    since,
+                    caller_device_id.as_deref(),
+                )
+                .unwrap_or_default();
+                let latest_ts = revisions.last().map(|r| r.timestamp).unwrap_or(since);
+                serde_json::json!({
+                    "device_id": device_id,
+                    "revisions": revisions,
+                    "latest_timestamp": latest_ts,
+                })
+            }
+        };
 
         let json = serde_json::to_vec(&resp).unwrap_or_default();
         send_response(&mut stream, 200, "OK", "application/json", &json, &[])?;

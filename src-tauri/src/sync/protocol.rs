@@ -27,6 +27,42 @@ pub enum SyncMessage {
     },
 }
 
+/// Revisions with a local id above `after_id`, oldest first, excluding those
+/// that originated on `exclude_device` (the caller already has them).
+///
+/// Ids follow insertion order on this device, including revisions relayed from
+/// other devices, so an id cursor never skips a change the way a timestamp
+/// cursor does when device clocks disagree.
+pub fn query_revisions_after_id(
+    conn: &Connection,
+    after_id: i64,
+    exclude_device: &str,
+    limit: usize,
+) -> Result<Vec<Revision>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, entity_type, entity_id, device_id, change_type, payload, timestamp
+         FROM revisions
+         WHERE id > ?1 AND device_id != ?2
+         ORDER BY id ASC
+         LIMIT ?3",
+    )?;
+    let rows = stmt.query_map(
+        rusqlite::params![after_id, exclude_device, limit as i64],
+        |row| {
+            Ok(Revision {
+                id: row.get(0)?,
+                entity_type: row.get(1)?,
+                entity_id: row.get(2)?,
+                device_id: row.get(3)?,
+                change_type: row.get(4)?,
+                payload: row.get(5)?,
+                timestamp: row.get(6)?,
+            })
+        },
+    )?;
+    rows.collect()
+}
+
 /// Queries all revisions recorded after `since_timestamp`.
 /// Optionally excludes revisions originating from `exclude_device` to prevent echo.
 pub fn query_revisions_since(
@@ -138,6 +174,24 @@ pub fn apply_remote_revisions(conn: &mut Connection, revisions: &[Revision]) -> 
     let mut applied_count = 0;
 
     for rev in revisions {
+        // A revision already held (received directly and again via another
+        // peer) is skipped, so relayed changes cannot circulate forever.
+        let already_held: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revisions WHERE entity_type = ?1 AND entity_id = ?2
+             AND device_id = ?3 AND change_type = ?4 AND timestamp = ?5)",
+            params![
+                rev.entity_type,
+                rev.entity_id,
+                rev.device_id,
+                rev.change_type,
+                rev.timestamp
+            ],
+            |row| row.get(0),
+        )?;
+        if already_held {
+            continue;
+        }
+
         match rev.entity_type.as_str() {
             "folder" => {
                 if let Some(payload_str) = &rev.payload {
@@ -285,7 +339,7 @@ pub fn apply_remote_revisions(conn: &mut Connection, revisions: &[Revision]) -> 
             _ => {}
         }
 
-        // Record revision locally to track peer progress (without re-broadcasting locally)
+        // Record the revision so it can be relayed to other peers.
         tx.execute(
             "INSERT INTO revisions (entity_type, entity_id, device_id, change_type, payload, timestamp)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",

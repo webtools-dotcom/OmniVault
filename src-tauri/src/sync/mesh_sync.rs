@@ -14,7 +14,7 @@ use crate::sync::discovery::{PeerInfo, PeerRegistry};
 use crate::sync::pairing::{
     is_device_paired, store_paired_device, update_peer_last_sync, PairedDevice,
 };
-use crate::sync::protocol::{apply_remote_revisions, query_revisions_since};
+use crate::sync::protocol::{apply_remote_revisions, query_revisions_after_id};
 
 /// Maximum media files fetched per sync pass; the rest follow on the next pass.
 const MAX_MEDIA_FETCH_PER_SYNC: usize = 25;
@@ -209,6 +209,9 @@ pub fn send_http_request(
 #[derive(Debug, Deserialize)]
 struct DeltasResponse {
     pub revisions: Vec<Revision>,
+    /// Present when the peer supports id cursors; older versions omit it.
+    #[serde(default)]
+    pub latest_id: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -230,16 +233,17 @@ pub fn sync_with_peer(
     peer: &PeerInfo,
     base_dir: &Path,
 ) -> Result<usize, String> {
-    let (auth_token, last_sync_at) = {
+    let (auth_token, last_sync_at, pull_cursor, push_cursor) = {
         let conn = db.lock().map_err(|e| e.to_string())?;
         if !is_device_paired(&conn, &peer.device_id).unwrap_or(false) {
             return Ok(0); // Skip unpaired peer until PIN authorized
         }
 
-        let row_res: rusqlite::Result<(String, Option<i64>)> = conn.query_row(
-            "SELECT auth_token, last_sync_at FROM paired_devices WHERE device_id = ?1",
+        let row_res: rusqlite::Result<(String, Option<i64>, i64, i64)> = conn.query_row(
+            "SELECT auth_token, last_sync_at, pull_cursor, push_cursor
+             FROM paired_devices WHERE device_id = ?1",
             [&peer.device_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         );
 
         match row_res {
@@ -252,10 +256,11 @@ pub fn sync_with_peer(
     let since_ts = last_sync_at.unwrap_or(0);
     let timeout = Duration::from_secs(5);
 
-    // Step 1: Pull remote deltas from peer
+    // Step 1: pull what the peer has that we have not seen. `since_id` is the
+    // cursor; `since` is only used by peers running older versions.
     let pull_path = format!(
-        "/api/sync/deltas?since={}&device_id={}&auth_token={}",
-        since_ts, self_device_id, auth_token
+        "/api/sync/deltas?since={}&since_id={}&device_id={}&auth_token={}",
+        since_ts, pull_cursor, self_device_id, auth_token
     );
     let resp = send_http_request(
         peer_addr,
@@ -349,12 +354,20 @@ pub fn sync_with_peer(
         }
     }
 
-    // Step 4: Push our local deltas to peer
+    // Step 4: push what the peer has not accepted yet. The cursor only moves
+    // once the peer confirms, so a failed push is retried next round.
     let local_revisions = {
         let conn = db.lock().map_err(|e| e.to_string())?;
-        query_revisions_since(&conn, since_ts, Some(&peer.device_id)).unwrap_or_default()
+        query_revisions_after_id(
+            &conn,
+            push_cursor,
+            &peer.device_id,
+            crate::http_server::SYNC_BATCH_LIMIT,
+        )
+        .unwrap_or_default()
     };
 
+    let mut new_push_cursor = push_cursor;
     if !local_revisions.is_empty() {
         let push_payload = PushDeltasRequest {
             device_id: self_device_id,
@@ -362,7 +375,7 @@ pub fn sync_with_peer(
             revisions: &local_revisions,
         };
         if let Ok(body_bytes) = serde_json::to_vec(&push_payload) {
-            let _ = send_http_request(
+            let pushed = send_http_request(
                 peer_addr,
                 "POST",
                 "/api/sync/deltas",
@@ -374,13 +387,24 @@ pub fn sync_with_peer(
                 Some(&body_bytes),
                 timeout,
             );
+            if matches!(pushed, Ok(ref r) if r.status == 200) {
+                new_push_cursor = local_revisions.last().map_or(push_cursor, |r| r.id);
+            }
         }
     }
 
-    // Step 5: Update peer last_sync_at timestamp
+    // Step 5: record the sync time and both cursors.
     {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let _ = update_peer_last_sync(&conn, &peer.device_id);
+        let _ = conn.execute(
+            "UPDATE paired_devices SET pull_cursor = ?1, push_cursor = ?2 WHERE device_id = ?3",
+            rusqlite::params![
+                deltas_resp.latest_id.unwrap_or(pull_cursor),
+                new_push_cursor,
+                peer.device_id
+            ],
+        );
     }
 
     Ok(applied_count)

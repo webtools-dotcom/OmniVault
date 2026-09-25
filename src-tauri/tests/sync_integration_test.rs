@@ -421,3 +421,148 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let _ = fs::remove_dir_all(&phone_storage);
     let _ = fs::remove_dir_all(&laptop_storage);
 }
+
+/// A node with its database behind a real HTTP server, as a peer sees it.
+struct LiveNode {
+    id: String,
+    db: Arc<Mutex<Connection>>,
+    dir: std::path::PathBuf,
+    port: u16,
+    _server: http_server::HttpServerHandle,
+}
+
+impl LiveNode {
+    fn start(id: &str) -> Self {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_schema(&conn).unwrap();
+        let db = Arc::new(Mutex::new(conn));
+        let server = http_server::start_http_server(db.clone(), id.to_string(), 0).unwrap();
+        let dir = std::env::temp_dir().join(format!("ov_live_{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        Self {
+            id: id.to_string(),
+            db,
+            dir,
+            port: server.port,
+            _server: server,
+        }
+    }
+
+    fn peer(&self) -> PeerInfo {
+        PeerInfo {
+            device_id: self.id.clone(),
+            device_name: self.id.clone(),
+            platform: "test".to_string(),
+            sync_port: self.port,
+            addr: "127.0.0.1".parse().unwrap(),
+            last_seen: chrono::Utc::now().timestamp(),
+        }
+    }
+
+    fn pull_from(&self, other: &LiveNode) {
+        sync_with_peer(self.db.clone(), &self.id, &other.peer(), &self.dir).unwrap();
+    }
+
+    fn titles(&self) -> Vec<String> {
+        let conn = self.db.lock().unwrap();
+        list_inbox_items(&conn)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.title)
+            .collect()
+    }
+
+    fn revision_count(&self) -> i64 {
+        let conn = self.db.lock().unwrap();
+        conn.query_row("SELECT COUNT(*) FROM revisions", [], |r| r.get(0))
+            .unwrap()
+    }
+}
+
+fn pair(a: &LiveNode, b: &LiveNode) {
+    let token = Uuid::new_v4().to_string();
+    store_paired_device(&a.db.lock().unwrap(), &b.id, &b.id, &token).unwrap();
+    store_paired_device(&b.db.lock().unwrap(), &a.id, &a.id, &token).unwrap();
+}
+
+/// A device whose clock runs behind must not lose changes it makes after a
+/// sync. The laptop that found this was 9 s ahead of the phone and missed
+/// almost everything the phone created, because progress was tracked by time.
+#[test]
+fn changes_from_a_device_with_a_slow_clock_are_not_skipped() {
+    let laptop = LiveNode::start("laptop");
+    let phone = LiveNode::start("phone");
+    pair(&laptop, &phone);
+
+    laptop.pull_from(&phone);
+
+    {
+        let mut conn = phone.db.lock().unwrap();
+        create_item(
+            &mut conn,
+            None,
+            "note",
+            "Hii",
+            "from the phone",
+            None,
+            "phone",
+        )
+        .unwrap();
+        // The phone's clock is a minute behind the laptop's.
+        conn.execute("UPDATE revisions SET timestamp = timestamp - 60000", [])
+            .unwrap();
+    }
+
+    laptop.pull_from(&phone);
+    assert_eq!(laptop.titles(), vec!["Hii".to_string()]);
+}
+
+/// Changes relay through an intermediate device, and a change that reaches a
+/// device by two routes is stored once rather than bouncing between peers.
+#[test]
+fn relayed_changes_arrive_once_and_stop_circulating() {
+    let laptop = LiveNode::start("laptop");
+    let tablet = LiveNode::start("tablet");
+    let phone = LiveNode::start("phone");
+    pair(&laptop, &tablet);
+    pair(&tablet, &phone);
+    pair(&laptop, &phone);
+
+    {
+        let mut conn = phone.db.lock().unwrap();
+        create_item(
+            &mut conn,
+            None,
+            "note",
+            "Relayed",
+            "via the tablet",
+            None,
+            "phone",
+        )
+        .unwrap();
+    }
+
+    tablet.pull_from(&phone);
+    laptop.pull_from(&tablet);
+    assert_eq!(laptop.titles(), vec!["Relayed".to_string()]);
+
+    // The laptop now also hears it directly, and the tablet from the laptop.
+    laptop.pull_from(&phone);
+    tablet.pull_from(&laptop);
+    let (laptop_revs, tablet_revs) = (laptop.revision_count(), tablet.revision_count());
+    for _ in 0..3 {
+        laptop.pull_from(&tablet);
+        tablet.pull_from(&laptop);
+    }
+    assert_eq!(
+        laptop.revision_count(),
+        laptop_revs,
+        "revisions kept circulating"
+    );
+    assert_eq!(
+        tablet.revision_count(),
+        tablet_revs,
+        "revisions kept circulating"
+    );
+    assert_eq!(laptop.revision_count(), phone.revision_count());
+}

@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS paired_devices (
 
 pub fn initialize_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(CREATE_TABLES_SQL)?;
+    add_sync_cursor_columns(conn)?;
 
     // Record or update schema version
     conn.execute(
@@ -98,6 +99,24 @@ pub fn initialize_schema(conn: &Connection) -> Result<()> {
         [SCHEMA_VERSION.to_string()],
     )?;
 
+    Ok(())
+}
+
+/// Per-peer sync positions, as revision ids: `pull_cursor` is the last id
+/// received from the peer (in the peer's numbering) and `push_cursor` the last
+/// local id the peer has accepted. Added to existing vaults on start-up.
+fn add_sync_cursor_columns(conn: &Connection) -> Result<()> {
+    let existing: Vec<String> = conn
+        .prepare("SELECT name FROM pragma_table_info('paired_devices')")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<_>>()?;
+    for column in ["pull_cursor", "push_cursor"] {
+        if !existing.iter().any(|c| c == column) {
+            conn.execute_batch(&format!(
+                "ALTER TABLE paired_devices ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0"
+            ))?;
+        }
+    }
     Ok(())
 }
 
