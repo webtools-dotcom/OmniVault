@@ -2235,6 +2235,7 @@ dependencies = [
  "chrono",
  "flate2",
  "image",
+ "libc",
  "rusqlite",
  "serde",
  "serde_json",

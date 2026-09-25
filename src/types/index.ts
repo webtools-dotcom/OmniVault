@@ -62,6 +62,8 @@ export type MeshSyncStatus = "standby" | "discovering" | "syncing" | "synced" | 
 export interface PeerInfo {
   device_id: string;
   device_name: string;
+  /** Operating system of the peer, e.g. "android" or "windows". Empty from older versions. */
+  platform?: string;
   sync_port: number;
   addr: string;
   last_seen: number;

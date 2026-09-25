@@ -67,8 +67,12 @@ over multicast (`239.255.42.99`) and subnet broadcast. Many shared networks
 unicast, so the beacon is also:
 
 - sent directly to every peer already known, on every tick, and
-- swept directly across the local /23 (about 500 addresses) at start-up and
-  every 30 seconds.
+- swept directly across the /23 of every private network the device is on
+  (about 500 addresses each) at start-up and every 30 seconds. A phone hosting
+  a hotspot while on mobile data sweeps the hotspot, not the carrier network.
+
+Beacons carry the device's own name (the Android device name or the Windows
+computer name) and its platform.
 
 A device that hears from a peer for the first time answers directly, so a single
 sweep introduces both sides. Peers expire after 15 seconds of silence.

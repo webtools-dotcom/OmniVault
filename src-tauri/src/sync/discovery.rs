@@ -28,11 +28,26 @@ pub fn sweep_targets(ip: Ipv4Addr) -> Vec<Ipv4Addr> {
         .collect()
 }
 
+/// Sweep targets for every private network this device is on: for example
+/// both the Wi-Fi it joined and the hotspot it hosts. Capped at three networks
+/// so VPN and virtual adapters cannot multiply the sweep.
+fn sweep_all_local_networks() -> std::collections::BTreeSet<Ipv4Addr> {
+    crate::http_server::local_ipv4_addrs()
+        .into_iter()
+        .filter(|ip| ip.is_private())
+        .take(3)
+        .flat_map(sweep_targets)
+        .collect()
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveryBeacon {
     pub protocol: String,
     pub device_id: String,
     pub device_name: String,
+    /// `std::env::consts::OS` of the sender, e.g. "android" or "windows".
+    #[serde(default)]
+    pub platform: String,
     pub sync_port: u16,
     pub timestamp: i64,
 }
@@ -41,6 +56,8 @@ pub struct DiscoveryBeacon {
 pub struct PeerInfo {
     pub device_id: String,
     pub device_name: String,
+    #[serde(default)]
+    pub platform: String,
     pub sync_port: u16,
     pub addr: IpAddr,
     pub last_seen: i64,
@@ -155,6 +172,7 @@ impl DiscoveryService {
             protocol: PROTOCOL_IDENTIFIER.to_string(),
             device_id: self.device_id.clone(),
             device_name: self.device_name.clone(),
+            platform: std::env::consts::OS.to_string(),
             sync_port: self.sync_port,
             timestamp: Utc::now().timestamp_millis(),
         }
@@ -193,6 +211,7 @@ impl DiscoveryService {
                         protocol: PROTOCOL_IDENTIFIER.to_string(),
                         device_id: device_id.clone(),
                         device_name: device_name.clone(),
+                        platform: std::env::consts::OS.to_string(),
                         sync_port,
                         timestamp: Utc::now().timestamp_millis(),
                     };
@@ -208,14 +227,10 @@ impl DiscoveryService {
                         }
 
                         if tick.is_multiple_of(SWEEP_EVERY_TICKS) {
-                            let own_ip = crate::http_server::find_local_lan_ip()
-                                .and_then(|ip| ip.parse::<Ipv4Addr>().ok());
-                            if let Some(ip) = own_ip {
-                                for target in sweep_targets(ip) {
-                                    let _ = socket
-                                        .send_to(&bytes, SocketAddr::V4(SocketAddrV4::new(target, DISCOVERY_PORT)))
-                                        .await;
-                                }
+                            for target in sweep_all_local_networks() {
+                                let _ = socket
+                                    .send_to(&bytes, SocketAddr::V4(SocketAddrV4::new(target, DISCOVERY_PORT)))
+                                    .await;
                             }
                         }
                     }
@@ -259,6 +274,7 @@ impl DiscoveryService {
                                 let peer = PeerInfo {
                                     device_id: beacon.device_id,
                                     device_name: beacon.device_name,
+                                    platform: beacon.platform,
                                     sync_port: beacon.sync_port,
                                     addr: src_addr.ip(),
                                     last_seen: Utc::now().timestamp(),
@@ -306,6 +322,7 @@ mod tests {
             protocol: PROTOCOL_IDENTIFIER.to_string(),
             device_id: "phone-uuid-123".to_string(),
             device_name: "Pixel 9 Pro".to_string(),
+            platform: "test".to_string(),
             sync_port: 42425,
             timestamp: 1725800000000,
         };
@@ -326,6 +343,7 @@ mod tests {
         let active_peer = PeerInfo {
             device_id: "laptop-1".to_string(),
             device_name: "Dev Laptop".to_string(),
+            platform: "test".to_string(),
             sync_port: 42424,
             addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 50)),
             last_seen: now,
@@ -334,6 +352,7 @@ mod tests {
         let stale_peer = PeerInfo {
             device_id: "old-tablet".to_string(),
             device_name: "Old Tablet".to_string(),
+            platform: "test".to_string(),
             sync_port: 42424,
             addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 99)),
             last_seen: now - 30, // 30s ago (exceeds 15s PEER_EXPIRY_SECONDS)
@@ -361,6 +380,7 @@ mod tests {
             protocol: PROTOCOL_IDENTIFIER.to_string(),
             device_id: "device-b".to_string(),
             device_name: "Mobile Phone".to_string(),
+            platform: "test".to_string(),
             sync_port: 42426,
             timestamp: Utc::now().timestamp_millis(),
         };
@@ -370,6 +390,7 @@ mod tests {
             protocol: PROTOCOL_IDENTIFIER.to_string(),
             device_id: my_device_id.to_string(),
             device_name: "Laptop".to_string(),
+            platform: "test".to_string(),
             sync_port: 42424,
             timestamp: Utc::now().timestamp_millis(),
         };
@@ -381,6 +402,7 @@ mod tests {
                     .register_or_update(PeerInfo {
                         device_id: b.device_id,
                         device_name: b.device_name,
+                        platform: "test".to_string(),
                         sync_port: b.sync_port,
                         addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 120)),
                         last_seen: Utc::now().timestamp(),
@@ -405,6 +427,7 @@ mod tests {
                 .register_or_update(PeerInfo {
                     device_id: format!("spoofed-{i}"),
                     device_name: "x".repeat(4000),
+                    platform: "test".to_string(),
                     sync_port: 42420,
                     addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2)),
                     last_seen: now,

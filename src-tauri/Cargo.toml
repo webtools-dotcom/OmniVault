@@ -29,6 +29,9 @@ socket2 = "0.5"
 # read backups that were re-zipped with deflate compression.
 flate2 = "1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [profile.release]
 opt-level = 3
 lto = true

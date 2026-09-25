@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.enableEdgeToEdge
 import org.json.JSONObject
 import java.io.File
@@ -14,6 +15,12 @@ class MainActivity : TauriActivity() {
   private var multicastLock: WifiManager.MulticastLock? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Written before the Rust core starts, which reads it as the name other
+    // devices see (the name set under Settings > About).
+    runCatching {
+      Settings.Global.getString(contentResolver, "device_name")
+        ?.let { File(filesDir, "device_name").writeText(it) }
+    }
     super.onCreate(savedInstanceState)
     acquireMulticastLock()
     handleIncomingIntent(intent)

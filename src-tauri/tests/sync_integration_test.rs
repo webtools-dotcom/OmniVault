@@ -144,6 +144,7 @@ async fn test_headless_two_node_sync_e2e() {
         .register_or_update(PeerInfo {
             device_id: phone.device_id.clone(),
             device_name: phone.device_name.clone(),
+            platform: "test".to_string(),
             sync_port: 42425,
             addr: "192.168.1.50".parse().unwrap(),
             last_seen: chrono::Utc::now().timestamp(),
@@ -390,6 +391,7 @@ async fn test_store_and_forward_mesh_sync_http_and_webp() {
     let laptop_peer_info = PeerInfo {
         device_id: laptop_dev_id.to_string(),
         device_name: "OmniVault Desktop".to_string(),
+        platform: "test".to_string(),
         sync_port: laptop_server.port,
         addr: "127.0.0.1".parse().unwrap(),
         last_seen: chrono::Utc::now().timestamp(),

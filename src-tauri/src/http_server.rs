@@ -230,52 +230,77 @@ fn address_rank(ip: std::net::Ipv4Addr) -> u8 {
     }
 }
 
-/// Returns this machine's address on its current network, or `None` if it is
-/// not on one.
+/// This machine's IPv4 addresses, best first (see [`address_rank`]).
 ///
 /// Connecting a UDP socket sends nothing but forces a route lookup, which
-/// reveals the local address. Private ranges are probed as well as a public
-/// address so this works on networks without internet access, such as a phone
-/// hotspot with mobile data off.
-pub fn find_local_lan_ip() -> Option<String> {
-    // The internet route first: on an ordinary Wi-Fi network it gives the right
-    // interface immediately. The private ranges cover the case with no internet.
+/// reveals the local address the system would use. Private ranges are probed
+/// as well as a public address so this works without internet access. The
+/// interfaces are listed too, which finds networks the default route does not
+/// use, such as the hotspot an Android phone hosts while on mobile data.
+pub fn local_ipv4_addrs() -> Vec<std::net::Ipv4Addr> {
     const PROBES: [&str; 4] = ["8.8.8.8:80", "192.168.0.1:9", "10.0.0.1:9", "172.16.0.1:9"];
 
-    let mut best: Option<(u8, String)> = None;
-
+    let mut found = Vec::new();
     for probe in PROBES {
-        let socket = match UdpSocket::bind("0.0.0.0:0") {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(socket) = UdpSocket::bind("0.0.0.0:0") else {
+            continue;
         };
         if socket.connect(probe).is_err() {
             continue;
         }
-        let ip = match socket.local_addr() {
-            Ok(a) => a.ip(),
-            Err(_) => continue,
-        };
-        if ip.is_loopback() || ip.is_unspecified() {
-            continue;
-        }
-        let rank = match ip {
-            std::net::IpAddr::V4(v4) => address_rank(v4),
-            // The mesh and this server are IPv4 throughout, so a v6 answer is
-            // no use to the device being handed the address.
-            std::net::IpAddr::V6(_) => continue,
-        };
-        // A real private address ends the search; anything weaker is held in
-        // case nothing better turns up.
-        if rank == 2 {
-            return Some(ip.to_string());
-        }
-        if best.as_ref().map(|(r, _)| rank > *r).unwrap_or(true) {
-            best = Some((rank, ip.to_string()));
+        if let Ok(std::net::SocketAddr::V4(addr)) = socket.local_addr() {
+            found.push(*addr.ip());
         }
     }
+    found.extend(interface_ipv4_addrs());
 
-    best.map(|(_, ip)| ip)
+    let mut unique = Vec::new();
+    for ip in found {
+        if !ip.is_loopback() && !ip.is_unspecified() && !unique.contains(&ip) {
+            unique.push(ip);
+        }
+    }
+    // Stable, so the routed address stays first among equally ranked ones.
+    unique.sort_by_key(|ip| std::cmp::Reverse(address_rank(*ip)));
+    unique
+}
+
+/// IPv4 addresses of every network interface.
+#[cfg(unix)]
+fn interface_ipv4_addrs() -> Vec<std::net::Ipv4Addr> {
+    let mut out = Vec::new();
+    let mut list: *mut libc::ifaddrs = std::ptr::null_mut();
+    // SAFETY: getifaddrs fills `list` with a linked list that is only read here
+    // and freed exactly once with freeifaddrs.
+    unsafe {
+        if libc::getifaddrs(&mut list) != 0 {
+            return out;
+        }
+        let mut cur = list;
+        while !cur.is_null() {
+            let addr = (*cur).ifa_addr;
+            if !addr.is_null() && i32::from((*addr).sa_family) == libc::AF_INET {
+                let sin = &*(addr as *const libc::sockaddr_in);
+                out.push(std::net::Ipv4Addr::from(u32::from_be(sin.sin_addr.s_addr)));
+            }
+            cur = (*cur).ifa_next;
+        }
+        libc::freeifaddrs(list);
+    }
+    out
+}
+
+/// On Windows the route lookups are enough: its hotspot shares the adapter's
+/// default route.
+#[cfg(not(unix))]
+fn interface_ipv4_addrs() -> Vec<std::net::Ipv4Addr> {
+    Vec::new()
+}
+
+/// Returns this machine's address on its current network, or `None` if it is
+/// not on one.
+pub fn find_local_lan_ip() -> Option<String> {
+    local_ipv4_addrs().first().map(|ip| ip.to_string())
 }
 
 /// Like [`find_local_lan_ip`], but falls back to `127.0.0.1`.
@@ -2358,9 +2383,9 @@ mod tests {
     fn the_private_ranges_are_probed_not_just_the_internet() {
         let src = include_str!("http_server.rs");
         let body = src
-            .split("pub fn find_local_lan_ip()")
+            .split("pub fn local_ipv4_addrs()")
             .nth(1)
-            .expect("find_local_lan_ip must exist");
+            .expect("local_ipv4_addrs must exist");
         let head = &body[..body.len().min(1200)];
         for probe in ["192.168", "10.0.0", "172.16"] {
             assert!(

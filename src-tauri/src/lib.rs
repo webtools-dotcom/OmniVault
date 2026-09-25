@@ -98,10 +98,7 @@ async fn pair_with_peer_cmd(
 ) -> Result<sync::pairing::PairedDevice, String> {
     let db = state.db.clone();
     let dev_id = state.device_id.clone();
-    #[cfg(target_os = "android")]
-    let dev_name = format!("OmniVault Mobile ({})", &dev_id[..6.min(dev_id.len())]);
-    #[cfg(not(target_os = "android"))]
-    let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
+    let dev_name = device_name(&state.base_dir, &dev_id);
 
     tokio::task::spawn_blocking(move || {
         sync::mesh_sync::pair_with_remote_peer(db, &dev_id, &dev_name, &peer_ip, peer_port, &pin)
@@ -119,10 +116,7 @@ async fn request_pair_approval_cmd(
 ) -> Result<sync::pairing::PairedDevice, String> {
     let db = state.db.clone();
     let dev_id = state.device_id.clone();
-    #[cfg(target_os = "android")]
-    let dev_name = format!("OmniVault Mobile ({})", &dev_id[..6.min(dev_id.len())]);
-    #[cfg(not(target_os = "android"))]
-    let dev_name = format!("OmniVault Desktop ({})", &dev_id[..6.min(dev_id.len())]);
+    let dev_name = device_name(&state.base_dir, &dev_id);
 
     tokio::task::spawn_blocking(move || {
         sync::mesh_sync::request_pairing_approval(
@@ -684,6 +678,26 @@ fn set_browser_access_cmd(state: State<AppState>, enabled: bool) -> Result<bool,
     Ok(enabled)
 }
 
+/// The name other devices see for this one: the device name set in Android's
+/// settings (written to `device_name` by `MainActivity`) or the Windows
+/// computer name, falling back to a generic label.
+pub fn device_name(base_dir: &std::path::Path, device_id: &str) -> String {
+    #[cfg(target_os = "android")]
+    let (named, generic) = (
+        std::fs::read_to_string(base_dir.join("device_name")).ok(),
+        "OmniVault Mobile",
+    );
+    #[cfg(not(target_os = "android"))]
+    let (named, generic) = {
+        let _ = base_dir;
+        (std::env::var("COMPUTERNAME").ok(), "OmniVault Desktop")
+    };
+    named
+        .map(|name| name.trim().chars().take(64).collect::<String>())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| format!("{generic} ({})", &device_id[..6.min(device_id.len())]))
+}
+
 pub fn resolve_app_base_dir() -> std::path::PathBuf {
     #[cfg(target_os = "android")]
     {
@@ -880,16 +894,7 @@ pub fn run() {
     let db_sync = db.clone();
     let base_dir_sync = base_dir.clone();
 
-    #[cfg(target_os = "android")]
-    let dev_name = format!(
-        "OmniVault Mobile ({})",
-        &device_id[..6.min(device_id.len())]
-    );
-    #[cfg(not(target_os = "android"))]
-    let dev_name = format!(
-        "OmniVault Desktop ({})",
-        &device_id[..6.min(device_id.len())]
-    );
+    let dev_name = device_name(&base_dir, &device_id);
 
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread()

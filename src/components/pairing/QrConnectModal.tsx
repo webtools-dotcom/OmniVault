@@ -420,7 +420,9 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
                   <div className="space-y-2">
                     {activePeers.map((peer) => {
                       const isPaired = pairedIds.includes(peer.device_id);
-                      const isDesktop = peer.device_name.toLowerCase().includes("desktop");
+                      const isDesktop = peer.platform
+                        ? peer.platform !== "android"
+                        : peer.device_name.toLowerCase().includes("desktop");
                       const isPairingThis = pairingPeerId === peer.device_id;
 
                       return (
