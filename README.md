@@ -38,6 +38,8 @@ not over the internet.
 - **One-tap pairing** — tap _Connect_ on one device and _Allow_ on the other.
 - **Backup and restore** to a single zip of plain Markdown, media and the
   database.
+- **One-tap updates** from inside the app: Windows updates and restarts
+  itself; Android hands the new version to the system installer.
 
 ## Download
 

@@ -15,7 +15,15 @@ import { ActiveView, Folder, MeshSyncState } from "../../types";
 import { StorageService, isTauriEnvironment } from "../../services/storageService";
 import { deviceLabel } from "../../utils/platform";
 import { RestoreModal } from "../backup/RestoreModal";
-import { APP_VERSION, UpdateCheck, checkForUpdate, openExternal } from "../../services/updates";
+import {
+  APP_VERSION,
+  InstallState,
+  UpdateCheck,
+  canInstallUpdate,
+  checkForUpdate,
+  installUpdate,
+  openExternal,
+} from "../../services/updates";
 import { FolderTree } from "../folders/FolderTree";
 import { cn } from "../../utils/cn";
 
@@ -72,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isRestoreOpen, setIsRestoreOpen] = useState(false);
   const [update, setUpdate] = useState<UpdateCheck | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [install, setInstall] = useState<{ state: InstallState; message?: string } | null>(null);
 
   // The app's only outbound request, made only when the user asks.
   const handleCheckForUpdate = async () => {
@@ -347,25 +356,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {update.status === "available" ? (
               <div className="flex flex-col gap-1">
                 <span className="text-vault-primary">Version {update.latest} is out.</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (update.url && !(await openExternal(update.url))) {
-                        try {
-                          await navigator.clipboard.writeText(update.url);
-                          setUpdate({ ...update, message: "Link copied." });
-                        } catch {
-                          setUpdate({ ...update, message: update.url });
+                {canInstallUpdate() && install?.state !== "failed" ? (
+                  <div className="flex items-center gap-2">
+                    {!install || install.state === "permission" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          installUpdate(update.latest!, (state, message) =>
+                            setInstall({ state, message }),
+                          )
                         }
-                      }
-                    }}
-                    className="text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
-                  >
-                    Open the release page
-                  </button>
-                  <span className="text-vault-subtle">Back up first.</span>
-                </div>
+                        className="text-vault-primary hover:text-vault-secondary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
+                      >
+                        Update now
+                      </button>
+                    ) : (
+                      <span className="text-vault-muted">
+                        {install.state === "downloading"
+                          ? "Downloading…"
+                          : install.state === "restarting"
+                            ? "Restarting…"
+                            : "Confirm in the installer."}
+                      </span>
+                    )}
+                    {!install && <span className="text-vault-subtle">Back up first.</span>}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (update.url && !(await openExternal(update.url))) {
+                          try {
+                            await navigator.clipboard.writeText(update.url);
+                            setUpdate({ ...update, message: "Link copied." });
+                          } catch {
+                            setUpdate({ ...update, message: update.url });
+                          }
+                        }
+                      }}
+                      className="text-vault-muted hover:text-vault-primary transition-colors cursor-pointer underline decoration-vault-border underline-offset-2"
+                    >
+                      Open the release page
+                    </button>
+                    <span className="text-vault-subtle">Back up first.</span>
+                  </div>
+                )}
+                {install?.message && <span className="text-vault-muted">{install.message}</span>}
                 {update.message && <span className="text-vault-muted">{update.message}</span>}
               </div>
             ) : update.status === "current" ? (

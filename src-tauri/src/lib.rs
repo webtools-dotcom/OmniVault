@@ -5,6 +5,11 @@ use tauri::State;
 pub mod db;
 pub mod http_server;
 pub mod sync;
+#[cfg(windows)]
+mod update;
+
+/// Repository whose GitHub releases the app updates from.
+const RELEASES_REPO: &str = "webtools-dotcom/OmniVault";
 
 use crate::db::media;
 use crate::db::models::{Folder, MediaFile, VaultItem};
@@ -476,6 +481,29 @@ fn open_file_in_folder_cmd(file_path: String) -> Result<(), String> {
 
 /// Opens a link in the system browser instead of navigating the app's webview.
 /// Only `http` and `https` URLs are accepted.
+/// Installs a newer release in place and restarts the app. Windows only; the
+/// Android app updates through the system installer instead.
+#[tauri::command]
+async fn install_update_cmd(app: tauri::AppHandle, version: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        tokio::task::spawn_blocking(move || update::install(RELEASES_REPO, &version))
+            .await
+            .map_err(|e| e.to_string())??;
+        // Give the UI a moment to show that it is restarting.
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            app.exit(0);
+        });
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, version, RELEASES_REPO);
+        Err("In-app updates are only available on Windows.".into())
+    }
+}
+
 #[tauri::command]
 fn open_url_cmd(url: String) -> Result<(), String> {
     let url = url.trim();
@@ -751,6 +779,9 @@ fn report_fatal_startup_error(base_dir: &std::path::Path, message: &str) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    update::clean_up_previous();
+
     let base_dir = resolve_app_base_dir();
     let media_dir = base_dir.join("media");
     let _ = std::fs::create_dir_all(&media_dir);
@@ -1002,6 +1033,7 @@ pub fn run() {
             list_backups_cmd,
             import_vault_cmd,
             open_url_cmd,
+            install_update_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running omnivault application");

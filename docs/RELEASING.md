@@ -58,8 +58,17 @@ it against `SHA256SUMS.txt`.
 - **A release someone has downloaded cannot be withdrawn.** Replacing a version
   is only acceptable while its download counts are zero — check them first.
 
-## The update check
+## In-app updates
 
-The app asks the releases page once, when _Check for updates_ is pressed, and
-links to the release if its tag is newer than `APP_VERSION`. It never downloads,
-installs or checks on its own.
+_Check for updates_ asks the releases page once and offers _Update now_ if the
+latest tag is newer than `APP_VERSION`. Nothing happens in the background.
+
+- **Windows** downloads `omnivault-vX.Y.Z-windows-x64.zip` and
+  `SHA256SUMS.txt` with the system `curl.exe`, verifies the zip, swaps in the
+  new `omnivault.exe` (and `dist/`, if present) and restarts. Leftovers are
+  removed on the next start.
+- **Android** downloads `omnivault-vX.Y.Z-android.apk` and hands it to the
+  system installer, which asks the user to confirm. The first time, Android
+  also asks the user to allow OmniVault to install updates.
+
+Both depend on the asset names above, so keep them unchanged.

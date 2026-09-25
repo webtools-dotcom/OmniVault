@@ -4,15 +4,78 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.UUID
+
+private const val RELEASES_REPO = "webtools-dotcom/OmniVault"
 
 class MainActivity : TauriActivity() {
   private var multicastLock: WifiManager.MulticastLock? = null
+  private var webView: WebView? = null
+
+  override fun onWebViewCreate(webView: WebView) {
+    this.webView = webView
+    webView.addJavascriptInterface(UpdateBridge(), "OmniVaultUpdater")
+  }
+
+  /**
+   * Downloads a release APK and hands it to the system installer, which asks
+   * the user to confirm and refuses any APK not signed with this app's key.
+   * Progress is reported to `window.__onOmniVaultUpdate(state, message)`.
+   */
+  inner class UpdateBridge {
+    @JavascriptInterface
+    fun install(version: String) {
+      if (!Regex("""^\d+(\.\d+){1,3}$""").matches(version)) {
+        return report("failed", "That is not a release version.")
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        !packageManager.canRequestPackageInstalls()
+      ) {
+        startActivity(
+          Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+        )
+        return report("permission", "Allow OmniVault to install updates, then tap Update again.")
+      }
+      Thread {
+        try {
+          val apk = File(cacheDir, "updates/omnivault.apk").apply { parentFile?.mkdirs() }
+          val url = URL(
+            "https://github.com/$RELEASES_REPO/releases/download/v$version/omnivault-v$version-android.apk"
+          )
+          val connection = url.openConnection() as HttpURLConnection
+          connection.connectTimeout = 15_000
+          connection.readTimeout = 60_000
+          connection.inputStream.use { input -> apk.outputStream().use { input.copyTo(it) } }
+          val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", apk)
+          startActivity(
+            Intent(Intent.ACTION_VIEW)
+              .setDataAndType(uri, "application/vnd.android.package-archive")
+              .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+          )
+          report("installing", "")
+        } catch (e: Exception) {
+          report("failed", "The download failed. Check the internet connection and try again.")
+        }
+      }.start()
+    }
+  }
+
+  private fun report(state: String, message: String) {
+    val script = "window.__onOmniVaultUpdate && window.__onOmniVaultUpdate(" +
+      "${JSONObject.quote(state)}, ${JSONObject.quote(message)})"
+    runOnUiThread { webView?.evaluateJavascript(script, null) }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Written before the Rust core starts, which reads it as the name other

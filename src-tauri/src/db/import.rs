@@ -192,6 +192,18 @@ fn read_entry(bytes: &[u8], e: &Entry) -> Result<Vec<u8>, ImportError> {
 // Offering the archive's rows to the vault
 // ---------------------------------------------------------------------------
 
+/// The entries of a zip archive whose names satisfy `wanted`, decompressed.
+pub(crate) fn zip_entries(
+    bytes: &[u8],
+    wanted: impl Fn(&str) -> bool,
+) -> Result<Vec<(String, Vec<u8>)>, ImportError> {
+    read_directory(bytes)?
+        .iter()
+        .filter(|e| wanted(&e.name))
+        .map(|e| Ok((e.name.clone(), read_entry(bytes, e)?)))
+        .collect()
+}
+
 /// Restores `archive` into the vault at `base_dir`.
 pub fn import_vault(
     conn: &mut Connection,

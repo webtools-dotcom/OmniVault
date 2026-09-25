@@ -7,8 +7,11 @@ what it does not.
 ## What it does
 
 - **No cloud, no accounts, no telemetry.** Nothing leaves the local network.
-  The only outbound request the app can make is the update check, and only
-  when _Check for updates_ is pressed.
+  The app only goes online when _Check for updates_ or _Update now_ is
+  pressed, and then only to this project's GitHub releases.
+- **Updates are verified.** On Windows the downloaded release is checked
+  against the published SHA-256 before it replaces anything. On Android the
+  system installer refuses any APK not signed with the release key.
 - **Every API route requires pairing.** `/api/*` rejects callers without a
   device token, except `/api/health`, `/api/lan-info` and the two pairing
   routes.

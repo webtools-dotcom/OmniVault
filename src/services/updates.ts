@@ -74,6 +74,47 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
   }
 }
 
+/** Progress of an in-app update, reported to the caller as it changes. */
+export type InstallState = "downloading" | "restarting" | "installing" | "permission" | "failed";
+
+type AndroidUpdater = { install: (version: string) => void };
+
+/** Whether this runtime can update itself rather than only link to the release. */
+export function canInstallUpdate(): boolean {
+  return isTauriEnvironment() || "OmniVaultUpdater" in window;
+}
+
+/**
+ * Downloads and installs `version`.
+ *
+ * On Windows the app replaces itself and restarts. On Android the APK is
+ * handed to the system installer, which asks the user to confirm; Android
+ * shows that step for every app installed outside an app store.
+ */
+export async function installUpdate(
+  version: string,
+  onState: (state: InstallState, message?: string) => void,
+): Promise<void> {
+  const android = (window as unknown as { OmniVaultUpdater?: AndroidUpdater }).OmniVaultUpdater;
+  if (android) {
+    (window as unknown as { __onOmniVaultUpdate?: unknown }).__onOmniVaultUpdate = (
+      state: InstallState,
+      message: string,
+    ) => onState(state, message || undefined);
+    onState("downloading");
+    android.install(version);
+    return;
+  }
+
+  onState("downloading");
+  try {
+    await invoke("install_update_cmd", { version });
+    onState("restarting");
+  } catch (err) {
+    onState("failed", typeof err === "string" ? err : "The update could not be installed.");
+  }
+}
+
 /** Opens a link outside the app. Desktop only; elsewhere the caller copies it. */
 export async function openExternal(url: string): Promise<boolean> {
   if (!isTauriEnvironment()) return false;
