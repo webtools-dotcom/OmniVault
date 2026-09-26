@@ -51,12 +51,12 @@ not over the internet.
 
 |                                              | OmniVault | Message yourself<br>(WhatsApp, Telegram) | LocalSend | Syncthing |
 | :------------------------------------------- | :-------: | :--------------------------------------: | :-------: | :-------: |
-| No account, no internet needed               |    Yes    |                    No                    |    Yes    |    Yes    |
-| Nothing stored on someone else's server      |    Yes    |                    No                    |    Yes    |    Yes    |
-| Other device can be off when you capture     |    Yes    |                   Yes                    |    No     |    Yes    |
-| Organised into folders                       |    Yes    |                    No                    |    No     |    Yes    |
-| Built for quick notes, links and screenshots |    Yes    |                   Yes                    |    No     |    No     |
-| Syncs while you're away from home            |    No     |                   Yes                    |    No     |    Yes    |
+| No account, no internet needed               |    ✅     |                    ❌                    |    ✅     |    ✅     |
+| Nothing stored on someone else's server      |    ✅     |                    ❌                    |    ✅     |    ✅     |
+| Other device can be off when you capture     |    ✅     |                    ✅                    |    ❌     |    ✅     |
+| Organised into folders                       |    ✅     |                    ❌                    |    ❌     |    ✅     |
+| Built for quick notes, links and screenshots |    ✅     |                    ✅                    |    ❌     |    ❌     |
+| Syncs while you're away from home            |    ❌     |                    ✅                    |    ❌     |    ✅     |
 
 ## Features
 

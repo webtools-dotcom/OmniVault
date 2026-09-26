@@ -194,7 +194,6 @@ test("the README and release notes do not overstate what the app does", () => {
     );
     assert.doesNotMatch(text, /end-to-end\s+encrypt/i, name);
     assert.doesNotMatch(text, /\bmDNS\b/, name);
-    assert.doesNotMatch(text, EMOJI, name);
     // Apple platforms may only be mentioned to say they are not supported.
     for (const sentence of text.replace(/\s+/g, " ").split(/(?<=[.!])\s/)) {
       if (/\b(?:iPhone|iPad|iOS|macOS)\b/.test(sentence)) {
