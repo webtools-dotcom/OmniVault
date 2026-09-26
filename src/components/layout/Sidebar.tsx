@@ -7,7 +7,6 @@ import {
   PanelLeftClose,
   Plus,
   QrCode,
-  ShieldCheck,
   Tablet,
   X,
 } from "lucide-react";
@@ -137,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand & App Header */}
       <div className="h-9.5 px-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-vault-primary" />
+          <img src="/icons/mark.svg" alt="" className="w-5 h-5" />
           <span className="font-display font-semibold text-sm tracking-[-0.01em] text-vault-primary">
             OmniVault
           </span>

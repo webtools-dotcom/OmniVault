@@ -1,32 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="96 96 320 320">
   <defs>
-    <linearGradient id="hv-top-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="hv-top-transparent" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF"/>
       <stop offset="100%" stop-color="#B2B5C4"/>
     </linearGradient>
-    <linearGradient id="hv-left-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="hv-left-transparent" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF"/>
       <stop offset="100%" stop-color="#9699AA"/>
     </linearGradient>
-    <linearGradient id="hv-right-dark" x1="100%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="hv-right-transparent" x1="100%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#C8CAD6"/>
       <stop offset="100%" stop-color="#4E5160"/>
     </linearGradient>
-    <radialGradient id="hv-ambient-dark" cx="50%" cy="45%" r="55%">
+    <radialGradient id="hv-ambient-transparent" cx="50%" cy="45%" r="55%">
       <stop offset="0%" stop-color="rgba(121, 194, 164, 0.08)"/>
       <stop offset="100%" stop-color="rgba(0, 0, 0, 0)"/>
     </radialGradient>
-    <filter id="hv-shadow-dark" x="-20%" y="-20%" width="140%" height="140%">
+    <filter id="hv-shadow-transparent" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.65"/>
     </filter>
   </defs>
 
-  <!-- App Icon Squircle Tile -->
-  <rect width="512" height="512" rx="112" fill="#0D0E11"/>
-  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="rgba(233, 234, 239, 0.08)" stroke-width="2"/>
-  <circle cx="256" cy="256" r="220" fill="url(#hv-ambient-dark)"/>
-
-  <g filter="url(#hv-shadow-dark)" transform="translate(256, 252)">
+  <g  transform="translate(256, 252)">
     <!-- 1. Top Structural Lintel (Omni Containment Lintel) -->
     <path d="M -136 -74
              L -62 -136
@@ -39,7 +34,7 @@
              L -36 -74
              L -86 -34
              Z"
-          fill="url(#hv-top-dark)"/>
+          fill="url(#hv-top-transparent)"/>
 
     <!-- 2. Left Vault Arm (Descending V Wing) -->
     <path d="M -146 -54
@@ -52,7 +47,7 @@
              L -86 24
              L -86 -24
              Z"
-          fill="url(#hv-left-dark)"/>
+          fill="url(#hv-left-transparent)"/>
 
     <!-- 3. Right Vault Arm (Descending V Wing, Metallic Shadow) -->
     <path d="M 146 -54
@@ -65,7 +60,7 @@
              L 86 24
              L 86 -24
              Z"
-          fill="url(#hv-right-dark)"/>
+          fill="url(#hv-right-transparent)"/>
 
     <!-- 4. Floating Vault Keystone Core -->
     <polygon points="0,-42 34,8 0,40 -34,8" fill="#FFFFFF"/>

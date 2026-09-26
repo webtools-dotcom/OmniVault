@@ -1,5 +1,5 @@
 import React from "react";
-import { HardDrive, ShieldCheck, Wifi } from "lucide-react";
+import { HardDrive, Wifi } from "lucide-react";
 
 export interface WelcomeScreenProps {
   onConnectDevice: () => void;
@@ -15,7 +15,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnectDevice, o
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-5 bg-vault-bg overflow-y-auto">
       <div className="w-full max-w-lg py-8">
         <div className="flex items-center gap-2.5">
-          <ShieldCheck className="w-5 h-5 text-vault-primary" />
+          <img src="/icons/mark.svg" alt="" className="w-7 h-7" />
           <span className="font-display text-lg font-semibold tracking-[-0.01em] text-vault-primary">
             OmniVault
           </span>
