@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 600" width="1200" height="600" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+  <title>OmniVault: capture on your phone, and it is on your laptop when both are on the same Wi-Fi</title>
+  <style>
+    .a { animation-duration: 10s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+    #cap1 { animation-name: cap1; }
+    #cap2 { animation-name: cap2; }
+    #cap3 { animation-name: cap3; }
+    #pcard { animation-name: pcard; }
+    #pold { animation-name: pold; }
+    #psaved { animation-name: psaved; }
+    #arc1 { animation-name: arc1; }
+    #arc2 { animation-name: arc2; }
+    #arc3 { animation-name: arc3; }
+    #wdot { animation-name: wdot; }
+    #link { animation: link 10s ease-in-out infinite, flow 0.6s linear infinite; }
+    #fly { animation-name: fly; animation-timing-function: linear; }
+    #lold { animation-name: lold; }
+    #lcard { animation-name: lcard; }
+    #lglow { animation-name: lglow; }
+    #lmeta, #badge, #lsync { animation-name: lmeta; }
+
+    @keyframes cap1 { 0%, 2% { opacity: 0 } 5%, 31% { opacity: 1 } 34%, 100% { opacity: 0 } }
+    @keyframes cap2 { 0%, 34% { opacity: 0 } 37%, 58% { opacity: 1 } 61%, 100% { opacity: 0 } }
+    @keyframes cap3 { 0%, 61% { opacity: 0 } 64%, 94% { opacity: 1 } 97%, 100% { opacity: 0 } }
+    @keyframes pcard { 0%, 7% { opacity: 0; transform: translateY(14px) } 12%, 94% { opacity: 1; transform: none } 98%, 100% { opacity: 0; transform: none } }
+    @keyframes pold { 0%, 7% { transform: translateY(-150px) } 12%, 94% { transform: none } 98%, 100% { transform: translateY(-150px) } }
+    @keyframes psaved { 0%, 15% { opacity: 0 } 19%, 94% { opacity: 1 } 98%, 100% { opacity: 0 } }
+    @keyframes arc1 { 0%, 38% { stroke: #2A2C34 } 41%, 94% { stroke: #79C2A4 } 98%, 100% { stroke: #2A2C34 } }
+    @keyframes arc2 { 0%, 40% { stroke: #2A2C34 } 43%, 94% { stroke: #79C2A4 } 98%, 100% { stroke: #2A2C34 } }
+    @keyframes arc3 { 0%, 42% { stroke: #2A2C34 } 45%, 94% { stroke: #79C2A4 } 98%, 100% { stroke: #2A2C34 } }
+    @keyframes wdot { 0%, 36% { fill: #2A2C34 } 39%, 94% { fill: #79C2A4 } 98%, 100% { fill: #2A2C34 } }
+    @keyframes link { 0%, 46% { opacity: 0 } 49%, 62% { opacity: 1 } 65%, 100% { opacity: 0 } }
+    @keyframes flow { to { stroke-dashoffset: -12 } }
+    @keyframes fly {
+      0%, 50% { opacity: 0; transform: translate(0, 0) }
+      51% { opacity: 1; transform: translate(0, 0) }
+      56.5% { opacity: 1; transform: translate(292px, -80px) }
+      62% { opacity: 1; transform: translate(584px, -24px) }
+      63%, 100% { opacity: 0; transform: translate(584px, -24px) }
+    }
+    @keyframes lold { 0%, 60% { transform: translateY(-116px) } 63%, 94% { transform: none } 98%, 100% { transform: translateY(-116px) } }
+    @keyframes lcard { 0%, 62% { opacity: 0 } 63%, 94% { opacity: 1 } 98%, 100% { opacity: 0 } }
+    @keyframes lglow { 0%, 62% { opacity: 0 } 64% { opacity: 1 } 80%, 100% { opacity: 0 } }
+    @keyframes lmeta { 0%, 63% { opacity: 0 } 66%, 94% { opacity: 1 } 98%, 100% { opacity: 0 } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .a, #link { animation: none; }
+      #cap1, #cap2, #fly, #lglow { opacity: 0; }
+      #arc1, #arc2, #arc3 { stroke: #79C2A4; }
+      #wdot { fill: #79C2A4; }
+    }
+  </style>
+
+  <defs>
+    <!-- The note being captured, drawn at the origin and placed with <use>. -->
+    <g id="note">
+      <rect width="196" height="110" rx="12" fill="#15161B" stroke="rgba(233,234,239,0.22)"/>
+      <rect x="12" y="12" width="46" height="18" rx="9" fill="rgba(121,194,164,0.14)"/>
+      <text x="35" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="#79C2A4">AAPL</text>
+      <text x="184" y="25" text-anchor="end" font-size="10" fill="#6E7280">now</text>
+      <rect x="12" y="38" width="172" height="40" rx="6" fill="#0D0E11"/>
+      <polyline points="18,70 38,64 56,67 74,58 92,61 110,52 128,55 146,46 164,48 178,42" fill="none" stroke="#79C2A4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <line x1="18" y1="50" x2="178" y2="50" stroke="#868A96" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+      <text x="12" y="97" font-size="11" fill="#A8AAB6">Breakout above 190, check volume</text>
+    </g>
+    <g id="row">
+      <rect width="196" height="40" rx="10" fill="#15161B" stroke="rgba(233,234,239,0.07)"/>
+      <rect x="12" y="12" width="90" height="7" rx="3.5" fill="#24252C"/>
+      <rect x="12" y="24" width="140" height="6" rx="3" fill="#1C1D23"/>
+    </g>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24252C"/>
+      <stop offset="1" stop-color="#1C1D23"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="600" fill="#0D0E11"/>
+
+  <!-- Captions -->
+  <g font-size="26" font-weight="600" fill="#E9EAEF" text-anchor="middle">
+    <text id="cap1" class="a" x="600" y="62">1 · Capture it on your phone, even offline</text>
+    <text id="cap2" class="a" x="600" y="62">2 · Get home: your devices find each other</text>
+    <text id="cap3" class="a" x="600" y="62">3 · It's already on your laptop</text>
+  </g>
+
+  <!-- Phone -->
+  <rect x="150" y="100" width="240" height="440" rx="36" fill="#1C1D23" stroke="rgba(233,234,239,0.10)"/>
+  <rect x="162" y="112" width="216" height="416" rx="26" fill="#0D0E11"/>
+  <rect x="240" y="122" width="60" height="8" rx="4" fill="#1C1D23"/>
+  <text x="178" y="164" font-size="16" font-weight="700" fill="#E9EAEF">Quick Inbox</text>
+  <text x="178" y="181" font-size="11" fill="#6E7280">Phone</text>
+  <svg x="162" y="186" width="216" height="296" overflow="hidden">
+    <g id="pold" class="a">
+      <use xlink:href="#row" x="10" y="154"/>
+      <use xlink:href="#row" x="10" y="204"/>
+    </g>
+    <g id="pcard" class="a"><use xlink:href="#note" x="10" y="4"/></g>
+    <g id="psaved" class="a">
+      <circle cx="21" cy="130" r="4" fill="#79C2A4"/>
+      <text x="31" y="134" font-size="11" fill="#79C2A4">Saved on this device</text>
+    </g>
+  </svg>
+  <circle cx="270" cy="496" r="20" fill="#E9EAEF"/>
+  <path d="M270 487v18M261 496h18" stroke="#12131A" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Wi-Fi -->
+  <g fill="none" stroke-width="5" stroke-linecap="round">
+    <path id="arc1" class="a" d="M468.7 288.7A16 16 0 0 1 491.3 288.7" stroke="#2A2C34"/>
+    <path id="arc2" class="a" d="M457.4 277.4A32 32 0 0 1 502.6 277.4" stroke="#2A2C34"/>
+    <path id="arc3" class="a" d="M446.1 266.1A48 48 0 0 1 513.9 266.1" stroke="#2A2C34"/>
+  </g>
+  <circle id="wdot" class="a" cx="480" cy="300" r="5" fill="#2A2C34"/>
+  <text x="480" y="332" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="1" fill="#868A96">SAME WI-FI</text>
+  <line id="link" x1="400" y1="356" x2="560" y2="356" stroke="#79C2A4" stroke-width="2" stroke-dasharray="6 6" opacity="0"/>
+
+  <!-- Laptop -->
+  <rect x="600" y="110" width="500" height="310" rx="14" fill="url(#lid)" stroke="rgba(233,234,239,0.10)"/>
+  <rect x="612" y="122" width="476" height="286" rx="6" fill="#0D0E11"/>
+  <path d="M570 420H1130L1110 442H590Z" fill="#24252C"/>
+  <rect x="820" y="420" width="60" height="6" rx="3" fill="#15161B"/>
+  <rect x="612" y="122" width="130" height="286" fill="#101116"/>
+  <g font-size="12" fill="#A8AAB6">
+    <text x="626" y="150" font-size="10" font-weight="700" letter-spacing="1" fill="#6E7280">FOLDERS</text>
+    <text x="626" y="176">Quick Inbox</text>
+    <rect x="618" y="187" width="118" height="24" rx="6" fill="rgba(233,234,239,0.10)"/>
+    <text x="626" y="204" fill="#E9EAEF" font-weight="600">Trading</text>
+    <text x="626" y="232">Ideas</text>
+    <text x="626" y="260">Receipts</text>
+    <text x="626" y="288">Reading</text>
+  </g>
+  <g id="badge" class="a">
+    <rect x="700" y="192" width="28" height="14" rx="7" fill="#79C2A4"/>
+    <text x="714" y="203" text-anchor="middle" font-size="10" font-weight="700" fill="#12131A">+1</text>
+  </g>
+  <text x="756" y="152" font-size="16" font-weight="700" fill="#E9EAEF">Trading</text>
+  <g id="lsync" class="a">
+    <circle cx="1000" cy="147" r="4" fill="#79C2A4"/>
+    <text x="1010" y="151" font-size="11" fill="#79C2A4">Synced</text>
+  </g>
+  <svg x="756" y="160" width="332" height="248" overflow="hidden">
+    <g id="lold" class="a">
+      <use xlink:href="#row" x="0" y="132"/>
+      <use xlink:href="#row" x="0" y="182"/>    </g>
+  </svg>
+  <rect id="lglow" class="a" x="750" y="160" width="208" height="122" rx="16" fill="none" stroke="#79C2A4" stroke-width="2"/>
+  <g id="lcard" class="a"><use xlink:href="#note" x="756" y="166"/></g>
+  <g id="lmeta" class="a" font-size="11">
+    <text x="968" y="186" fill="#E9EAEF" font-weight="600">Just now</text>
+    <text x="968" y="203" fill="#868A96">from Phone</text>
+    <text x="968" y="220" fill="#868A96">no cloud involved</text>
+  </g>
+
+  <!-- The copy travelling across; the phone keeps its own. -->
+  <g id="fly" class="a" opacity="0"><use xlink:href="#note" x="172" y="190"/></g>
+
+  <text x="600" y="584" text-anchor="middle" font-size="14" fill="#6E7280">No server · No account · Every device keeps a full copy</text>
+</svg>

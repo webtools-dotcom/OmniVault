@@ -1,13 +1,37 @@
-# OmniVault
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <img src="docs/assets/logo-light.png" alt="OmniVault" width="600">
+  </picture>
+</p>
 
-A private, local-first vault for the notes, links, screenshots and files you
-send between your own devices. Every device keeps a complete copy, and devices
-on the same Wi-Fi find each other and sync on their own. No server, no account,
-no cloud.
+<p align="center">
+  <b>Your own "message yourself" chat, minus the cloud.</b><br>
+  Capture on your phone. It's on your laptop by the time you're home.<br>
+  No server. No account. Nothing leaves your Wi-Fi.
+</p>
 
-Available for **Windows** and **Android**. Any phone or tablet on the same
-network can also open it in a browser without installing anything. There is no
-iOS or macOS build.
+<p align="center">
+  <a href="https://github.com/webtools-dotcom/OmniVault/releases/latest"><img src="https://img.shields.io/github/v/release/webtools-dotcom/OmniVault?color=79C2A4&label=download" alt="Latest release"></a>
+  <a href="https://github.com/webtools-dotcom/OmniVault/releases"><img src="https://img.shields.io/github/downloads/webtools-dotcom/OmniVault/total?color=868A96" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20Android%20%7C%20any%20browser-868A96" alt="Platforms">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/webtools-dotcom/OmniVault?color=868A96" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/demo.svg" alt="A note captured on a phone appears in the right folder on a laptop once both are on the same Wi-Fi" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/webtools-dotcom/OmniVault/releases/latest"><b>Download for Windows or Android</b></a>
+  &nbsp;·&nbsp; iPhone, iPad or Mac: open it in the browser on the same Wi-Fi, nothing to install
+</p>
+
+---
+
+OmniVault is a private, local-first vault for the notes, links, screenshots and
+files you send between your own devices. Every device keeps a complete copy,
+and devices on the same Wi-Fi find each other and sync on their own.
 
 ## Why
 
@@ -22,6 +46,17 @@ it is already on the laptop. Copy it out in one tap.
 
 The trade-off is deliberate: sync happens when your devices share a network,
 not over the internet.
+
+### How it compares
+
+|                                              | OmniVault | Message yourself<br>(WhatsApp, Telegram) | LocalSend | Syncthing |
+| :------------------------------------------- | :-------: | :--------------------------------------: | :-------: | :-------: |
+| No account, no internet needed               |    ✅     |                    ❌                    |    ✅     |    ✅     |
+| Nothing stored on someone else's server      |    ✅     |                    ❌                    |    ✅     |    ✅     |
+| Other device can be off when you capture     |    ✅     |                    ✅                    |    ❌     |    ✅     |
+| Organised into folders                       |    ✅     |                    ❌                    |    ❌     |    ✅     |
+| Built for quick notes, links and screenshots |    ✅     |                    ✅                    |    ❌     |    ❌     |
+| Syncs while you're away from home            |    ❌     |                    ✅                    |    ❌     |    ✅     |
 
 ## Features
 
@@ -49,6 +84,10 @@ Get the latest build from the
 - **Windows** — extract the zip and run `omnivault.exe`. There is no installer.
 - **Android** — open the APK on the device and allow installs from your browser
   or file manager. One APK covers phones and tablets.
+- **iPhone, iPad, Mac or any other device** — on your Windows or Android
+  device, open _Connect_, turn on _Allow browser access_ and scan the QR code.
+  It opens in any browser on the same network. There is no native iOS or macOS
+  build.
 
 Neither binary is signed by a commercial certificate authority, so Windows
 SmartScreen and Android will both ask for confirmation. The build steps below
