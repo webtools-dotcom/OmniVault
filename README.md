@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://github.com/webtools-dotcom/OmniVault/releases/latest"><b>Download for Windows or Android</b></a>
-  &nbsp;·&nbsp; iPhone, iPad or Mac: open it in the browser on the same Wi-Fi, nothing to install
+  &nbsp;·&nbsp; No iPhone or Mac app needed: open it in a browser on the same Wi-Fi
 </p>
 
 ---
@@ -51,12 +51,12 @@ not over the internet.
 
 |                                              | OmniVault | Message yourself<br>(WhatsApp, Telegram) | LocalSend | Syncthing |
 | :------------------------------------------- | :-------: | :--------------------------------------: | :-------: | :-------: |
-| No account, no internet needed               |    ✅     |                    ❌                    |    ✅     |    ✅     |
-| Nothing stored on someone else's server      |    ✅     |                    ❌                    |    ✅     |    ✅     |
-| Other device can be off when you capture     |    ✅     |                    ✅                    |    ❌     |    ✅     |
-| Organised into folders                       |    ✅     |                    ❌                    |    ❌     |    ✅     |
-| Built for quick notes, links and screenshots |    ✅     |                    ✅                    |    ❌     |    ❌     |
-| Syncs while you're away from home            |    ❌     |                    ✅                    |    ❌     |    ✅     |
+| No account, no internet needed               |    Yes    |                    No                    |    Yes    |    Yes    |
+| Nothing stored on someone else's server      |    Yes    |                    No                    |    Yes    |    Yes    |
+| Other device can be off when you capture     |    Yes    |                   Yes                    |    No     |    Yes    |
+| Organised into folders                       |    Yes    |                    No                    |    No     |    Yes    |
+| Built for quick notes, links and screenshots |    Yes    |                   Yes                    |    No     |    No     |
+| Syncs while you're away from home            |    No     |                   Yes                    |    No     |    Yes    |
 
 ## Features
 
@@ -84,7 +84,7 @@ Get the latest build from the
 - **Windows** — extract the zip and run `omnivault.exe`. There is no installer.
 - **Android** — open the APK on the device and allow installs from your browser
   or file manager. One APK covers phones and tablets.
-- **iPhone, iPad, Mac or any other device** — on your Windows or Android
+- **iPhone, iPad, Mac or any other device** — no app to install. On your Windows or Android
   device, open _Connect_, turn on _Allow browser access_ and scan the QR code.
   It opens in any browser on the same network. There is no native iOS or macOS
   build.
