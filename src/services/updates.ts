@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 export const RELEASES_REPO = "webtools-dotcom/OmniVault";
 
 /** Must match package.json, tauri.conf.json and Cargo.toml (checked by the tests). */
-export const APP_VERSION = "0.2.2";
+export const APP_VERSION = "0.2.3";
 
 export type UpdateStatus = "unconfigured" | "current" | "available" | "failed";
 
