@@ -999,6 +999,15 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(state)
+        .setup(|app| {
+            let resolver = app.asset_resolver();
+            http_server::set_embedded_assets(Box::new(move |path| {
+                resolver
+                    .get(path.to_string())
+                    .map(|asset| (asset.bytes, asset.mime_type))
+            }));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_system_status,
             get_discovered_peers_cmd,

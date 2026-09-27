@@ -54,6 +54,19 @@ pub fn browser_access_enabled() -> bool {
     BROWSER_ACCESS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Looks up a frontend file by path, returning its bytes and MIME type.
+type AssetLookup = Box<dyn Fn(&str) -> Option<(Vec<u8>, String)> + Send + Sync>;
+
+/// The frontend bundled into the executable, set once the app has started.
+/// Browsers are served from it before any `dist/` on disk, so the browser UI
+/// always matches the running binary, including after a self-update that
+/// replaced only the executable.
+static EMBEDDED_ASSETS: std::sync::OnceLock<AssetLookup> = std::sync::OnceLock::new();
+
+pub fn set_embedded_assets(lookup: AssetLookup) {
+    let _ = EMBEDDED_ASSETS.set(lookup);
+}
+
 /// Failed pairing attempts per source address, as (count, window_start_ms).
 static PAIR_ATTEMPTS: std::sync::OnceLock<Mutex<HashMap<std::net::IpAddr, (u32, i64)>>> =
     std::sync::OnceLock::new();
@@ -2152,7 +2165,8 @@ fn handle_connection(
     }
 
     // Static Assets & SPA Fallback Serving
-    if let Some(dist) = dist_dir {
+    let embedded = EMBEDDED_ASSETS.get();
+    if embedded.is_some() || dist_dir.is_some() {
         if !browser_access_enabled() {
             // Everything above this point — health, pairing and the sync API —
             // stays reachable, so mesh sync is unaffected. Only the browser UI
@@ -2183,43 +2197,54 @@ fn handle_connection(
             return Ok(());
         }
 
-        let target_file = if relative_path.is_empty() {
-            dist.join("index.html")
-        } else {
-            dist.join(relative_path)
-        };
-
-        // Canonical verification: ensure resolved path is strictly contained within dist directory
-        let is_safe = if let (Ok(canonical_target), Ok(canonical_dist)) =
-            (target_file.canonicalize(), dist.canonicalize())
-        {
-            canonical_target.starts_with(&canonical_dist)
-        } else {
-            false
-        };
-
-        if is_safe && target_file.exists() && target_file.is_file() {
-            if let Ok(bytes) = fs::read(&target_file) {
-                let mime = get_mime_type(&target_file);
-                send_response(&mut stream, 200, "OK", mime, &bytes, &[])?;
+        // The resolver falls back to index.html for any unknown path, which
+        // is the SPA fallback wanted for GET and wrong for anything else.
+        if let (Some(lookup), "GET") = (embedded, method) {
+            if let Some((bytes, mime)) = lookup(relative_path) {
+                send_response(&mut stream, 200, "OK", &mime, &bytes, &[])?;
                 return Ok(());
             }
         }
 
-        // SPA Fallback: Serve index.html for client-side GET routes (never API calls)
-        if method == "GET" && !path.starts_with("/api/") {
-            let fallback_index = dist.join("index.html");
-            if fallback_index.exists() {
-                if let Ok(bytes) = fs::read(&fallback_index) {
-                    send_response(
-                        &mut stream,
-                        200,
-                        "OK",
-                        "text/html; charset=utf-8",
-                        &bytes,
-                        &[],
-                    )?;
+        if let Some(dist) = dist_dir {
+            let target_file = if relative_path.is_empty() {
+                dist.join("index.html")
+            } else {
+                dist.join(relative_path)
+            };
+
+            // Canonical verification: ensure resolved path is strictly contained within dist directory
+            let is_safe = if let (Ok(canonical_target), Ok(canonical_dist)) =
+                (target_file.canonicalize(), dist.canonicalize())
+            {
+                canonical_target.starts_with(&canonical_dist)
+            } else {
+                false
+            };
+
+            if is_safe && target_file.exists() && target_file.is_file() {
+                if let Ok(bytes) = fs::read(&target_file) {
+                    let mime = get_mime_type(&target_file);
+                    send_response(&mut stream, 200, "OK", mime, &bytes, &[])?;
                     return Ok(());
+                }
+            }
+
+            // SPA Fallback: Serve index.html for client-side GET routes (never API calls)
+            if method == "GET" && !path.starts_with("/api/") {
+                let fallback_index = dist.join("index.html");
+                if fallback_index.exists() {
+                    if let Ok(bytes) = fs::read(&fallback_index) {
+                        send_response(
+                            &mut stream,
+                            200,
+                            "OK",
+                            "text/html; charset=utf-8",
+                            &bytes,
+                            &[],
+                        )?;
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -2647,6 +2672,22 @@ mod tests {
         stream.read_to_string(&mut resp).unwrap();
         assert!(resp.contains("200 OK"));
         assert!(resp.contains("text/html"));
+
+        // 6b. Once the app has started, the UI bundled into the executable wins
+        // over any dist/ on disk, so an update that replaced only the executable
+        // cannot leave browsers on the previous version's UI.
+        set_embedded_assets(Box::new(|path| {
+            Some((format!("embedded:{path}").into_bytes(), "text/html".into()))
+        }));
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        stream
+            .write_all(
+                b"GET /some/custom/path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            )
+            .unwrap();
+        let mut resp = String::new();
+        stream.read_to_string(&mut resp).unwrap();
+        assert!(resp.ends_with("embedded:some/custom/path"), "{resp}");
 
         // 7. Test decode_base64
         let test_b64 = "SGVsbG8gV29ybGQ=";
