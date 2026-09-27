@@ -21,9 +21,7 @@ const targetApkPath = path.resolve(targetApkDir, `omnivault-v${VERSION}-android.
 const apkShaPath = path.resolve(targetApkDir, `omnivault-v${VERSION}-android.apk.sha256`);
 const shaSumsPath = path.resolve(targetApkDir, "SHA256SUMS.txt");
 
-console.log("\n=======================================================");
-console.log("   OmniVault Android APK Release Packaging");
-console.log("=======================================================\n");
+console.log(`Packaging OmniVault v${VERSION} for Android`);
 
 // 1. Locate release APK (or fallback to universal debug APK if release not built)
 let sourceApkPath = releaseApkPath;
@@ -31,11 +29,11 @@ let isReleaseBuild = true;
 
 if (!fs.existsSync(sourceApkPath)) {
   if (fs.existsSync(debugApkPath)) {
-    console.warn("⚠️ Warning: Release APK not found. Using debug universal APK as fallback.");
+    console.warn("warning: Release APK not found. Using debug universal APK as fallback.");
     sourceApkPath = debugApkPath;
     isReleaseBuild = false;
   } else {
-    console.error("❌ Android APK not found!");
+    console.error("Android APK not found!");
     console.error("Expected at:", releaseApkPath);
     console.error("Run `npm run build:android` or `cargo tauri android build --apk` first.");
     process.exit(1);
@@ -81,7 +79,7 @@ const apkBuf = fs.readFileSync(sourceApkPath);
 }
 
 if (abiSizes.size === 0) {
-  console.error("❌ No native libraries found in the APK — it would not run on any device.");
+  console.error("No native libraries found in the APK — it would not run on any device.");
   process.exit(1);
 }
 
@@ -93,16 +91,16 @@ console.log(`      ABIs: ${abiReport}`);
 const largestAbi = Math.max(...abiSizes.values());
 if (largestAbi > MAX_CODE_MB * 1024 * 1024) {
   console.error(
-    `❌ Native code for one ABI exceeds ${MAX_CODE_MB} MB! Actual: ${(largestAbi / (1024 * 1024)).toFixed(2)} MB`,
+    `Native code for one ABI exceeds ${MAX_CODE_MB} MB! Actual: ${(largestAbi / (1024 * 1024)).toFixed(2)} MB`,
   );
   process.exit(1);
 }
 if (stats.size > MAX_PACKAGE_MB * 1024 * 1024) {
-  console.error(`❌ APK exceeds the ${MAX_PACKAGE_MB} MB package ceiling! Actual: ${sizeMB} MB`);
+  console.error(`APK exceeds the ${MAX_PACKAGE_MB} MB package ceiling! Actual: ${sizeMB} MB`);
   process.exit(1);
 }
 console.log(
-  `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ✅ PASS`,
+  `[2/4] Size budget check passed (code < ${MAX_CODE_MB} MB per ABI, package < ${MAX_PACKAGE_MB} MB): ok`,
 );
 
 /**
@@ -134,7 +132,7 @@ const aapt2 = findAapt2();
 if (!aapt2) {
   // Skipping loudly beats failing on a machine with no Android SDK, but it
   // must be visible that the check did not run.
-  console.log("      ⚠️  aapt2 not found — APK version NOT verified against package.json.");
+  console.log("      warning: aapt2 not found — APK version NOT verified against package.json.");
 } else {
   const badging = execFileSync(aapt2, ["dump", "badging", sourceApkPath], {
     encoding: "utf-8",
@@ -142,15 +140,13 @@ if (!aapt2) {
   });
   const declared = (badging.match(/versionName='([^']*)'/) || [])[1];
   if (declared !== VERSION) {
-    console.error(
-      `❌ The APK declares versionName='${declared}' but this repository is ${VERSION}.`,
-    );
+    console.error(`The APK declares versionName='${declared}' but this repository is ${VERSION}.`);
     console.error(
       "   Gradle reused a stale manifest. Delete src-tauri/gen/android/app/build and rebuild.",
     );
     process.exit(1);
   }
-  console.log(`      APK declares versionName=${declared}: ✅ matches package.json`);
+  console.log(`      APK declares versionName=${declared}, matches package.json`);
 }
 
 // 3. Stage APK to release directory
@@ -180,6 +176,4 @@ if (fs.existsSync(shaSumsPath)) {
   fs.writeFileSync(shaSumsPath, `${apkHash}  omnivault-v${VERSION}-android.apk\n`, "utf-8");
 }
 
-console.log("\n-------------------------------------------------------");
-console.log(`✅ Standalone Android APK ready in release/!`);
-console.log("=======================================================\n");
+console.log("Android release ready in release/");

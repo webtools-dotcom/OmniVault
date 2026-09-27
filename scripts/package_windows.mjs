@@ -14,13 +14,11 @@ const zipPath = path.resolve(rootDir, `release/omnivault-v${VERSION}-windows-x64
 const shaSumsPath = path.resolve(rootDir, "release/SHA256SUMS.txt");
 const releaseNotesPath = path.resolve(rootDir, "release/RELEASE_NOTES.md");
 
-console.log("\n=======================================================");
-console.log("   OmniVault Windows Release Packaging & Verification");
-console.log("=======================================================\n");
+console.log(`Packaging OmniVault v${VERSION} for Windows`);
 
 // 1. Verify release binary exists
 if (!fs.existsSync(releaseExePath)) {
-  console.error("❌ Release binary not found at:", releaseExePath);
+  console.error("Release binary not found at:", releaseExePath);
   console.error("Run `npm run build:release` first.");
   process.exit(1);
 }
@@ -33,10 +31,10 @@ console.log(`      Binary size: ${stats.size.toLocaleString()} bytes (${sizeMB} 
 // 2. Size budget: the binary must stay under 15 MB.
 const MAX_BUDGET_MB = 15;
 if (stats.size > MAX_BUDGET_MB * 1024 * 1024) {
-  console.error(`❌ Binary size exceeds ${MAX_BUDGET_MB} MB budget! Actual: ${sizeMB} MB`);
+  console.error(`Binary size exceeds ${MAX_BUDGET_MB} MB budget! Actual: ${sizeMB} MB`);
   process.exit(1);
 }
-console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ✅ PASS`);
+console.log(`[2/5] Size budget check passed (< ${MAX_BUDGET_MB} MB budget): ok`);
 
 // 3. Stage the binary and web assets. The staging directory is emptied
 // first: Vite names output by content hash, so old bundles would pile up.
@@ -49,7 +47,7 @@ try {
 } catch (err) {
   if (err && err.code === "EBUSY") {
     console.warn(
-      "⚠️ Notice: Target release executable is currently running and locked. Preserved running binary.",
+      "Target release executable is currently running and locked. Preserved running binary.",
     );
   } else {
     throw err;
@@ -61,7 +59,7 @@ try {
 } catch (err) {
   if (err && err.code === "EBUSY") {
     console.warn(
-      "⚠️ Notice: release/omnivault.exe is currently running and locked. Preserved running binary.",
+      "release/omnivault.exe is currently running and locked. Preserved running binary.",
     );
   } else {
     throw err;
@@ -76,29 +74,19 @@ if (fs.existsSync(sourceDistDir)) {
   console.log("      Copied web PWA static assets (dist/) to release packages.");
 }
 
-const readmeContent = `OmniVault v${VERSION} - Windows Release (x86_64)
-==============================================
+const readmeContent = `OmniVault v${VERSION} for Windows (64-bit)
 
-OmniVault is a private, local-first cross-device personal workspace and knowledge vault
-with nested folders, instant capture, and asynchronous store-and-forward mesh
-synchronization over local Wi-Fi.
+Run omnivault.exe. There is no installer. The vault is stored in this
+folder, next to the exe, so keep the folder together and back it up whole.
 
-Requirements:
-- Windows 10 / 11 (64-bit)
-- Zero cloud account required
-- Zero external runtime required (WebView2 is built into modern Windows)
+To add a phone, put both devices on the same Wi-Fi, open OmniVault on both
+and tap Connect. An iPhone or any other browser works too: open Connect,
+turn on "Allow browser access" and scan the QR code.
 
-Quick Start:
-1. Double-click \`omnivault.exe\` to launch the desktop application.
-2. Open Quick Inbox (Ctrl+Shift+I) to instantly capture ideas, notes, charts, and links.
-3. Click "Connect Mobile" in the top bar to display the local Wi-Fi QR code.
-4. Scan the QR code with your iPhone, iPad, or Android phone to access OmniVault
-   over your local Wi-Fi with zero installation!
+The exe is not code-signed, so Windows warns about an unrecognised
+publisher. Choose "More info", then "Run anyway".
 
-Documentation & Architecture:
-- Embedded HTTP Server: http://0.0.0.0:42420
-- Decentralized mDNS Discovery + TCP Delta Mesh Sync
-- 100% Offline Capable & Private
+https://github.com/webtools-dotcom/OmniVault
 `;
 
 fs.writeFileSync(path.resolve(releaseDistDir, "README.txt"), readmeContent, "utf-8");
@@ -112,7 +100,7 @@ try {
   const zipMB = (zipStats.size / (1024 * 1024)).toFixed(2);
   console.log(`[4/5] Compressed release archive created: ${zipPath} (${zipMB} MB)`);
 } catch (err) {
-  console.warn("⚠️ Warning: Could not create zip archive via PowerShell:", err.message);
+  console.warn("warning: Could not create zip archive via PowerShell:", err.message);
 }
 
 // 5. Generate SHA-256 checksums & GitHub Release Notes
@@ -175,6 +163,4 @@ console.log(`[5/5] Generated SHA-256 checksums & GitHub Release Notes:`);
 console.log(`      Saved to: ${shaSumsPath}`);
 console.log(`      Saved to: ${releaseNotesPath}\n`);
 
-console.log("-------------------------------------------------------");
-console.log(`✅ Standalone Windows release package ready in release/!`);
-console.log("=======================================================\n");
+console.log("Windows release ready in release/");

@@ -95,7 +95,7 @@ if (!found) {
 
 if (found !== expected) {
   console.error("");
-  console.error("  ✖ THE APK IS SIGNED WITH THE WRONG KEY.");
+  console.error("  The APK is signed with the wrong key.");
   console.error(`      expected  ${expected}`);
   console.error(`      found     ${found}`);
   console.error("");

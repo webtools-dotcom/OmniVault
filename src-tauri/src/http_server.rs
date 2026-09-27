@@ -459,7 +459,7 @@ pub struct MediaUploadRequest {
     pub base64: Option<String>,
 }
 
-/// Robust base64 decoder supporting data-URL prefixes and padding.
+/// Base64 decoder supporting data-URL prefixes and padding.
 pub fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
     let clean = input.trim();
     let clean = if let Some(idx) = clean.find(',') {

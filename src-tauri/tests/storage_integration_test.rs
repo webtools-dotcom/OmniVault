@@ -189,8 +189,6 @@ fn test_storage_integration_e2e_workflow() {
     let media_payload: MediaFile = serde_json::from_str(&revisions[7].5).unwrap();
     assert_eq!(media_payload.mime_type, "image/webp");
 
-    println!("✅ E2E Storage & Revision Audit Self-Check passed with 9 valid revisions!");
-
     // Clean up temporary disk files
     let _ = fs::remove_dir_all(&temp_storage);
 }
