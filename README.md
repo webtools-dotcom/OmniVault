@@ -58,6 +58,27 @@ not over the internet.
 | Built for quick notes, links and screenshots |    ✅     |                    ✅                    |    ❌     |    ❌     |
 | Syncs while you're away from home            |    ❌     |                    ✅                    |    ❌     |    ✅     |
 
+## Screenshots
+
+**Folders for everything.** Notes, screenshots, links and tickers, nested as
+deep as you like.
+
+<img src="docs/assets/screenshots/desktop-folders.png" alt="The desktop app showing nested folders and a folder with a chart screenshot, a note and ticker cards" width="100%">
+
+**On your phone.** The same vault, synced from the laptop over Wi-Fi.
+
+<img src="docs/assets/screenshots/phone.png" alt="Three phone screens: the quick inbox with the capture bar, the folder drawer, and a folder synced from the laptop" width="100%">
+
+**A Markdown editor** with a formatting toolbar, live preview and autosave.
+Tickers become one-tap links to TradingView and Yahoo Finance.
+
+<img src="docs/assets/screenshots/editor.png" alt="The note editor in split view: Markdown on the left, the rendered preview with a checklist on the right" width="100%">
+
+**Pairing takes one tap.** Devices on the same network find each other. Tap
+_Connect_ on one and _Allow_ on the other.
+
+<img src="docs/assets/screenshots/connect.png" alt="The Connect a device dialog listing a laptop found on the local network" width="100%">
+
 ## Features
 
 - **Nested folders** with drag and drop, plus a Quick Inbox for things you file
