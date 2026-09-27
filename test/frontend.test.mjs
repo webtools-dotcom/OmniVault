@@ -255,6 +255,19 @@ test("the QR encoder produces decodable codes", async () => {
   }
 });
 
+test("a card previews a note's Markdown as plain text", async () => {
+  const { previewText } = await importTs("src/utils/copyText.ts");
+  assert.equal(
+    previewText(
+      "## Setup\nHandle under **142.50**.\n\n## Plan\n- [ ] Entry above 142.50\n> Skip gaps",
+    ),
+    "Handle under 142.50.\nEntry above 142.50\nSkip gaps",
+  );
+  assert.equal(previewText("# Only a heading"), "Only a heading");
+  assert.equal(previewText("See [the docs](https://x.y) and `code`"), "See the docs and code");
+  assert.equal(previewText("keep snake_case_names and 5 * 3"), "keep snake_case_names and 5 * 3");
+});
+
 test("copying a note does not repeat a title that begins its body", async () => {
   const { copyableText } = await importTs("src/utils/copyText.ts");
   assert.equal(

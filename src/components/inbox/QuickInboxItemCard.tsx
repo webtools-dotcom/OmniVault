@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { VaultItem } from "../../types";
 import { cn } from "../../utils/cn";
-import { copyableText } from "../../utils/copyText";
+import { copyableText, previewText } from "../../utils/copyText";
 import { extractTickers } from "../../utils/tickerDetector";
 import { extractLinks } from "../../utils/linkDetector";
 import { SmartMarketLauncher } from "../research/SmartMarketLauncher";
@@ -199,8 +199,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
           )}
 
           {item.content && !isFile && (
-            <p className="mt-2 text-[0.8125rem] text-vault-secondary leading-relaxed line-clamp-3">
-              {item.content}
+            <p className="mt-2 text-[0.8125rem] text-vault-secondary leading-relaxed line-clamp-3 whitespace-pre-line">
+              {previewText(item.content)}
             </p>
           )}
 

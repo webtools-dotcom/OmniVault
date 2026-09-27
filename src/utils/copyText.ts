@@ -12,3 +12,26 @@ export function copyableText(title: string, content: string): string {
   if (firstLine === t || c.startsWith(t)) return c;
   return `${t}\n\n${c}`;
 }
+
+/**
+ * A note's Markdown as the plain lines a card preview shows: markers removed,
+ * heading-only lines dropped when there is anything else to show.
+ */
+export function previewText(content: string): string {
+  const lines = (content || "")
+    .replace(/```[\s\S]*?```/g, "")
+    .split("\n")
+    .map((line) => {
+      const heading = /^\s{0,3}#{1,6}\s+/.test(line);
+      const text = line
+        .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)/, "")
+        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/(\*\*|__|~~|`)(.+?)\1/g, "$2")
+        .replace(/\*(\S(?:.*?\S)?)\*/g, "$1")
+        .trim();
+      return { heading, text };
+    })
+    .filter((l) => l.text);
+  const body = lines.filter((l) => !l.heading);
+  return (body.length ? body : lines).map((l) => l.text).join("\n");
+}
