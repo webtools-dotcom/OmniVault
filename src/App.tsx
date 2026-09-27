@@ -545,8 +545,14 @@ export function App() {
           onClose={onClose}
           onToggleCollapse={onToggleCollapse}
           activeView={activeView}
-          onSelectInbox={handleSelectInbox}
-          onSelectFolder={handleSelectFolder}
+          onSelectInbox={() => {
+            handleSelectInbox();
+            if (isMobile) onClose();
+          }}
+          onSelectFolder={(folderId) => {
+            handleSelectFolder(folderId);
+            if (isMobile) onClose();
+          }}
           onCreateFolder={handleCreateFolder}
           onRenameFolder={handleRenameFolder}
           onMoveFolder={handleMoveFolder}
