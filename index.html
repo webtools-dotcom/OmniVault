@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniVault · Sync notes between your phone and PC over Wi-Fi, no cloud</title>
+<meta name="description" content="OmniVault is a free, open-source notes app that syncs notes, links, screenshots and files between your Android phone and Windows PC over your own Wi-Fi. No cloud, no server, no account.">
+<link rel="canonical" href="https://webtools-dotcom.github.io/OmniVault/">
+<meta name="theme-color" content="#0D0E11">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OmniVault">
+<meta property="og:title" content="OmniVault · Your notes on all your devices. No cloud.">
+<meta property="og:description" content="Save it on your phone, it's on your laptop a moment later. Free and open source, syncs over your own Wi-Fi.">
+<meta property="og:url" content="https://webtools-dotcom.github.io/OmniVault/">
+<meta property="og:image" content="https://webtools-dotcom.github.io/OmniVault/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://webtools-dotcom.github.io/OmniVault/assets/og.png">
+<link rel="preload" href="assets/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "OmniVault",
+  "description": "Free, open-source, local-first notes app that syncs notes, links, screenshots and files between your own devices over Wi-Fi, with no cloud, server or account.",
+  "applicationCategory": "ProductivityApplication",
+  "operatingSystem": "Windows, Android",
+  "softwareVersion": "0.2.4",
+  "license": "https://opensource.org/licenses/MIT",
+  "url": "https://webtools-dotcom.github.io/OmniVault/",
+  "downloadUrl": "https://github.com/webtools-dotcom/OmniVault/releases/latest",
+  "image": "https://webtools-dotcom.github.io/OmniVault/assets/og.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+<style>
+  @font-face { font-family: Archivo; src: url(assets/archivo-latin.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: Fraunces; src: url(assets/fraunces-latin.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    --bg: #0D0E11; --panel: #15161B; --line: rgba(233, 234, 239, 0.09); --line-2: rgba(233, 234, 239, 0.16);
+    --text: #E9EAEF; --soft: #A8AAB6; --muted: #868A96; --accent: #79C2A4;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.6 Archivo, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 21px Fraunces, serif; }
+  .logo img { width: 28px; height: 28px; }
+  .nav-links { display: flex; gap: 22px; align-items: center; font-size: 15px; color: var(--soft); }
+  .nav-links a { text-decoration: none; }
+  .nav-links a:hover { color: var(--text); }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px; border-radius: 10px;
+    font: 600 16px Archivo, sans-serif; text-decoration: none; border: 1px solid var(--line-2); transition: background 0.15s, border-color 0.15s; }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn.primary:hover { background: #fff; }
+  .btn.ghost:hover { border-color: rgba(233, 234, 239, 0.32); }
+  .btn.small { height: 36px; padding: 0 14px; font-size: 14px; }
+
+  .hero { padding: 72px 0 40px; text-align: center; }
+  .hero h1 { font-size: clamp(40px, 6.4vw, 72px); line-height: 1.04; max-width: 900px; margin: 0 auto; }
+  .hero p.lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--soft); max-width: 640px; margin: 22px auto 0; }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+  .platforms { margin-top: 18px; font-size: 14px; color: var(--muted); }
+
+  .video { margin: 44px auto 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--line-2);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6); background: #000; aspect-ratio: 16 / 9; }
+  .video video { width: 100%; height: 100%; display: block; }
+
+  section { padding: 96px 0 0; }
+  .eyebrow { font: 600 13px Archivo, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  section h2 { font-size: clamp(30px, 4vw, 42px); line-height: 1.12; margin-top: 10px; }
+  .intro { color: var(--soft); max-width: 620px; margin-top: 14px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; }
+  .step { border: 1px solid var(--line); border-radius: 14px; padding: 24px; background: var(--panel); }
+  .step b { display: block; font: 600 13px Archivo; color: var(--muted); letter-spacing: 0.08em; }
+  .step h3 { font-size: 22px; margin: 10px 0 6px; }
+  .step p { margin: 0; color: var(--soft); font-size: 16px; }
+
+  .feature { display: grid; grid-template-columns: 5fr 7fr; gap: 48px; align-items: center; margin-top: 72px; }
+  .feature.flip { grid-template-columns: 7fr 5fr; }
+  .feature.flip .copy { order: 2; }
+  .feature h3 { font-size: 30px; line-height: 1.15; }
+  .feature p { color: var(--soft); margin: 14px 0 0; }
+  .shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line-2); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); }
+  .shot img { width: 100%; display: block; height: auto; }
+
+  .honest { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 32px; }
+  .honest div { border-top: 1px solid var(--line-2); padding-top: 18px; }
+  .honest h3 { font: 600 17px Archivo, sans-serif; letter-spacing: 0; }
+  .honest p { margin: 6px 0 0; color: var(--soft); font-size: 16px; }
+
+  details { border-bottom: 1px solid var(--line); padding: 20px 0; }
+  details:first-of-type { border-top: 1px solid var(--line); margin-top: 28px; }
+  summary { cursor: pointer; list-style: none; font: 600 18px Archivo, sans-serif; display: flex; justify-content: space-between; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 22px; line-height: 1; }
+  details[open] summary::after { content: "−"; }
+  details p { color: var(--soft); margin: 12px 0 0; max-width: 760px; }
+
+  .final { text-align: center; padding: 110px 0 90px; }
+  .final h2 { font-size: clamp(32px, 4.4vw, 48px); }
+  .final p { color: var(--soft); margin: 14px 0 0; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer a { text-decoration: none; margin-left: 18px; }
+  footer a:hover { color: var(--text); }
+
+  @media (max-width: 820px) {
+    .nav-links .hide-sm { display: none; }
+    .steps, .honest { grid-template-columns: 1fr; }
+    .feature, .feature.flip { grid-template-columns: 1fr; gap: 24px; margin-top: 56px; }
+    .feature.flip .copy { order: 0; }
+    section { padding-top: 72px; }
+    footer a { margin: 0 18px 0 0; }
+  }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <nav>
+    <a class="logo" href="./"><img src="assets/mark.svg" alt="">OmniVault</a>
+    <div class="nav-links">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a href="https://github.com/webtools-dotcom/OmniVault">GitHub</a>
+      <a class="btn small primary" href="https://github.com/webtools-dotcom/OmniVault/releases/latest">Download</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Your notes on all your devices. No cloud.</h1>
+    <p class="lead">OmniVault is a free, open-source notes app that syncs your phone and laptop over your own Wi-Fi. Save a note, a link or a screenshot on one, and it's on the other a moment later.</p>
+    <div class="ctas">
+      <a class="btn primary" href="https://github.com/webtools-dotcom/OmniVault/releases/latest">Download for Windows &amp; Android</a>
+      <a class="btn ghost" href="https://github.com/webtools-dotcom/OmniVault">View source on GitHub</a>
+    </div>
+    <div class="platforms">Free and MIT licensed · No account · iPhone and Mac can use it from a browser on the same Wi-Fi</div>
+    <div class="video">
+      <video src="assets/demo.mp4" poster="assets/poster.jpg" autoplay muted loop playsinline preload="metadata"
+        aria-label="OmniVault demo: a note typed on a phone appears on the laptop, then capturing, pasting a screenshot, folders and the Markdown editor"></video>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="eyebrow">How it works</div>
+      <h2>Your devices talk to each other. Nothing in between.</h2>
+      <p class="intro">Every device keeps its own complete copy. When two of them share a network, they find each other and swap what changed.</p>
+      <div class="steps">
+        <div class="step"><b>01</b><h3>Install it twice</h3><p>On your Android phone and your Windows PC. No sign-up.</p></div>
+        <div class="step"><b>02</b><h3>Connect once</h3><p>Tap Connect on one device and Allow on the other.</p></div>
+        <div class="step"><b>03</b><h3>Just save</h3><p>On the same Wi-Fi or your phone's hotspot, everything syncs on its own.</p></div>
+      </div>
+
+      <div class="feature">
+        <div class="copy">
+          <div class="eyebrow">Phone to laptop</div>
+          <h3>Save it on your phone. It's already on your laptop.</h3>
+          <p>No more messaging yourself on WhatsApp. The laptop doesn't even need to be on when you save; it catches up the next time both devices share a network.</p>
+        </div>
+        <div class="shot"><img src="assets/phone-to-laptop.webp" width="1600" height="900" loading="lazy" alt="A note captured on an Android phone appearing in the OmniVault inbox on a Windows laptop"></div>
+      </div>
+
+      <div class="feature flip">
+        <div class="copy">
+          <div class="eyebrow">Capture</div>
+          <h3>Notes, links, tickers and screenshots, in a second.</h3>
+          <p>Type into the capture bar or paste a screenshot with Ctrl+V. Stock and crypto tickers become one-tap links to TradingView and Yahoo Finance.</p>
+        </div>
+        <div class="shot"><img src="assets/inbox.webp" width="1600" height="900" loading="lazy" alt="The OmniVault quick inbox with notes and a ticker card"></div>
+      </div>
+
+      <div class="feature">
+        <div class="copy">
+          <div class="eyebrow">Organise</div>
+          <h3>Folders inside folders, not one endless chat.</h3>
+          <p>Drag anything from the inbox into nested folders. Trades, receipts, reading lists and ideas each get their own place.</p>
+        </div>
+        <div class="shot"><img src="assets/desktop-folders.webp" width="1600" height="900" loading="lazy" alt="Nested folders in OmniVault with chart screenshots, a note and ticker cards"></div>
+      </div>
+
+      <div class="feature flip">
+        <div class="copy">
+          <div class="eyebrow">Write</div>
+          <h3>Markdown with a live preview.</h3>
+          <p>Checklists, headings and quotes, saved as you type. Back up everything as plain Markdown files you can read without the app.</p>
+        </div>
+        <div class="shot"><img src="assets/editor.webp" width="1600" height="900" loading="lazy" alt="The OmniVault note editor with Markdown on the left and a live preview on the right"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">Worth knowing</div>
+      <h2>What it doesn't do.</h2>
+      <div class="honest">
+        <div><h3>No sync over the internet</h3><p>Devices sync when they share a network, not from across town. That's the trade for keeping it all off the internet.</p></div>
+        <div><h3>Sync isn't encrypted yet</h3><p>It's built for your home Wi-Fi or your own hotspot. Avoid using it on public Wi-Fi for now.</p></div>
+        <div><h3>No native iPhone or Mac app</h3><p>They can still use the full app from a browser on the same network, with nothing to install.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="eyebrow">FAQ</div>
+      <h2>Questions</h2>
+      <details><summary>How do I get notes from my Android phone to my Windows PC without the cloud?</summary><p>Install OmniVault on both, put them on the same Wi-Fi or the phone's hotspot, and tap Connect. Anything you save on one shows up on the other, directly over your network.</p></details>
+      <details><summary>How is it different from LocalSend or KDE Connect?</summary><p>Those send a file from one device to another while both are open. OmniVault keeps a synced, organised vault: the other device can be off when you save something, and it catches up later.</p></details>
+      <details><summary>Does it work without internet?</summary><p>Yes. It only needs the devices to share a local network. The only request that goes to the internet is the update check, and it runs only when you press the button.</p></details>
+      <details><summary>Where is my data stored?</summary><p>In a SQLite database and a media folder on each of your devices. Nothing is stored on a server, because there isn't one.</p></details>
+      <details><summary>Is it really free?</summary><p>Yes. It's open source under the MIT license, with no ads, no tracking and no paid tier.</p></details>
+    </div>
+  </section>
+
+  <div class="wrap final">
+    <h2>Stop messaging yourself.</h2>
+    <p>Free for Windows and Android.</p>
+    <div class="ctas">
+      <a class="btn primary" href="https://github.com/webtools-dotcom/OmniVault/releases/latest">Download OmniVault</a>
+      <a class="btn ghost" href="https://github.com/webtools-dotcom/OmniVault">Star on GitHub</a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>OmniVault · MIT license</span>
+    <span><a href="https://github.com/webtools-dotcom/OmniVault">Source</a><a href="https://github.com/webtools-dotcom/OmniVault/releases">Releases</a><a href="https://github.com/webtools-dotcom/OmniVault/issues">Report a bug</a></span>
+  </div>
+</footer>
+<script>
+  // Respect reduced-motion: show the poster instead of autoplaying.
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const v = document.querySelector("video"); v.removeAttribute("autoplay"); v.pause(); v.controls = true;
+  }
+</script>
+</body>
+</html>
