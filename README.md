@@ -1,9 +1,9 @@
-<p align="center">
+<h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
     <img src="docs/assets/logo-light.png" alt="OmniVault" width="600">
   </picture>
-</p>
+</h1>
 
 <p align="center">
   <b>Your own "message yourself" chat, minus the cloud.</b><br>
@@ -19,19 +19,22 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/demo.svg" alt="A note captured on a phone appears in the right folder on a laptop once both are on the same Wi-Fi" width="100%">
+  <img src="docs/assets/demo.gif" alt="OmniVault demo: a note typed on an Android phone appears on a Windows laptop over Wi-Fi, then capturing notes and tickers, pasting a screenshot, dragging it into a folder and editing Markdown with live preview" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/webtools-dotcom/OmniVault/releases/latest"><b>Download for Windows or Android</b></a>
+  &nbsp;·&nbsp; <a href="https://webtools-dotcom.github.io/OmniVault/"><b>Website</b></a>
   &nbsp;·&nbsp; No iPhone or Mac app needed: open it in a browser on the same Wi-Fi
 </p>
 
 ---
 
-OmniVault is a private, local-first vault for the notes, links, screenshots and
-files you send between your own devices. Every device keeps a complete copy,
-and devices on the same Wi-Fi find each other and sync on their own.
+**OmniVault is a free, open-source, local-first notes app that syncs notes,
+links, screenshots and files between your Android phone and your Windows PC over
+Wi-Fi.** It works peer to peer: no cloud, no server and no account. Every device
+keeps a complete copy, and devices on the same network find each other and sync
+on their own.
 
 ## Why
 
@@ -63,11 +66,12 @@ not over the internet.
 **Folders for everything.** Notes, screenshots, links and tickers, nested as
 deep as you like.
 
-<img src="docs/assets/screenshots/desktop-folders.png" alt="The desktop app showing nested folders and a folder with a chart screenshot, a note and ticker cards" width="100%">
+<img src="docs/assets/screenshots/desktop-folders.png" alt="OmniVault on Windows: nested folders and a trading folder with chart screenshots, a note and ticker cards" width="100%">
 
-**On your phone.** The same vault, synced from the laptop over Wi-Fi.
+**Save on your phone, open it on your laptop.** A note captured on the phone
+shows up in the laptop's inbox a moment later, over the same Wi-Fi.
 
-<img src="docs/assets/screenshots/phone.png" alt="Three phone screens: the quick inbox with the capture bar, the folder drawer, and a folder synced from the laptop" width="100%">
+<img src="docs/assets/screenshots/phone-to-laptop.png" alt="A note captured on an Android phone appearing in the OmniVault inbox on a Windows laptop" width="100%">
 
 **A Markdown editor** with a formatting toolbar, live preview and autosave.
 Tickers become one-tap links to TradingView and Yahoo Finance.
@@ -183,6 +187,36 @@ SQLite database for an exact restore. The Markdown needs no app to read.
 Back up before updating. If an Android build were ever signed with a different
 key, it could not be installed over the existing one, and uninstalling deletes
 the vault.
+
+## FAQ
+
+**How do I get notes from my Android phone to my Windows PC without the cloud?**
+Install OmniVault on both, put them on the same Wi-Fi (or the phone's hotspot)
+and tap _Connect_. Anything you save on one appears on the other, directly over
+your network.
+
+**Is it an alternative to messaging myself on WhatsApp or Telegram?**
+That is exactly why it exists: the same quick capture, but organised into
+folders and kept on your own devices instead of a chat server.
+
+**How is it different from LocalSend or KDE Connect?**
+Those send a file from one device to another while both are open. OmniVault
+keeps a synced, organised vault: the other device can be off when you save
+something, and it catches up the next time both are on the same network.
+
+**Does it work without internet?**
+Yes. It only needs the devices to share a local network. Your notes never go
+to the internet; the only request that does is the update check, and it runs
+only when you press _Check for updates_.
+
+**Can I use it on an iPhone or a Mac?**
+There is no native app for them, but they can open OmniVault in a browser on the
+same network: turn on _Allow browser access_ under _Connect_ on the Windows or
+Android device and scan the QR code.
+
+**Where is my data stored?**
+In a SQLite database and a media folder on each device. _Back up_ exports
+everything as plain Markdown files, so your notes stay readable without the app.
 
 ## License
 
