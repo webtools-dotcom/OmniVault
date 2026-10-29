@@ -298,7 +298,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({
                 setImagePreview(null);
                 setImageInfo(null);
               }}
-              className="text-vault-secondary hover:text-vault-primary ml-1 cursor-pointer text-xs"
+              className="text-vault-secondary hover:text-vault-primary ml-1 p-1 -m-1 cursor-pointer text-xs"
               title="Remove photo"
             >
               ×
@@ -314,7 +314,7 @@ export const QuickCaptureBar: React.FC<QuickCaptureBarProps> = ({
             <button
               type="button"
               onClick={() => setPendingFile(null)}
-              className="text-vault-secondary hover:text-vault-primary ml-1 cursor-pointer text-xs"
+              className="text-vault-secondary hover:text-vault-primary ml-1 p-1 -m-1 cursor-pointer text-xs"
               title="Remove file"
             >
               ×

@@ -660,7 +660,13 @@ export function App() {
                       {activeFolder?.name || "This folder"} is empty
                     </h2>
                     <p className="mt-3 text-[0.8125rem] leading-relaxed text-vault-muted">
-                      Capture straight into it above, or drag anything here from Quick Inbox.
+                      {/* A phone has the capture bar below and cannot drag. */}
+                      <span className="sm:hidden">
+                        Capture straight into it below, or use Move on anything in Quick Inbox.
+                      </span>
+                      <span className="hidden sm:inline">
+                        Capture straight into it above, or drag anything here from Quick Inbox.
+                      </span>
                     </p>
                   </div>
                 </div>

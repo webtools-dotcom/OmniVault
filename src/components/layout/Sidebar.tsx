@@ -128,7 +128,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               // The drawer is fixed to the screen edges, so it needs its own
               // safe-area padding to stay clear of the status and navigation bars.
               "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
-              isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none",
+              // Open means no transform at all: any transform, even a zero one,
+              // traps the folder dialogs rendered inside the drawer within it.
+              isOpen ? "transform-none" : "-translate-x-full pointer-events-none",
             )
           : "w-56 shrink-0",
       )}
@@ -227,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               onClick={() => setIsCreateOpen(true)}
               title="Create new folder"
-              className="w-5 h-5 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
+              className="w-5 h-5 [@media(hover:none)]:w-8 [@media(hover:none)]:h-8 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-primary/[0.06] transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>

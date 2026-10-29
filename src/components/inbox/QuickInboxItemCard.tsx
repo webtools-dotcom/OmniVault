@@ -87,7 +87,11 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
    */
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(copyableText(item.title, item.content));
+      // A photo or file's content is an internal media path, useless pasted elsewhere.
+      const isMedia = item.item_type === "image" || item.item_type === "file";
+      await navigator.clipboard.writeText(
+        isMedia ? item.title : copyableText(item.title, item.content),
+      );
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     } catch {
@@ -109,6 +113,8 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
 
   /** A document is opened by saving it where the rest of the computer can reach it. */
   const handleSaveFile = async () => {
+    // A second tap while saving would save a second copy.
+    if (fileStatus) return;
     setFileStatus("Saving…");
     const res = await StorageService.saveMediaToDownloads(
       item.content,
@@ -116,7 +122,7 @@ export const QuickInboxItemCard: React.FC<QuickInboxItemCardProps> = ({
     );
     if (res.success && res.filePath) StorageService.openFileInFolder(res.filePath);
     setFileStatus(res.success ? "Saved to Downloads" : res.error || "Could not save it");
-    setTimeout(() => setFileStatus(null), 2500);
+    setTimeout(() => setFileStatus(null), res.success ? 2500 : 4000);
   };
 
   // Auto-detect any stock/crypto tickers and web links in the item

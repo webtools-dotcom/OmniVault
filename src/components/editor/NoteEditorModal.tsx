@@ -191,13 +191,15 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md select-none">
       <div
-        className="w-full max-w-5xl h-[92vh] max-h-[860px] bg-vault-card/95 border border-vault-border rounded-2xl shadow-[0_32px_80px_rgba(0,0,0,0.75)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl"
+        className="w-full max-w-5xl h-[92vh] supports-[height:100dvh]:h-[92dvh] max-h-[860px] bg-vault-card/95 border border-vault-border rounded-2xl shadow-[0_32px_80px_rgba(0,0,0,0.75)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl"
         role="dialog"
         aria-modal="true"
       >
         {/* Editor Header */}
-        <div className="px-4 sm:px-6 py-3.5 border-b border-vault-border flex items-center justify-between gap-3 shrink-0 bg-vault-card/90">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* On a phone the title takes its own row; beside four controls it
+            was squeezed to two letters. */}
+        <div className="px-4 sm:px-6 py-3.5 border-b border-vault-border flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 shrink-0 bg-vault-card/90">
+          <div className="flex items-center gap-3 min-w-0 flex-1 basis-full sm:basis-auto">
             <div className="w-8 h-8 rounded-xl bg-vault-accent/15 border border-vault-accent/30 flex items-center justify-center text-vault-accent shrink-0 shadow-xs">
               <FileText className="w-4 h-4 text-vault-accent" />
             </div>
@@ -273,7 +275,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           </div>
 
           {/* Auto-save Status Badge */}
-          <div className="shrink-0 flex items-center">
+          <div className="shrink-0 flex items-center ml-auto sm:ml-0">
             {saveStatus === "saving" ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.815rem] font-medium bg-vault-pending/10 text-vault-pending border border-vault-pending/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-vault-pending animate-pulse" />
@@ -373,7 +375,6 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             </span>
             {item && onTogglePin && (
               <span className="flex items-center gap-3">
-                <span className="text-vault-muted">•</span>
                 <button
                   type="button"
                   onClick={() => {

@@ -269,7 +269,7 @@ export const QrConnectModal: React.FC<QrConnectModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none animate-in fade-in duration-150">
       <div
-        className="w-full max-w-lg bg-vault-card/95 border border-white/[0.12] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl ring-1 ring-white/[0.05] overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-vault-card/95 border border-white/[0.12] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl ring-1 ring-white/[0.05] overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] supports-[max-height:100dvh]:max-h-[90dvh]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-modal-title"

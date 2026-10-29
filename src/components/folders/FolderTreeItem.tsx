@@ -183,7 +183,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
             type="button"
             onClick={() => onOpenCreateSubfolder(folder.id)}
             title="Create subfolder"
-            className="w-5 h-5 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-card transition-colors"
+            className="w-5 h-5 [@media(hover:none)]:w-8 [@media(hover:none)]:h-8 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-card transition-colors"
           >
             <FolderPlus className="w-3 h-3" />
           </button>
@@ -195,7 +195,7 @@ export const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
               onClick={() => setMenuOpen((prev) => !prev)}
               title="Folder options"
               className={cn(
-                "w-5 h-5 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-card transition-colors",
+                "w-5 h-5 [@media(hover:none)]:w-8 [@media(hover:none)]:h-8 flex items-center justify-center rounded text-vault-muted hover:text-vault-primary hover:bg-vault-card transition-colors",
                 menuOpen && "bg-vault-card text-vault-primary",
               )}
             >

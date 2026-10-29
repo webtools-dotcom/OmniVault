@@ -1139,14 +1139,28 @@ export const StorageService = {
     mediaUrlOrHash: string,
     suggestedFilename?: string,
   ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    // A synced item lands seconds before its file, which the receiving device
+    // only fetches on its next sync pass. Asking for it in between used to
+    // surface as a bare "HTTP 404".
+    const notArrived = "Still arriving from the other device. Try again in a moment.";
     if (isTauriEnvironment()) {
-      try {
-        const filePath = await invoke<string>("save_media_to_downloads_cmd", {
+      const save = () =>
+        invoke<string>("save_media_to_downloads_cmd", {
           mediaUrlOrHash,
           suggestedFilename: suggestedFilename || null,
         });
-        return { success: true, filePath };
+      try {
+        return { success: true, filePath: await save() };
       } catch (err) {
+        if (String(err).includes("not found on disk")) {
+          // Pull it now rather than waiting for the next pass, then try once more.
+          await StorageService.triggerMeshSync();
+          try {
+            return { success: true, filePath: await save() };
+          } catch {
+            return { success: false, error: notArrived };
+          }
+        }
         console.warn(
           "Tauri save_media_to_downloads_cmd failed, falling back to browser download:",
           err,
@@ -1158,6 +1172,7 @@ export const StorageService = {
     try {
       const targetUrl = resolveMediaUrl(mediaUrlOrHash);
       const res = await fetch(targetUrl);
+      if (res.status === 404) return { success: false, error: notArrived };
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
