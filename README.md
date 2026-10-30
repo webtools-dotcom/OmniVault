@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="OmniVault demo: a note typed on an Android phone appears on a Windows laptop over Wi-Fi, then capturing notes and tickers, pasting a screenshot, dragging it into a folder and editing Markdown with live preview" width="100%">
+  <img src="docs/assets/demo.webp" alt="OmniVault in 30 seconds: a note typed on a phone skips the cloud and hops across the Wi-Fi router to a laptop, followed by a photo and a PDF; the note is copied out in one tap, a tablet wakes and receives everything, and the OmniVault title lands on the desk: no cloud, no account, just your Wi-Fi" width="100%">
 </p>
 
 <p align="center">
